@@ -1,0 +1,114 @@
+/* ── +case study — graphic-brutalist-meets-editorial-corporation ─────────────
+   Ported from the sibling "after tokens" project's chrome, recolored to the
+   campeón palette. Fully lowercase voice; per-section organism accent. */
+
+.case {
+  --cs-accent: var(--slate);           /* overridden per-section inline */
+  text-transform: lowercase;
+  background: var(--bone);
+  color: var(--ink);
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--ink) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--ink) 4%, transparent) 1px, transparent 1px);
+  background-size: 46px 46px;
+  background-position: -1px -1px;
+  width: 100%;
+  overflow-x: hidden;
+}
+.case [data-demo],
+.case .mono,
+.case code { text-transform: none; }
+
+.cs-grid { width: min(64rem, 92vw); margin-inline: auto; }
+
+.cs-section {
+  position: relative;
+  padding: clamp(4rem, 11vh, 9rem) clamp(1.25rem, 5vw, 4rem);
+  border-top: 1px solid color-mix(in oklab, var(--ink) 10%, transparent);
+}
+.cs-section::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--cs-accent); opacity: .9;
+}
+
+.cs-eyebrow {
+  display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em;
+  color: var(--slate-2); margin-bottom: .9rem;
+}
+.cs-eyebrow .sep { color: color-mix(in oklab, var(--cs-accent) 70%, var(--ink)); }
+
+.cs-numeral {
+  position: absolute; right: clamp(.5rem, 3vw, 2.5rem); bottom: -1.5rem;
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(7rem, 22vw, 16rem);
+  line-height: .78; letter-spacing: -.06em; color: var(--ink);
+  opacity: .05; pointer-events: none; user-select: none; z-index: 0;
+}
+
+.cs-reg { position: absolute; width: 13px; height: 13px; opacity: .55; color: var(--slate-2); pointer-events: none; }
+.cs-reg::before, .cs-reg::after { content: ''; position: absolute; background: currentColor; }
+.cs-reg::before { left: 50%; top: 0; width: 1px; height: 100%; transform: translateX(-50%); }
+.cs-reg::after { top: 50%; left: 0; height: 1px; width: 100%; transform: translateY(-50%); }
+.cs-reg[data-corner="tl"] { top: 1.4rem; left: 1.4rem; }
+.cs-reg[data-corner="tr"] { top: 1.4rem; right: 1.4rem; }
+.cs-reg[data-corner="bl"] { bottom: 1.4rem; left: 1.4rem; }
+.cs-reg[data-corner="br"] { bottom: 1.4rem; right: 1.4rem; }
+
+.cs-spine {
+  position: absolute; left: .9rem; top: 0; bottom: 0; display: none;
+  align-items: center; justify-content: center; pointer-events: none; z-index: 1;
+}
+.cs-spine > span {
+  writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .34em;
+  color: color-mix(in oklab, var(--cs-accent) 80%, transparent);
+}
+@media (min-width: 1180px) { .cs-spine { display: flex; } }
+
+.cs-exo {
+  position: absolute; left: 0; right: 0; top: 2rem; bottom: 2rem;
+  max-width: 66rem; margin-inline: auto;
+  border: 1px dotted color-mix(in oklab, var(--ink) 14%, transparent);
+  pointer-events: none; z-index: 0;
+}
+
+.cs-h { font-family: var(--font-display); line-height: 1.02; letter-spacing: -.02em;
+  font-size: clamp(2rem, 5.5vw, 3.4rem); color: var(--ink); margin-bottom: 1.1rem; position: relative; z-index: 2; }
+.cs-h .idx { color: var(--slate-2); font-weight: 500; margin-right: .3em; }
+.cs-lede { font-size: clamp(1.05rem, 1.7vw, 1.3rem); line-height: 1.6; color: var(--slate);
+  max-width: 46ch; position: relative; z-index: 2; }
+.cs-body { font-size: 1rem; line-height: 1.7; color: var(--slate); max-width: 60ch;
+  position: relative; z-index: 2; }
+.cs-body > * + * { margin-top: .9rem; }
+.cs-body strong { color: var(--ink); font-weight: 600; }
+.cs-body em { font-style: italic; color: color-mix(in oklab, var(--cs-accent) 60%, var(--ink)); }
+.cs-mark { background: color-mix(in oklab, var(--cs-accent) 20%, transparent); padding: 0 .12em; }
+
+.cs-spec { border-top: 1px solid color-mix(in oklab, var(--cs-accent) 40%, transparent);
+  margin-top: 1.4rem; max-width: 40rem; position: relative; z-index: 2; }
+.cs-spec > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1.5rem;
+  padding: .55rem 0; border-bottom: 1px solid color-mix(in oklab, var(--ink) 10%, transparent); }
+.cs-spec dt { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em;
+  color: color-mix(in oklab, var(--cs-accent) 90%, var(--ink)); white-space: nowrap; }
+.cs-spec dd { font-size: .95rem; text-align: right; color: var(--ink); }
+.cs-spec dd.mono { font-family: var(--font-mono); }
+
+.cs-figure { position: relative; z-index: 2; margin-top: 1.6rem; background: var(--ink);
+  border: 1px solid var(--slate-2); padding: 1rem; }
+.cs-figure svg { display: block; width: 100%; height: auto; }
+.cs-figure figcaption { font-family: var(--font-mono); font-size: .72rem; color: var(--slate-2);
+  margin-top: .5rem; text-transform: none; }
+
+.cs-refs { list-style: none; font-size: .82rem; line-height: 1.6; color: var(--slate); max-width: 60ch; }
+.cs-refs li { padding: .3rem 0; border-bottom: 1px solid color-mix(in oklab, var(--ink) 8%, transparent); text-transform: none; }
+.cs-credit { font-family: var(--font-display); font-style: italic; color: var(--gold); font-size: 1.05rem; margin-top: .4rem; }
+.cs-credit-theme { color: var(--slate-2); font-size: .9rem; margin-top: .2rem; }
+
+.cs-back { position: sticky; top: 0; z-index: 5; display: inline-block;
+  padding: .8rem clamp(1.25rem, 5vw, 4rem); }
+
+[data-reveal] { opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
+[data-reveal][data-in-view="true"] { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1; transform: none; transition: none; }
+}
