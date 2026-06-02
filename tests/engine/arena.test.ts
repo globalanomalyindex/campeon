@@ -4,9 +4,11 @@ import { Arena } from '../../src/engine/arena';
 import type { RendererLike, InputSource } from '../../src/engine/arena';
 import { degreesPerCount } from '../../src/engine/camera-rig';
 import { mulberry32 } from '../../src/stats/bootstrap';
+import { separation } from '../../src/engine/targets';
 
 function harness() {
   let emit: (s: AimSample) => void = () => {};
+  let fire: (now: number) => void = () => {};
   let unsubs = 0;
   const input: InputSource = {
     onSample(cb) {
@@ -14,6 +16,12 @@ function harness() {
       return () => {
         emit = () => {};
         unsubs += 1;
+      };
+    },
+    onFire(cb) {
+      fire = cb;
+      return () => {
+        fire = () => {};
       };
     },
   };
@@ -39,6 +47,7 @@ function harness() {
   return {
     arena,
     send: (s: AimSample) => emit(s),
+    fire: (now: number) => fire(now),
     renders: () => renders,
     unsubs: () => unsubs,
     disposes: () => disposes,
@@ -103,6 +112,71 @@ describe('Arena (headless)', () => {
     h.arena.dispose();
     h.arena.dispose();
     expect(h.unsubs()).toBe(1);
+    expect(h.disposes()).toBe(1);
+  });
+});
+
+describe('Arena instrument surface', () => {
+  it('onFrame fires with dt and an advancing clock', () => {
+    const h = harness();
+    const ticks: Array<[number, number]> = [];
+    h.arena.onFrame((dt, now) => ticks.push([dt, now]));
+    h.arena.tick(16);
+    h.arena.tick(16);
+    expect(ticks).toHaveLength(2);
+    expect(ticks[0][0]).toBe(16);
+    expect(ticks[1][1]).toBeGreaterThan(ticks[0][1]);
+  });
+
+  it('view() reflects the integrated aim', () => {
+    const h = harness();
+    const dpc = degreesPerCount(34, 800);
+    h.send({ t: 0, dx: 12 / dpc, dy: 0 });
+    expect(h.arena.view()[0]).toBeCloseTo(12, 4);
+  });
+
+  it('onFire delivers the arena clock on a fire event', () => {
+    const h = harness();
+    const fires: number[] = [];
+    h.arena.onFire((now) => fires.push(now));
+    h.arena.tick(100);
+    h.fire(h.arena.now());
+    expect(fires).toHaveLength(1);
+    expect(fires[0]).toBeCloseTo(100, 6);
+  });
+
+  it('spawnTarget honors explicit placement', () => {
+    const h = harness();
+    const t = h.arena.spawnTarget({ kind: 'static', yaw: 18, pitch: -7, distance: 25, worldRadius: 0.5 });
+    const [y, p] = t.bearing();
+    expect(y).toBeCloseTo(18, 4);
+    expect(p).toBeCloseTo(-7, 4);
+  });
+
+  it('a moving target changes bearing as the clock advances', () => {
+    const h = harness();
+    const t = h.arena.spawnTarget({
+      kind: 'moving',
+      yaw: 0,
+      pitch: 0,
+      distance: 20,
+      worldRadius: 0.6,
+      motion: { yawAmp: 10, pitchAmp: 4, baseFreq: 0.5, seed: 2 },
+    });
+    const b0 = t.bearing();
+    h.arena.tick(800);
+    const b1 = t.bearing();
+    expect(separation(b0, b1)).toBeGreaterThan(0.3);
+  });
+
+  it('dispose() unsubscribes frame/fire callbacks too (idempotent)', () => {
+    const h = harness();
+    let frames = 0;
+    h.arena.onFrame(() => (frames += 1));
+    h.arena.dispose();
+    h.arena.dispose();
+    h.arena.tick(16);
+    expect(frames).toBe(0);
     expect(h.disposes()).toBe(1);
   });
 });
