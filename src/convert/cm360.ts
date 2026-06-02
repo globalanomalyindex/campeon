@@ -1,4 +1,6 @@
-/** cm/360 conversion. yaw = degrees turned per mouse count at in-game sens 1. */
+// cm/360 conversion. yaw = degrees turned per mouse count at in-game sens 1.
+
+/** Conversion factor for one full turn: 360 × 2.54 cm/in = 914.4. */
 export const TURN_CM = 360 * 2.54; // 914.4
 
 /** Physical cm of mouse travel for one 360° turn. */

@@ -20,4 +20,7 @@ describe('cm360 conversion', () => {
 
   it('crossGame CS2(1.0)→Valorant = 0.022/0.07 ≈ 0.314', () =>
     expect(crossGame(1, 800, 0.022, 800, 0.07)).toBeCloseTo(0.314, 3));
+
+  it('crossGame preserves cm/360 across different DPIs', () =>
+    expect(crossGame(1, 400, 0.022, 800, 0.022)).toBeCloseTo(0.5, 6));
 });
