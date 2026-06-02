@@ -7,6 +7,7 @@ import {
   placeStatic,
   Target,
 } from '../../src/engine/targets';
+import { separation, motionOffset, MovingTarget } from '../../src/engine/targets';
 import { mulberry32 } from '../../src/stats/bootstrap';
 
 describe('angularRadius', () => {
@@ -68,5 +69,53 @@ describe('placeStatic', () => {
       expect(pl.distance).toBeGreaterThan(0);
       expect(pl.worldRadius).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('separation', () => {
+  it('is the great-circle angle between two bearings', () => {
+    expect(separation([0, 0], [0, 0])).toBeCloseTo(0, 9);
+    expect(separation([0, 0], [90, 0])).toBeCloseTo(90, 6);
+    expect(separation([0, 0], [0, 90])).toBeCloseTo(90, 6);
+    expect(separation([10, 5], [10, 5])).toBeCloseTo(0, 9);
+  });
+  it('is symmetric and bounded by 180', () => {
+    expect(separation([30, 10], [-40, -5])).toBeCloseTo(separation([-40, -5], [30, 10]), 9);
+    expect(separation([0, 0], [180, 0])).toBeLessThanOrEqual(180 + 1e-6);
+  });
+});
+
+describe('motionOffset', () => {
+  it('is deterministic from the seed and bounded by the amplitudes', () => {
+    const motion = { yawAmp: 8, pitchAmp: 3, baseFreq: 0.5, seed: 7 };
+    for (let t = 0; t <= 5; t += 0.25) {
+      const [dy, dp] = motionOffset(motion, t);
+      expect(Math.abs(dy)).toBeLessThanOrEqual(8 + 1e-9);
+      expect(Math.abs(dp)).toBeLessThanOrEqual(3 + 1e-9);
+    }
+    expect(motionOffset(motion, 1.3)).toEqual(motionOffset(motion, 1.3));
+  });
+  it('actually moves over time', () => {
+    const motion = { yawAmp: 8, pitchAmp: 3, baseFreq: 0.5, seed: 1 };
+    const a = motionOffset(motion, 0);
+    const b = motionOffset(motion, 0.6);
+    expect(Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1])).toBeGreaterThan(0.1);
+  });
+});
+
+describe('MovingTarget', () => {
+  it('updates its bearing as time advances along the path', () => {
+    const t = new MovingTarget(
+      'm1',
+      { yaw: 0, pitch: 0, distance: 20, worldRadius: 0.6 },
+      { yawAmp: 10, pitchAmp: 4, baseFreq: 0.5, seed: 3 },
+      0,
+    );
+    const b0 = t.bearing();
+    t.update(1500);
+    const b1 = t.bearing();
+    expect(separation(b0, b1)).toBeGreaterThan(0.5);
+    expect(t.radiusDeg()).toBeGreaterThan(0);
+    t.dispose();
   });
 });

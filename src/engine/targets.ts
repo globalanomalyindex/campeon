@@ -1,5 +1,6 @@
 import { Color, Mesh, MeshStandardMaterial, SphereGeometry, Vector3 } from 'three';
-import type { Degrees, TargetHandle } from '../types';
+import type { Degrees, TargetHandle, TargetMotion } from '../types';
+import { mulberry32 } from '../stats/bootstrap';
 
 const RAD2DEG = 180 / Math.PI;
 const DEG2RAD = Math.PI / 180;
@@ -59,6 +60,44 @@ export function placeStatic(rng: () => number, opt: PlaceOptions = {}): Placemen
   };
 }
 
+/** Build the standard gold target mesh (shared by static + moving targets). */
+export function createTargetMesh(worldRadius: number): Mesh {
+  const geometry = new SphereGeometry(worldRadius, 24, 16);
+  const material = new MeshStandardMaterial({
+    color: new Color('#FFC400'),
+    emissive: new Color('#3a2a00'),
+    roughness: 0.4,
+    metalness: 0,
+  });
+  return new Mesh(geometry, material);
+}
+
+/** Great-circle angular distance (degrees) between two bearings. */
+export function separation(a: [Degrees, Degrees], b: [Degrees, Degrees]): Degrees {
+  const ua = positionAt(a[0], a[1], 1);
+  const ub = positionAt(b[0], b[1], 1);
+  // atan2(|cross|, dot) is numerically stable near 0° and 180°, unlike acos(dot).
+  const cross = new Vector3().crossVectors(ua, ub);
+  const sinA = cross.length();
+  const cosA = ua.dot(ub);
+  return Math.atan2(sinA, cosA) * RAD2DEG;
+}
+
+/** Deterministic band-limited (two-sine) offset [Δyaw, Δpitch] in degrees at time `tSec`. */
+export function motionOffset(motion: TargetMotion, tSec: number): [Degrees, Degrees] {
+  const yawAmp = motion.yawAmp ?? 10;
+  const pitchAmp = motion.pitchAmp ?? 4;
+  const f = motion.baseFreq ?? 0.5;
+  const rng = mulberry32((motion.seed ?? 1) >>> 0);
+  const phiY1 = rng() * Math.PI * 2;
+  const phiY2 = rng() * Math.PI * 2;
+  const phiP1 = rng() * Math.PI * 2;
+  const TAU = Math.PI * 2;
+  const dy = (yawAmp / 1.5) * (Math.sin(TAU * f * tSec + phiY1) + 0.5 * Math.sin(TAU * f * 1.7 * tSec + phiY2));
+  const dp = pitchAmp * Math.sin(TAU * f * 0.8 * tSec + phiP1);
+  return [dy, dp];
+}
+
 /** A spawned arena target. Owns its mesh; reports bearing/angular radius for scoring. */
 export class Target implements TargetHandle {
   readonly id: string;
@@ -69,14 +108,7 @@ export class Target implements TargetHandle {
   constructor(id: string, placement: Placement) {
     this.id = id;
     this.placement = placement;
-    const geometry = new SphereGeometry(placement.worldRadius, 24, 16);
-    const material = new MeshStandardMaterial({
-      color: new Color('#FFC400'),
-      emissive: new Color('#3a2a00'),
-      roughness: 0.4,
-      metalness: 0,
-    });
-    this.mesh = new Mesh(geometry, material);
+    this.mesh = createTargetMesh(placement.worldRadius);
     this.mesh.position.copy(positionAt(placement.yaw, placement.pitch, placement.distance));
   }
 
@@ -89,6 +121,43 @@ export class Target implements TargetHandle {
   }
 
   /** Release GPU resources. Safe to call once the target is removed from the scene. */
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    (this.mesh.material as MeshStandardMaterial).dispose();
+  }
+}
+
+/** A target that orbits a base placement along a deterministic band-limited path. */
+export class MovingTarget implements TargetHandle {
+  readonly id: string;
+  readonly mesh: Mesh;
+  private readonly base: Placement;
+  private readonly motion: TargetMotion;
+  private readonly spawnMs: number;
+
+  constructor(id: string, base: Placement, motion: TargetMotion, spawnMs: number) {
+    this.id = id;
+    this.base = base;
+    this.motion = motion;
+    this.spawnMs = spawnMs;
+    this.mesh = createTargetMesh(base.worldRadius);
+    this.update(spawnMs);
+  }
+
+  /** Reposition for the arena clock `nowMs`. */
+  update(nowMs: number): void {
+    const [dy, dp] = motionOffset(this.motion, (nowMs - this.spawnMs) / 1000);
+    this.mesh.position.copy(positionAt(this.base.yaw + dy, this.base.pitch + dp, this.base.distance));
+  }
+
+  bearing(): [Degrees, Degrees] {
+    return bearingOf(this.mesh.position);
+  }
+
+  radiusDeg(): Degrees {
+    return angularRadius(this.base.worldRadius, this.base.distance);
+  }
+
   dispose(): void {
     this.mesh.geometry.dispose();
     (this.mesh.material as MeshStandardMaterial).dispose();

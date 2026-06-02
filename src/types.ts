@@ -19,8 +19,33 @@ export interface ArenaScene {
   spawnTarget(spec: TargetSpec): TargetHandle;
   onAim(cb: (sample: AimSample, viewYawPitch: [Degrees, Degrees]) => void): () => void;
   clearTargets(): void;
+  // Phase 3 — the instrument-driving surface (the contract anticipated this):
+  /** Per-frame tick: dt since the previous frame and the arena clock, both in ms. */
+  onFrame(cb: (dtMs: Ms, nowMs: Ms) => void): () => void;
+  /** Fire (primary-button) events, with the arena clock in ms. */
+  onFire(cb: (nowMs: Ms) => void): () => void;
+  /** Current aim bearing [yaw, pitch] in degrees. */
+  view(): [Degrees, Degrees];
 }
-export interface TargetSpec { kind: 'static' | 'moving' | 'grid'; }
+export interface TargetMotion {
+  /** Sum-of-sines yaw/pitch amplitudes (degrees) about the base placement. */
+  yawAmp?: Degrees;
+  pitchAmp?: Degrees;
+  /** Base angular frequency (Hz); the second sine runs at ~1.7× this. */
+  baseFreq?: number;
+  /** Seed for the deterministic phase offsets. */
+  seed?: number;
+}
+export interface TargetSpec {
+  kind: 'static' | 'moving' | 'grid';
+  // Phase 3: optional explicit placement (else a random forward-cone static target).
+  yaw?: Degrees;
+  pitch?: Degrees;
+  distance?: number;
+  worldRadius?: number;
+  // Phase 3 'moving': band-limited path about the placement.
+  motion?: TargetMotion;
+}
 export interface TargetHandle { id: string; bearing(): [Degrees, Degrees]; radiusDeg(): Degrees; }
 
 // ── instruments (instruments/) ─────────────────────────────────────────
