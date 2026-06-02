@@ -23,4 +23,10 @@ describe('psychometric peak fit', () => {
   it('returns a curve for plotting', () => {
     expect(fitPeak(obs).curve.length).toBeGreaterThan(10);
   });
+
+  it('throws when the fit is convex (no interior peak)', () => {
+    // monotonically increasing data → convex/linear fit, b2 ≥ 0
+    const monotone = [10, 20, 30, 40, 50].map((s) => ({ x: Math.log(s), y: s }));
+    expect(() => fitPeak(monotone)).toThrow(/not concave/);
+  });
 });

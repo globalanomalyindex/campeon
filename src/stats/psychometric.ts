@@ -35,9 +35,19 @@ export function fitQuadratic(obs: Observation[]): Quadratic {
 
 export interface PeakFit { optimalCm360: number; coeffs: Quadratic; curve: { x: number; mean: number }[]; }
 
-/** Fit the peaked curve and return the optimum cm/360 (= exp(−b1/2b2)) plus a sampled curve. */
+/**
+ * Fit the peaked curve and return the optimum cm/360 (= exp(−b1/2b2)) plus a sampled curve.
+ * Requires a concave fit (b2 < 0, a true peak). Throws if the data is convex/linear
+ * (no interior maximum) — the Phase-4 session controller decides what to do (gather more
+ * trials); the bootstrap CI path filters non-concave resamples rather than calling this.
+ */
 export function fitPeak(obs: Observation[]): PeakFit {
   const coeffs = fitQuadratic(obs);
+  if (coeffs.b2 >= 0) {
+    throw new Error(
+      `fitPeak: fit is not concave (b2=${coeffs.b2.toFixed(4)}); need more observations or wider spread`,
+    );
+  }
   const xStar = -coeffs.b1 / (2 * coeffs.b2);
   const xs = obs.map(o => o.x);
   const lo = Math.min(...xs), hi = Math.max(...xs);
