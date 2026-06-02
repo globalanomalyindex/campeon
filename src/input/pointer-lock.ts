@@ -21,12 +21,17 @@ export function flattenCoalesced(
 }
 
 export interface PointerLockController {
-  /** Request lock, preferring raw (unadjusted) movement; resolves with the granted mode. */
+  /**
+   * Request lock, preferring raw (unadjusted) movement. Resolves with the granted
+   * mode; rejects if the lock could not be acquired at all. `isLocked()` flips on the
+   * async `pointerlockchange` event, so observe lock state via the render loop or
+   * `mode()` rather than polling immediately after this resolves.
+   */
   request(): Promise<PointerLockMode>;
   exit(): void;
   /** Subscribe to per-sample deltas while locked. Returns an unsubscribe fn. */
   onSample(cb: (sample: AimSample) => void): () => void;
-  /** The granted mode, or null when not locked. */
+  /** Granted mode, or null when not locked. 'raw' only on browsers that support raw input. */
   mode(): PointerLockMode | null;
   isLocked(): boolean;
   dispose(): void;
@@ -34,43 +39,39 @@ export interface PointerLockController {
 
 /**
  * Pointer-lock + high-frequency raw capture over `element`.
- * - Prefers `pointerrawupdate` (with `getCoalescedEvents`); falls back to `mousemove`
- *   for browsers without raw updates, deduping so counts are never doubled.
- * - Tries `unadjustedMovement: true` first (Chromium raw), falls back to plain lock.
- * Runtime-verified later; not unit-tested.
+ * - On browsers that support raw input (Chromium: `pointerrawupdate` exists), captures via
+ *   `pointerrawupdate` + `getCoalescedEvents()` so no counts are lost at 1000 Hz. Elsewhere
+ *   (Firefox/Safari) captures via `mousemove`. Exactly one path is registered, so counts are
+ *   never doubled.
+ * - Requests `unadjustedMovement: true` first; reports mode 'raw' only when the browser
+ *   actually supports raw input — there is no API to read back whether the flag was honored
+ *   (spec §6.2), so support is the honest proxy, backed by the accel-check gate.
+ * Runtime-verified later; the shell is not unit-tested.
  */
 export function createPointerLock(element: HTMLElement): PointerLockController {
   const cbs = new Set<(sample: AimSample) => void>();
   let currentMode: PointerLockMode | null = null;
   let locked = false;
-  let rawSeen = false;
+  const supportsRaw = 'onpointerrawupdate' in window;
+  const moveEvent = supportsRaw ? 'pointerrawupdate' : 'mousemove';
 
-  const emit = (ev: Event): void => {
+  const onMove = (ev: Event): void => {
     if (!locked) return;
     const pe = ev as PointerEvent;
     const dpr = window.devicePixelRatio || 1;
     const coalesced =
       typeof pe.getCoalescedEvents === 'function' ? pe.getCoalescedEvents() : [];
     const batch = coalesced.length > 0 ? coalesced : [pe];
-    const samples = flattenCoalesced(batch as unknown as MovementLike[], dpr, ev.timeStamp);
+    const samples = flattenCoalesced(batch, dpr, ev.timeStamp);
     for (const sample of samples) for (const cb of cbs) cb(sample);
   };
 
-  const onRaw = (ev: Event): void => {
-    rawSeen = true;
-    emit(ev);
-  };
-  const onMouse = (ev: Event): void => {
-    if (rawSeen) return; // pointerrawupdate is handling this device
-    emit(ev);
-  };
   const onLockChange = (): void => {
     locked = document.pointerLockElement === element;
     if (!locked) currentMode = null;
   };
 
-  document.addEventListener('pointerrawupdate', onRaw as EventListener);
-  document.addEventListener('mousemove', onMouse as EventListener);
+  document.addEventListener(moveEvent, onMove as EventListener);
   document.addEventListener('pointerlockchange', onLockChange);
 
   return {
@@ -81,20 +82,19 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
           | undefined;
         if (req && typeof req.then === 'function') {
           await req;
-          currentMode = 'raw';
-          return 'raw';
+          currentMode = supportsRaw ? 'raw' : 'os-adjusted';
+          return currentMode;
         }
+        // Legacy undefined-returning API: lock requested without a raw guarantee.
         currentMode = 'os-adjusted';
-        return 'os-adjusted';
+        return currentMode;
       } catch {
-        try {
-          const fallback = element.requestPointerLock() as Promise<void> | undefined;
-          if (fallback && typeof fallback.then === 'function') await fallback;
-        } catch {
-          /* surfaced via the pointerlockerror event */
-        }
+        // Raw unsupported or rejected: fall back to a plain lock. A genuine failure here
+        // rejects this promise so the caller can surface it (no silent dead capture loop).
+        const fallback = element.requestPointerLock() as Promise<void> | undefined;
+        if (fallback && typeof fallback.then === 'function') await fallback;
         currentMode = 'os-adjusted';
-        return 'os-adjusted';
+        return currentMode;
       }
     },
     exit(): void {
@@ -113,8 +113,7 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
       return locked;
     },
     dispose(): void {
-      document.removeEventListener('pointerrawupdate', onRaw as EventListener);
-      document.removeEventListener('mousemove', onMouse as EventListener);
+      document.removeEventListener(moveEvent, onMove as EventListener);
       document.removeEventListener('pointerlockchange', onLockChange);
       cbs.clear();
     },
