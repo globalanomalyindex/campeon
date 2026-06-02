@@ -64,6 +64,33 @@ export function speedTrace(frames: readonly Frame[]): Array<{ t: Ms; speed: numb
   return out;
 }
 
+/**
+ * Decompose a landing error into task-local axes about the intended reach.
+ * The approach is `start → target`; the miss is `landing − target` in the local (yaw,pitch)
+ * plane, split into radial (along the approach, + = overshoot) and signed tangential
+ * (perpendicular). `reach` is the planar approach amplitude. Planar approximation — valid
+ * at aim-drill angles; the systematic-bias signal it feeds is dominated by the mean.
+ */
+export function missComponents(
+  start: [Degrees, Degrees],
+  target: [Degrees, Degrees],
+  landing: [Degrees, Degrees],
+): { radial: Degrees; tangential: Degrees; reach: Degrees } {
+  const dy = target[0] - start[0];
+  const dp = target[1] - start[1];
+  const reach = Math.hypot(dy, dp);
+  if (reach === 0) return { radial: 0, tangential: 0, reach: 0 };
+  const uy = dy / reach;
+  const up = dp / reach;
+  const my = landing[0] - target[0];
+  const mp = landing[1] - target[1];
+  return {
+    radial: my * uy + mp * up,
+    tangential: my * -up + mp * uy,
+    reach,
+  };
+}
+
 /** Fraction of frames whose aim lies within the target's angular radius. */
 export function timeOnTarget(frames: readonly Frame[]): number {
   let on = 0;

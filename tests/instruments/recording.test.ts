@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TrialRecorder, speedTrace, timeOnTarget } from '../../src/instruments/recording';
+import { TrialRecorder, speedTrace, timeOnTarget, missComponents } from '../../src/instruments/recording';
 import { FakeScene } from './fake-scene';
 
 describe('TrialRecorder', () => {
@@ -42,5 +42,25 @@ describe('timeOnTarget', () => {
       { t: 32, aim: [3, 0] as [number, number], target: [3, 0] as [number, number], targetRadius: 2 },
     ];
     expect(timeOnTarget(frames)).toBeCloseTo(2 / 3, 6);
+  });
+});
+
+describe('missComponents', () => {
+  it('pure overshoot → positive radial, ~zero tangential', () => {
+    const m = missComponents([0, 0], [10, 0], [12, 0]);
+    expect(m.radial).toBeCloseTo(2, 6);
+    expect(m.tangential).toBeCloseTo(0, 6);
+    expect(m.reach).toBeCloseTo(10, 6);
+  });
+  it('pure undershoot → negative radial', () => {
+    expect(missComponents([0, 0], [10, 0], [7, 0]).radial).toBeCloseTo(-3, 6);
+  });
+  it('lateral miss → tangential, ~zero radial', () => {
+    const m = missComponents([0, 0], [10, 0], [10, 3]);
+    expect(m.radial).toBeCloseTo(0, 6);
+    expect(Math.abs(m.tangential)).toBeCloseTo(3, 6);
+  });
+  it('reach is the planar approach amplitude', () => {
+    expect(missComponents([0, 0], [3, 4], [3, 4]).reach).toBeCloseTo(5, 6);
   });
 });

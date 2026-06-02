@@ -1,6 +1,6 @@
 import type { ArenaScene, Degrees, InstrumentId, Ms, Shot, TargetHandle, TrialContext, TrialResult } from '../types';
 import { decompose, ewmaBias, calibrationCost } from '../scoring/bias-variance';
-import { separation } from '../engine/targets';
+import { missComponents } from './recording';
 
 const ID: InstrumentId = 'calibrate';
 const SHOTS = 12;
@@ -62,13 +62,11 @@ export const calibrate = {
         if (!handle) return;
         const aim = scene.view();
         const tgt = handle.bearing();
-        const radial = separation(aim, tgt);
-        // required = the angular amplitude of the intended reach (present-time aim → target).
-        const required = separation(presentAim, tgt) || 1;
+        const m = missComponents(presentAim, tgt, aim);
         shots.push({
-          errAlong: radial * (aim[0] >= tgt[0] ? 1 : -1),
-          errCross: 0,
-          required,
+          errAlong: m.radial,
+          errCross: m.tangential,
+          required: m.reach || 1,
           mt: now - presentedAt,
         });
         scene.clearTargets();
