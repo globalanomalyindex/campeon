@@ -50,4 +50,26 @@ describe('caseStudy screen', () => {
     screen.unmount();
     expect(host.children.length).toBe(0);
   });
+  it('marks the article reveal-active when an observer can drive the reveal', () => {
+    const host = document.createElement('div');
+    const screen = caseStudy(host, ctx());
+    screen.mount();
+    expect(host.querySelector('.case')?.hasAttribute('data-reveal-active')).toBe(true);
+    screen.unmount();
+  });
+  it('without IntersectionObserver, content is not gated and reveals immediately', () => {
+    const g = globalThis as unknown as { IntersectionObserver?: unknown };
+    const saved = g.IntersectionObserver;
+    delete g.IntersectionObserver;
+    try {
+      const host = document.createElement('div');
+      const screen = caseStudy(host, ctx());
+      screen.mount();
+      expect(host.querySelector('.case')?.hasAttribute('data-reveal-active')).toBe(false);
+      expect(host.querySelector('.cs-section')?.getAttribute('data-in-view')).toBe('true');
+      screen.unmount();
+    } finally {
+      g.IntersectionObserver = saved;
+    }
+  });
 });

@@ -107,8 +107,12 @@
 .cs-back { position: sticky; top: 0; z-index: 5; display: inline-block;
   padding: .8rem clamp(1.25rem, 5vw, 4rem); }
 
-[data-reveal] { opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
-[data-reveal][data-in-view="true"] { opacity: 1; transform: none; }
+/* Reveal-on-scroll is a PROGRESSIVE ENHANCEMENT: sections are visible by default.
+   The hidden-then-fade state applies only once JS marks the article active
+   (`data-reveal-active` — set when IntersectionObserver is present and motion is
+   allowed). If JS or IO ever fail, no content is trapped at opacity:0. */
+.case[data-reveal-active] [data-reveal] { opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
+.case[data-reveal-active] [data-reveal][data-in-view="true"] { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
-  [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .case[data-reveal-active] [data-reveal] { opacity: 1; transform: none; transition: none; }
 }

@@ -28,4 +28,13 @@ describe('createReveal', () => {
     r.observe(a);
     expect(a.getAttribute('data-in-view')).toBe('true');
   });
+  it('reveals synchronously when the element is already on-screen at observe time', () => {
+    const a = document.createElement('div'); a.setAttribute('data-reveal', '');
+    a.getBoundingClientRect = () =>
+      ({ top: 10, bottom: 200, left: 0, right: 100, width: 100, height: 190, x: 0, y: 10, toJSON() {} }) as DOMRect;
+    const r = createReveal({ reduced: false });
+    r.observe(a);
+    // revealed without any IO callback firing (above-the-fold, no flash of invisible content)
+    expect(a.getAttribute('data-in-view')).toBe('true');
+  });
 });

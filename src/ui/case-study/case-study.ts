@@ -96,11 +96,16 @@ function buildRefsAndCredit(): DocumentFragment {
 }
 
 export function caseStudy(host: HTMLElement, ctx: AppContext): Screen {
-  const reveal = createReveal({ reduced: prefersReduced() });
+  // Reveal-on-scroll is an enhancement: only hide-then-animate when an observer can
+  // actually drive it (IntersectionObserver present + motion allowed). Otherwise content
+  // shows immediately and createReveal's reduced path reveals on observe — never trapped hidden.
+  const animate = typeof IntersectionObserver !== 'undefined' && !prefersReduced();
+  const reveal = createReveal({ reduced: !animate });
   return {
     mount() {
       const article = document.createElement('article');
       article.className = 'case fade-in';
+      if (animate) article.setAttribute('data-reveal-active', '');
 
       const back = document.createElement('button');
       back.className = 'action action--ghost cs-back';
@@ -109,12 +114,14 @@ export function caseStudy(host: HTMLElement, ctx: AppContext): Screen {
       back.addEventListener('click', () => ctx.navigate('hero'));
       article.appendChild(back);
 
-      for (const s of SECTIONS) {
+      const sections = SECTIONS.map((s) => {
         const sec = buildSection(s);
         article.appendChild(sec);
-        reveal.observe(sec);
-      }
+        return sec;
+      });
       host.appendChild(article);
+      // Observe AFTER the article is in the document so the on-screen check has real layout.
+      for (const sec of sections) reveal.observe(sec);
     },
     unmount() {
       reveal.stop();
