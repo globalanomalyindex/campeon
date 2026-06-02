@@ -27,6 +27,7 @@ export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
 export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
   let raf = 0;
+  let alive = true;
   let cleanup: (() => void) | null = null;
 
   return {
@@ -91,6 +92,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           },
           onTrial: (_t, trials, interim) => drawPlot(interim, trials),
         }).then(({ report, trials }) => {
+          if (!alive) return; // unmounted mid-session — never touch a torn-down context
           const sessionId = `s-${trials.length}-${Math.round(report.optimalCm360 * 100)}`;
           const result = buildResult(report, trials, ctx.draft.dpi);
           ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...trials], status: 'complete', createdAt: 0 });
@@ -103,6 +105,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       canvas.addEventListener('click', () => void pointer.request().then(start).catch(start), { once: true });
 
       cleanup = () => {
+        alive = false;
         window.cancelAnimationFrame(raf);
         window.removeEventListener('resize', onResize);
         pointer.dispose();

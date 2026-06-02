@@ -1,4 +1,4 @@
-import type { Cm360, Dpi, GameId, Report, Result, TrialResult } from '../types';
+import type { Dpi, GameId, Report, Result, TrialResult } from '../types';
 import { perGameSens } from '../convert/schools';
 import { computeBreakdown } from './breakdown';
 
@@ -18,7 +18,7 @@ export function buildResult(
     ? (Object.fromEntries(games.map((g) => [g, all[g]])) as Partial<Record<GameId, number>>)
     : all;
   return {
-    optimalCm360: report.optimalCm360 as Cm360,
+    optimalCm360: report.optimalCm360,
     ci90: report.ci90,
     perGameSens: perGameSensOut,
     breakdown: computeBreakdown(trials, report.optimalCm360),
