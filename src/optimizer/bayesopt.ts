@@ -45,7 +45,8 @@ export interface BoConfig {
   kappa?: number;
   /** Dense 1-D acquisition grid resolution (default 96). */
   gridSize?: number;
-  /** isDone budget (default 20). */
+  /** Budget for `isDone` only (default 20). Inert when driven by the session controller, which
+   *  owns stopping — see SearchEngine.isDone. */
   maxTrials?: number;
 }
 

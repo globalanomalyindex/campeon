@@ -72,6 +72,8 @@ export interface Shot { error: [Degrees, Degrees]; required: Degrees; }
 export interface Observation { x: number; y: number; noise?: number; }  // x = ln(cm360)
 export interface SearchEngine {
   suggest(history: Observation[], bounds: [Cm360, Cm360]): Cm360;
+  // A self-contained budget signal for engine-driven callers. The Phase-4 session controller owns
+  // stopping itself (trial cap + CI-width convergence), so `runSession` does NOT consult isDone.
   isDone(history: Observation[]): boolean;
 }
 

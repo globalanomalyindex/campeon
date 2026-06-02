@@ -1,6 +1,18 @@
-import type { Cm360, Observation, Report } from '../types';
+import type {
+  ArenaScene,
+  Cm360,
+  Dpi,
+  Instrument,
+  InstrumentId,
+  Observation,
+  Profile,
+  Report,
+  SearchEngine,
+  TrialResult,
+} from '../types';
 import { fitPeak } from '../stats/psychometric';
 import { bootstrapCi } from '../stats/bootstrap';
+import { trialsToObservations } from './objective';
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -71,4 +83,81 @@ export function finalizeReport(
     }
   }
   return { optimalCm360: peak, ci90: ci, curve: fit.curve };
+}
+
+export interface SessionConfig {
+  dpi: Dpi;
+  profile: Profile;
+  bounds: [Cm360, Cm360];
+  engine: SearchEngine;
+  instruments: Record<InstrumentId, Instrument>;
+  scene: ArenaScene;
+  /** Cycled one-per-trial; e.g. ['track','flick','calibrate','strike']. */
+  schedule: InstrumentId[];
+  maxTrials: number;
+  /** Shared RNG stream — consumed by the instruments AND the early-stop/final bootstraps, so
+   *  changing `ciStopWidth` or `bootstrapIters` perturbs the (still deterministic) noise sequence
+   *  later trials see. Fine for an offline session; just don't expect identical early trials when
+   *  only the stop criterion differs. */
+  rng: () => number;
+  /** Log-spaced design-of-experiments seeds run before the engine is consulted
+   *  (default max(4, 2×schedule.length) — each scheduled instrument needs ≥2 trials
+   *  before its z-score has any spread). */
+  coldStart?: number;
+  /** Earliest trial index at which CI early-stop is allowed (default 8). */
+  minTrials?: number;
+  /** Stop early once the 90% CI (in cm/360) is narrower than this. */
+  ciStopWidth?: Cm360;
+  /** Bootstrap resamples for early-stop checks and the final report (default 400). */
+  bootstrapIters?: number;
+}
+
+export interface SessionOutcome {
+  report: Report;
+  trials: TrialResult[];
+}
+
+/**
+ * Run a full Bayesian-optimization session: cold-start log-spaced seeds → suggest cm/360 → run the
+ * next scheduled instrument → append → rebuild the blended objective → (optionally) stop early on a
+ * tight CI → finalize a Report. Cold-start is the controller's job (not the engine's) because the
+ * blended objective is undefined until each instrument has ≥2 trials.
+ */
+export async function runSession(config: SessionConfig): Promise<SessionOutcome> {
+  const { engine, schedule, bounds, profile, rng } = config;
+  if (schedule.length === 0) throw new Error('runSession: schedule must list at least one instrument');
+  const [lo, hi] = bounds;
+  const loX = Math.log(lo);
+  const hiX = Math.log(hi);
+  const coldStart = config.coldStart ?? Math.max(4, 2 * schedule.length);
+  const minTrials = config.minTrials ?? 8;
+  const iters = config.bootstrapIters ?? 400;
+  const seedAt = (k: number): Cm360 => Math.exp(loX + ((k + 0.5) / coldStart) * (hiX - loX));
+
+  const trials: TrialResult[] = [];
+  while (trials.length < config.maxTrials) {
+    const obs = trialsToObservations(trials, profile);
+    const cm360 =
+      trials.length < coldStart ? seedAt(trials.length) : clamp(engine.suggest(obs, bounds), lo, hi);
+    const id = schedule[trials.length % schedule.length];
+    const result = await config.instruments[id].run(
+      { cm360, dpi: config.dpi, rng, profile },
+      config.scene,
+    );
+    trials.push(result);
+
+    if (config.ciStopWidth !== undefined && trials.length >= minTrials) {
+      try {
+        const ci = bootstrapCi([...trialsToObservations(trials, profile)], iters, rng);
+        if (Math.abs(ci[1] - ci[0]) <= config.ciStopWidth) break;
+      } catch {
+        // not yet concave-fittable → keep gathering
+      }
+    }
+  }
+
+  const report = finalizeReport(trialsToObservations(trials, profile), bounds, rng, {
+    bootstrapIters: iters,
+  });
+  return { report, trials };
 }
