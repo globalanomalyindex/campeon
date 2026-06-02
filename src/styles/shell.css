@@ -88,3 +88,14 @@
 /* Ensure wordmark, tagline, actions sit above the wing scatter */
 .hero__mark, .hero__tagline, .hero__byline, .hero__nav,
 .hero__inner > .action { position: relative; z-index: 1; }
+
+/* ─── Setup screen ─────────────────────────────────────────────────────────── */
+.setup__inner { max-width: 34rem; margin-inline: auto; padding: var(--space-6) 0; }
+.setup__title { font-size: 2rem; }
+.setup__lead { color: var(--slate-2); }
+.field { display: flex; flex-direction: column; gap: var(--space-1); font-size: .9rem; color: var(--slate-2); }
+.field input, .field select { font-size: 1rem; padding: .5rem .6rem; border: 1px solid var(--slate-2); background: #fff; color: var(--ink); border-radius: 2px; }
+.field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.setup__readout { font-size: 1.1rem; color: var(--slate); }
+.setup__readout [data-readout] { color: var(--gold); font-weight: 700; font-size: 1.4rem; }
+.setup__goalhint { color: var(--slate-2); }
