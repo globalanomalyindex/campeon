@@ -10,9 +10,9 @@ import {
 import { mulberry32 } from '../../src/stats/bootstrap';
 
 describe('angularRadius', () => {
-  it('is atan(r/d) in degrees', () => {
-    expect(angularRadius(1, 10)).toBeCloseTo(5.7106, 3);
-    expect(angularRadius(1, 1)).toBeCloseTo(45, 6);
+  it('is the sphere half-angle asin(r/d) in degrees', () => {
+    expect(angularRadius(1, 10)).toBeCloseTo(5.739, 3);
+    expect(angularRadius(1, 1)).toBeCloseTo(90, 6); // sphere fills the forward hemisphere when d = r
   });
 });
 
@@ -26,6 +26,10 @@ describe('bearingOf', () => {
     expect(bearingOf(new Vector3(10, 0, 0))[0]).toBeCloseTo(90, 6);
     expect(bearingOf(new Vector3(0, 10, -10))[1]).toBeCloseTo(45, 6);
   });
+  it('-X is -90° yaw (left); directly behind is ±180°', () => {
+    expect(bearingOf(new Vector3(-10, 0, 0))[0]).toBeCloseTo(-90, 6);
+    expect(Math.abs(bearingOf(new Vector3(0, 0, 10))[0])).toBeCloseTo(180, 6);
+  });
 });
 
 describe('positionAt / bearingOf are inverses', () => {
@@ -33,6 +37,13 @@ describe('positionAt / bearingOf are inverses', () => {
     const [y, p] = bearingOf(positionAt(33, -12, 25));
     expect(y).toBeCloseTo(33, 6);
     expect(p).toBeCloseTo(-12, 6);
+  });
+  it('round-trips bearings across all quadrants (pins the frame against sign flips)', () => {
+    for (const [y, p] of [[-45, 10], [0, -30], [135, -20], [-120, 5]] as const) {
+      const [ry, rp] = bearingOf(positionAt(y, p, 15));
+      expect(ry).toBeCloseTo(y, 5);
+      expect(rp).toBeCloseTo(p, 5);
+    }
   });
 });
 
