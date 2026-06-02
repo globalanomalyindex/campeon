@@ -2,6 +2,7 @@ import type { ArenaScene, Degrees, InstrumentId, Ms, TargetHandle, TrialContext,
 import { segment } from '../scoring/submovement';
 import { speedTrace, type Frame } from './recording';
 import { separation } from '../engine/targets';
+import { sampleStd } from '../scoring/stats';
 
 const ID: InstrumentId = 'strike';
 const SHOTS = 10;
@@ -12,14 +13,6 @@ export interface StrikeShot {
   vPeak: number; // peak angular speed (deg/s)
   endpointError: Degrees; // signed scatter about the mean
   hit: boolean;
-}
-
-function sampleStd(xs: readonly number[]): number {
-  if (xs.length < 2) return 0;
-  const m = xs.reduce((s, x) => s + x, 0) / xs.length;
-  let ss = 0;
-  for (const x of xs) ss += (x - m) * (x - m);
-  return Math.sqrt(ss / (xs.length - 1));
 }
 
 /** Pure strike analysis: TTK operating point + scatter, scored by the speed/accuracy weight. */
@@ -73,7 +66,7 @@ export const strike = {
         const aim = scene.view();
         const tgt = handle.bearing();
         const radial = separation(aim, tgt);
-        const tr = speedTrace(frames).map((s) => ({ t: s.t, speed: s.speed }));
+        const tr = speedTrace(frames);
         let onsetTime = presentedAt;
         let vPeak = 0;
         try {

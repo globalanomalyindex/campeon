@@ -1,23 +1,10 @@
 import type { Degrees, Ms, Tap, FittsCondition } from '../types';
+import { mean, sampleStd } from './stats';
 
 /** Effective-width multiplier √(2πe) (ISO 9241-9): We = WE_CONST · SD(endpoint error). */
 export const WE_CONST = Math.sqrt(2 * Math.PI * Math.E); // ≈ 4.1327
 
-function mean(xs: readonly number[]): number {
-  let s = 0;
-  for (const x of xs) s += x;
-  return s / xs.length;
-}
-
-/** Sample standard deviation (N−1 denominator). Returns 0 for ≤1 element. */
-export function sampleStd(xs: readonly number[]): number {
-  const n = xs.length;
-  if (n < 2) return 0;
-  const m = mean(xs);
-  let ss = 0;
-  for (const x of xs) ss += (x - m) * (x - m);
-  return Math.sqrt(ss / (n - 1));
-}
+export { sampleStd };
 
 export interface ConditionThroughput {
   ae: Degrees; // effective amplitude = nominal A + mean signed along-axis error

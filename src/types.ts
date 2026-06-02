@@ -54,7 +54,7 @@ export interface TrialContext { cm360: Cm360; dpi: Dpi; rng: () => number; profi
 export interface TrialResult {
   instrument: InstrumentId;
   cm360: Cm360;
-  score: number;                 // normalized, higher = better
+  score: number;                 // within-trial, higher = better (Phase 4 normalizes across the cm/360 sweep)
   raw: Record<string, number>;   // instrument-specific metrics
   at: Ms;
 }

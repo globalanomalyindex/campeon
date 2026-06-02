@@ -116,7 +116,7 @@ export const flick = {
         const errAlong = radial * (aim[0] >= tgt[0] ? 1 : -1);
         let nCorr = 0;
         try {
-          nCorr = segment(speedTrace(reachFrames).map((s) => ({ t: s.t, speed: s.speed })), { onsetThresh: 20 }).nCorr;
+          nCorr = segment(speedTrace(reachFrames), { onsetThresh: 20 }).nCorr;
         } catch {
           nCorr = 0; // no movement detected → no corrections
         }
