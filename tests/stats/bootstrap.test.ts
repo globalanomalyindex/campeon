@@ -20,7 +20,14 @@ describe('bootstrap CI', () => {
     expect(hi).toBeGreaterThan(35);
   });
 
+  it('mulberry32 is deterministic for a given seed', () => {
+    const a = mulberry32(42);
+    const b = mulberry32(42);
+    expect([a(), a(), a()]).toEqual([b(), b(), b()]);
+  });
+
   it('CI widens as noise grows', () => {
+    // each mulberry32(7) is an independent closure — reused seed only for reproducibility
     const tight = bootstrapCi(dataset(0.2, mulberry32(7)), 400, mulberry32(7));
     const loose = bootstrapCi(dataset(2.0, mulberry32(7)), 400, mulberry32(7));
     expect(loose[1] - loose[0]).toBeGreaterThan(tight[1] - tight[0]);

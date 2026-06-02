@@ -13,8 +13,8 @@ export function mulberry32(seed: number): () => number {
 }
 
 /** Peak cm/360 of a fit, or NaN if the fit is non-concave (no interior maximum → not a valid peak). */
-const peakCm360 = (o: Observation[]): number => {
-  const { b1, b2 } = fitQuadratic(o);
+const peakCm360 = (obs: Observation[]): number => {
+  const { b1, b2 } = fitQuadratic(obs);
   if (b2 >= 0) return NaN;
   return Math.exp(-b1 / (2 * b2));
 };
@@ -36,7 +36,13 @@ export function bootstrapCi(obs: Observation[], iters: number, rng: () => number
     const p = peakCm360(resampled);
     if (Number.isFinite(p) && p > 0) peaks.push(p);
   }
+  if (peaks.length === 0) {
+    throw new Error(
+      `bootstrapCi: all ${iters} resamples were non-concave; data may be too noisy or too sparse`,
+    );
+  }
   peaks.sort((a, b) => a - b);
   const at = (q: number) => peaks[Math.min(peaks.length - 1, Math.floor(q * peaks.length))];
-  return [at(0.05), at(0.95)];
+  const LO = 0.05, HI = 0.95; // 90% CI
+  return [at(LO), at(HI)];
 }
