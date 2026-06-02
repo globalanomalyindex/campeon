@@ -5,7 +5,7 @@ import { degreesPerCount } from '../engine/camera-rig';
 import { createPointerLock } from '../input/pointer-lock';
 import { AccelMeter, accelVerdict } from '../input/accel-check';
 import { mulberry32 } from '../stats/bootstrap';
-import type { AimSample, PointerLockMode, InstrumentId, TrialResult } from '../types';
+import type { AimSample, PointerLockMode, InstrumentId, TrialResult, Report } from '../types';
 
 const CM360 = 34;
 const DPI = 800;
@@ -17,6 +17,7 @@ interface ArenaDebug {
   mode(): PointerLockMode | null;
   fire(): void;
   runInstrument(id: InstrumentId): Promise<TrialResult>;
+  runSession(): Promise<Report>;
   cleanup(): void;
 }
 declare global {
@@ -164,6 +165,36 @@ export function mountArenaHarness(root: HTMLElement): void {
         },
         arena,
       );
+    },
+    async runSession(): Promise<Report> {
+      const { runSession } = await import('../optimizer/session-controller');
+      const { makeBo } = await import('../optimizer/bayesopt');
+      const { INSTRUMENTS } = await import('../instruments/registry');
+      arena.clearTargets();
+      const engine = makeBo({
+        gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 },
+        acquisition: 'ei',
+      });
+      // Auto-fire pulse so the fire-gated instruments progress without a human (dev proof only).
+      const autofire = window.setInterval(() => pushFire(), 220);
+      try {
+        const { report } = await runSession({
+          dpi: DPI,
+          profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
+          bounds: [18, 50],
+          engine,
+          instruments: INSTRUMENTS,
+          scene: arena,
+          schedule: ['flick', 'strike', 'calibrate', 'track'],
+          maxTrials: 8,
+          rng: mulberry32(2026),
+          bootstrapIters: 300,
+        });
+        console.log('[campeón] session report', report);
+        return report;
+      } finally {
+        window.clearInterval(autofire);
+      }
     },
     cleanup() {
       window.cancelAnimationFrame(raf);
