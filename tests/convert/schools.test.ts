@@ -9,9 +9,11 @@ describe('per-game output (360-distance)', () => {
     );
   });
   it('matches the spec worked examples', () => {
-    expect(out.valorant!).toBeCloseTo(0.480, 2);
-    expect(out.cs2!).toBeCloseTo(1.528, 2);
-    expect(out.ow2!).toBeCloseTo(5.09, 2);
-    expect(out.fortnite!).toBeCloseTo(6.05, 2);
+    expect(out.valorant).toBeCloseTo(0.480, 2);
+    expect(out.cs2).toBeCloseTo(1.528, 2);
+    expect(out.ow2).toBeCloseTo(5.09, 2);
+    expect(out.fortnite).toBeCloseTo(6.05, 2);
+    expect(out.r6).toBeCloseTo(5.867, 2);
+    expect(out.pubg).toBeCloseTo(15.131, 2);
   });
 });
