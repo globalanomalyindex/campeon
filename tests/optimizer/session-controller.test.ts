@@ -197,3 +197,39 @@ describe('runSession — convergence on synthetic players', () => {
     expect(Math.min(...post.map((c) => Math.abs(c - 40)))).toBeLessThan(2); // homed in on the true peak
   });
 });
+
+describe('runSession — live callbacks', () => {
+  const base = () => ({
+    dpi: 800,
+    profile: profile({ flick: 1 }),
+    bounds: sessionBounds,
+    engine: makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' as const }),
+    instruments: instruments({ flick: synthetic('flick', 33) }),
+    scene: new FakeScene(),
+    schedule: ['flick'] as InstrumentId[],
+    maxTrials: 6,
+    rng: mulberry32(5),
+    bootstrapIters: 80,
+  });
+
+  it('fires onTrialStart before and onTrial after each trial with a finite interim estimate', async () => {
+    const starts: number[] = [];
+    const afters: number[] = [];
+    await runSession({
+      ...base(),
+      onTrialStart: (_id, i) => starts.push(i),
+      onTrial: (_t, trials, interim) => {
+        afters.push(trials.length);
+        expect(Number.isFinite(interim.optimalCm360)).toBe(true);
+      },
+    });
+    expect(starts).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(afters).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('the trial sequence is identical whether or not onTrial is set (interim uses its own RNG)', async () => {
+    const a = await runSession({ ...base(), rng: mulberry32(5) });
+    const b = await runSession({ ...base(), rng: mulberry32(5), onTrial: () => {} });
+    expect(b.trials.map((t) => t.cm360)).toEqual(a.trials.map((t) => t.cm360));
+  });
+});

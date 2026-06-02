@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { fitPeak } from '../stats/psychometric';
 import { bootstrapCi } from '../stats/bootstrap';
+import { mulberry32 } from '../stats/rng';
 import { trialsToObservations } from './objective';
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
@@ -110,6 +111,14 @@ export interface SessionConfig {
   ciStopWidth?: Cm360;
   /** Bootstrap resamples for early-stop checks and the final report (default 400). */
   bootstrapIters?: number;
+  /** Fired before each trial's instrument runs — for a live "now: +flick" HUD. */
+  onTrialStart?: (id: InstrumentId, index: number, cm360: Cm360) => void;
+  /** Fired after each trial with the trial, all trials so far, and a cheap interim Report — for the
+   *  live convergence view. The interim bootstrap uses its OWN seeded RNG, so setting this never
+   *  perturbs the (deterministic) instrument-noise stream. */
+  onTrial?: (trial: TrialResult, trials: readonly TrialResult[], interim: Report) => void;
+  /** Bootstrap resamples for the per-trial interim report (default 120; cheaper than the final). */
+  interimBootstrapIters?: number;
 }
 
 export interface SessionOutcome {
@@ -140,11 +149,22 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
     const cm360 =
       trials.length < coldStart ? seedAt(trials.length) : clamp(engine.suggest(obs, bounds), lo, hi);
     const id = schedule[trials.length % schedule.length];
+    config.onTrialStart?.(id, trials.length, cm360);
     const result = await config.instruments[id].run(
       { cm360, dpi: config.dpi, rng, profile },
       config.scene,
     );
     trials.push(result);
+
+    if (config.onTrial) {
+      const interim = finalizeReport(
+        trialsToObservations(trials, profile),
+        bounds,
+        mulberry32(0x5eed ^ trials.length), // own stream — does NOT touch the instrument RNG
+        { bootstrapIters: config.interimBootstrapIters ?? 120 },
+      );
+      config.onTrial(result, trials, interim);
+    }
 
     if (config.ciStopWidth !== undefined && trials.length >= minTrials) {
       try {
