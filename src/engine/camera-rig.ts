@@ -10,8 +10,13 @@ export const PITCH_LIMIT: Degrees = 89;
  * turn equals `cm360` of physical mouse travel at `dpi`.
  *   deg/count = 914.4 / (cm360 · dpi)
  * Independent of any internal yaw constant — this is the measured observable.
+ * Throws RangeError on a non-positive cm360 or dpi: an invalid sensitivity must
+ * fail loudly here rather than propagate Infinity/NaN into the view rotation.
  */
 export function degreesPerCount(cm360: Cm360, dpi: Dpi): Degrees {
+  if (!(cm360 > 0) || !(dpi > 0)) {
+    throw new RangeError(`degreesPerCount: cm360 and dpi must be positive (got ${cm360}, ${dpi})`);
+  }
   return TURN_CM / (cm360 * dpi);
 }
 

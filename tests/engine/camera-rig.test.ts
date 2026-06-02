@@ -15,6 +15,11 @@ describe('cm/360 → degrees per count', () => {
     // 34 cm @ 800 DPI → 914.4 / 27200
     expect(degreesPerCount(34, 800)).toBeCloseTo(0.033618, 6);
   });
+  it('rejects a non-positive cm360 or dpi (fails loudly at the validity core)', () => {
+    expect(() => degreesPerCount(0, 800)).toThrow(RangeError);
+    expect(() => degreesPerCount(34, 0)).toThrow(RangeError);
+    expect(() => degreesPerCount(-1, 800)).toThrow(RangeError);
+  });
 });
 
 describe('wrapYaw', () => {
