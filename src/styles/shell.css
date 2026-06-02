@@ -99,3 +99,8 @@
 .setup__readout { font-size: 1.1rem; color: var(--slate); }
 .setup__readout [data-readout] { color: var(--gold); font-weight: 700; font-size: 1.4rem; }
 .setup__goalhint { color: var(--slate-2); }
+
+/* ─── Gate screen ──────────────────────────────────────────────────────────── */
+.gate__inner { margin: auto; max-width: 36rem; text-align: center; padding: var(--space-6) 0; }
+.gate__lead { font-size: 1.2rem; color: var(--bone); }
+.gate__inner .action { margin-top: var(--space-3); display: block; }
