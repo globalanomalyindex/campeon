@@ -11,7 +11,7 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
       const root = document.createElement('section');
       root.className = 'screen screen--shell options fade-in';
       const [lo, hi] = ctx.draft.bounds;
-      const mid = Math.round(Math.sqrt(lo * hi));
+      let mid = Math.round(Math.sqrt(lo * hi));
 
       root.innerHTML = `
         <div class="wrap options__inner stack">
@@ -28,12 +28,12 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
               <label class="field">source fov (°) <input type="number" data-fov="source" value="103" min="60" max="140"></label>
               <label class="field">target fov (°) <input type="number" data-fov="target" value="90" min="60" max="140"></label>
               <label class="field">screen fraction <input type="number" data-fov="fraction" value="0" min="0" max="1" step="0.1"></label>
-              <p class="options__readout">at <span class="mono">${mid}</span> cm/360 → <span class="mono" data-fov-out>—</span> cm/360</p>
+              <p class="options__readout">at <span class="mono" data-fov-mid>${mid}</span> cm/360 → <span class="mono" data-fov-out>—</span> cm/360</p>
             </div>
           </section>
 
           <section class="options__panel" data-panel="games">
-            <h3 class="options__h">per-game yaw + sensitivity <span class="options__sub mono">dpi ${ctx.draft.dpi} · ${mid} cm/360</span></h3>
+            <h3 class="options__h">per-game yaw + sensitivity <span class="options__sub mono">dpi ${ctx.draft.dpi} · <span data-mid-sub>${mid}</span> cm/360</span></h3>
             <table class="options__table"><thead><tr><th>game</th><th>yaw (°/count)</th><th>sensitivity</th></tr></thead>
             <tbody data-games-body></tbody></table>
             <button class="action action--ghost" data-action="reset-yaw">reset yaw to defaults</button>
@@ -56,7 +56,7 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
         $('[data-games-body]').innerHTML = effectiveYawTable(overrides).map((e) => `
           <tr data-yaw-row data-game="${e.id}">
             <td>${e.label}</td>
-            <td><input class="options__yaw" type="number" step="0.0001" data-yaw="${e.id}" value="${e.yaw}"></td>
+            <td><input class="options__yaw" type="number" step="0.0001" data-yaw="${e.id}" value="${e.yaw}" aria-label="${e.label} yaw (degrees per count)"></td>
             <td class="mono" data-sens="${e.id}">${sensFor(mid, ctx.draft.dpi, e.yaw).toFixed(3)}</td>
           </tr>`).join('');
       };
@@ -93,14 +93,27 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
       });
       fovBlock.addEventListener('input', recalcFov);
 
-      const syncBounds = (): void => {
-        const a = parseFloat($<HTMLInputElement>('[data-bound="lo"]').value);
-        const b = parseFloat($<HTMLInputElement>('[data-bound="hi"]').value);
-        const [nlo, nhi] = normalizeBounds(a, b);
+      const loInput = $<HTMLInputElement>('[data-bound="lo"]');
+      const hiInput = $<HTMLInputElement>('[data-bound="hi"]');
+      const syncBounds = (): [number, number] => {
+        const [nlo, nhi] = normalizeBounds(parseFloat(loInput.value), parseFloat(hiInput.value));
         ctx.draft.bounds = [nlo, nhi];
         $('[data-bounds-out]').textContent = `${nlo}–${nhi}`;
+        return [nlo, nhi];
       };
+      // live: keep the draft + readout in step as the user types (without clobbering the fields mid-type)
       $('[data-panel="bounds"]').addEventListener('input', syncBounds);
+      // commit (blur/enter): snap the inputs to the normalized values + refresh the mid-derived previews
+      $('[data-panel="bounds"]').addEventListener('change', () => {
+        const [nlo, nhi] = syncBounds();
+        loInput.value = String(nlo);
+        hiInput.value = String(nhi);
+        mid = Math.round(Math.sqrt(nlo * nhi));
+        $('[data-mid-sub]').textContent = String(mid);
+        $('[data-fov-mid]').textContent = String(mid);
+        renderGames();
+        if (!fovBlock.hidden) recalcFov();
+      });
 
       $('[data-action="back"]').addEventListener('click', () => ctx.navigate('hero'));
       host.appendChild(root);

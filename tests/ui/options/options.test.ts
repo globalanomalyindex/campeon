@@ -35,12 +35,15 @@ describe('options screen', () => {
     expect(c.draft.bounds).toEqual([20, 40]);
     screen.unmount();
   });
-  it('selecting the monitor-distance school reveals FOV inputs', () => {
+  it('selecting the monitor-distance school reveals the (initially hidden) FOV inputs', () => {
     const host = document.createElement('div');
     const screen = options(host, ctx()); screen.mount();
+    const block = host.querySelector<HTMLElement>('[data-fov-block]')!;
+    expect(block.hidden).toBe(true); // 360-distance default → FOV block hidden
     const sel = host.querySelector<HTMLSelectElement>('[data-school]')!;
     sel.value = 'monitor';
     sel.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(block.hidden).toBe(false); // load-bearing: fails if the reveal toggle is removed
     expect(host.querySelector('[data-fov="source"]')).not.toBeNull();
     expect(host.querySelector('[data-fov="target"]')).not.toBeNull();
     screen.unmount();
