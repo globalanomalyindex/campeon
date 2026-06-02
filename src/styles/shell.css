@@ -104,3 +104,57 @@
 .gate__inner { margin: auto; max-width: 36rem; text-align: center; padding: var(--space-6) 0; }
 .gate__lead { font-size: 1.2rem; color: var(--bone); }
 .gate__inner .action { margin-top: var(--space-3); display: block; }
+
+/* ─── Session / arena screen ───────────────────────────────────────────────── */
+.session__canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  display: block; cursor: none;
+}
+
+.session__crosshair {
+  position: fixed; left: 50%; top: 50%;
+  width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 1px var(--ink);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.session__hud {
+  position: fixed; left: var(--space-4); top: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-1);
+  font-size: .8rem; line-height: 1.5;
+  color: var(--bone);
+  background: rgba(13, 13, 13, .75);
+  padding: .5rem .7rem;
+  border: 1px solid var(--slate-2);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.session__plot {
+  position: fixed; right: var(--space-4); bottom: var(--space-4);
+  width: 360px; height: 200px;
+  background: rgba(13, 13, 13, .8);
+  border: 1px solid var(--slate-2);
+  padding: .5rem;
+  margin: 0;
+  z-index: 10;
+}
+
+.session__plot svg[data-plot] {
+  display: block;
+  width: 360px;
+  height: 160px;
+}
+
+.session__plot figcaption {
+  font-size: .72rem;
+  color: var(--slate-2);
+  margin-top: .25rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
