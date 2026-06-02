@@ -5,7 +5,7 @@ import { degreesPerCount } from '../engine/camera-rig';
 import { createPointerLock } from '../input/pointer-lock';
 import { AccelMeter, accelVerdict } from '../input/accel-check';
 import { mulberry32 } from '../stats/bootstrap';
-import type { AimSample, PointerLockMode } from '../types';
+import type { AimSample, PointerLockMode, InstrumentId, TrialResult } from '../types';
 
 const CM360 = 34;
 const DPI = 800;
@@ -15,6 +15,8 @@ interface ArenaDebug {
   degPerCount(): number;
   view(): [number, number];
   mode(): PointerLockMode | null;
+  fire(): void;
+  runInstrument(id: InstrumentId): Promise<TrialResult>;
   cleanup(): void;
 }
 declare global {
@@ -52,6 +54,7 @@ export function mountArenaHarness(root: HTMLElement): void {
 
   // Composite input: real pointer samples + a synthetic feed for runtime verification (Task 9).
   const manual = new Set<(s: AimSample) => void>();
+  const manualFire = new Set<() => void>();
   const input: InputSource = {
     onSample(cb) {
       const off = pointer.onSample(cb);
@@ -61,9 +64,20 @@ export function mountArenaHarness(root: HTMLElement): void {
         manual.delete(cb);
       };
     },
+    onFire(cb) {
+      const off = pointer.onFire(cb);
+      manualFire.add(cb);
+      return () => {
+        off();
+        manualFire.delete(cb);
+      };
+    },
   };
   const pushSynthetic = (s: AimSample): void => {
     for (const cb of manual) cb(s);
+  };
+  const pushFire = (): void => {
+    for (const cb of manualFire) cb();
   };
 
   const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7) });
@@ -116,7 +130,11 @@ export function mountArenaHarness(root: HTMLElement): void {
   window.addEventListener('resize', () => arena.resize());
 
   let raf = 0;
-  const loop = (): void => {
+  let last = 0;
+  const loop = (ts: number): void => {
+    const dt = last === 0 ? 16 : ts - last;
+    last = ts;
+    arena.tick(dt);
     arena.render();
     refreshHud();
     raf = window.requestAnimationFrame(loop);
@@ -131,6 +149,22 @@ export function mountArenaHarness(root: HTMLElement): void {
     degPerCount: () => degreesPerCount(CM360, DPI),
     view: () => view,
     mode: () => pointer.mode(),
+    fire() {
+      pushFire();
+    },
+    async runInstrument(id: InstrumentId): Promise<TrialResult> {
+      const { getInstrument } = await import('../instruments/registry');
+      arena.clearTargets();
+      return getInstrument(id).run(
+        {
+          cm360: CM360,
+          dpi: DPI,
+          rng: mulberry32(42),
+          profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
+        },
+        arena,
+      );
+    },
     cleanup() {
       window.cancelAnimationFrame(raf);
       offMeter();

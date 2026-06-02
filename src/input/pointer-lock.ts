@@ -31,6 +31,8 @@ export interface PointerLockController {
   exit(): void;
   /** Subscribe to per-sample deltas while locked. Returns an unsubscribe fn. */
   onSample(cb: (sample: AimSample) => void): () => void;
+  /** Subscribe to fire (primary-button) events while locked. Returns an unsubscribe fn. */
+  onFire(cb: () => void): () => void;
   /** Granted mode, or null when not locked. 'raw' only on browsers that support raw input. */
   mode(): PointerLockMode | null;
   isLocked(): boolean;
@@ -50,6 +52,7 @@ export interface PointerLockController {
  */
 export function createPointerLock(element: HTMLElement): PointerLockController {
   const cbs = new Set<(sample: AimSample) => void>();
+  const fireCbs = new Set<() => void>();
   let currentMode: PointerLockMode | null = null;
   let locked = false;
   const supportsRaw = 'onpointerrawupdate' in window;
@@ -71,8 +74,14 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
     if (!locked) currentMode = null;
   };
 
+  const onMouseDown = (ev: MouseEvent): void => {
+    if (!locked || ev.button !== 0) return;
+    for (const cb of fireCbs) cb();
+  };
+
   document.addEventListener(moveEvent, onMove as EventListener);
   document.addEventListener('pointerlockchange', onLockChange);
+  document.addEventListener('mousedown', onMouseDown);
 
   return {
     async request(): Promise<PointerLockMode> {
@@ -106,6 +115,12 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
         cbs.delete(cb);
       };
     },
+    onFire(cb): () => void {
+      fireCbs.add(cb);
+      return () => {
+        fireCbs.delete(cb);
+      };
+    },
     mode(): PointerLockMode | null {
       return currentMode;
     },
@@ -115,7 +130,9 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
     dispose(): void {
       document.removeEventListener(moveEvent, onMove as EventListener);
       document.removeEventListener('pointerlockchange', onLockChange);
+      document.removeEventListener('mousedown', onMouseDown);
       cbs.clear();
+      fireCbs.clear();
     },
   };
 }
