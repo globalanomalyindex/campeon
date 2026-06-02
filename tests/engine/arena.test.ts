@@ -7,21 +7,26 @@ import { mulberry32 } from '../../src/stats/bootstrap';
 
 function harness() {
   let emit: (s: AimSample) => void = () => {};
+  let unsubs = 0;
   const input: InputSource = {
     onSample(cb) {
       emit = cb;
       return () => {
         emit = () => {};
+        unsubs += 1;
       };
     },
   };
   let renders = 0;
+  let disposes = 0;
   const renderer: RendererLike = {
     render() {
       renders += 1;
     },
     setSize() {},
-    dispose() {},
+    dispose() {
+      disposes += 1;
+    },
   };
   const arena = new Arena({
     renderer,
@@ -31,7 +36,13 @@ function harness() {
     dpi: 800,
     rng: mulberry32(1),
   });
-  return { arena, send: (s: AimSample) => emit(s), renders: () => renders };
+  return {
+    arena,
+    send: (s: AimSample) => emit(s),
+    renders: () => renders,
+    unsubs: () => unsubs,
+    disposes: () => disposes,
+  };
 }
 
 describe('Arena (headless)', () => {
@@ -85,5 +96,13 @@ describe('Arena (headless)', () => {
     const h = harness();
     h.arena.render();
     expect(h.renders()).toBe(1);
+  });
+
+  it('dispose() is idempotent: unsubscribes input + disposes the renderer once', () => {
+    const h = harness();
+    h.arena.dispose();
+    h.arena.dispose();
+    expect(h.unsubs()).toBe(1);
+    expect(h.disposes()).toBe(1);
   });
 });

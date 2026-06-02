@@ -44,6 +44,7 @@ export class Arena implements ArenaScene {
   private readonly aimCbs = new Set<AimCallback>();
   private readonly unsubInput: () => void;
   private nextId = 0;
+  private readonly envDisposables: Array<{ dispose(): void }> = [];
   private disposed = false;
 
   constructor(opts: ArenaOptions) {
@@ -51,7 +52,7 @@ export class Arena implements ArenaScene {
     this.sizeFn = opts.size;
     this.rng = opts.rng ?? Math.random;
     const [w, h] = this.sizeFn();
-    this.rig = new CameraRig(opts.cm360, opts.dpi, w / h);
+    this.rig = new CameraRig(opts.cm360, opts.dpi, w / Math.max(1, h));
     this.buildEnvironment();
     this.renderer.setSize(w, h);
     this.unsubInput = opts.input.onSample((sample) => this.handleSample(sample));
@@ -65,6 +66,7 @@ export class Arena implements ArenaScene {
     const grid = new GridHelper(200, 80, 0x33424c, 0x1a2228);
     grid.position.y = -3;
     this.scene.add(hemi, dir, grid);
+    this.envDisposables.push(grid); // GridHelper owns a BufferGeometry + LineBasicMaterial
   }
 
   private handleSample(sample: AimSample): void {
@@ -105,7 +107,7 @@ export class Arena implements ArenaScene {
   /** Re-read the size function and update camera aspect + renderer (call on window resize). */
   resize(): void {
     const [w, h] = this.sizeFn();
-    this.rig.camera.aspect = w / h;
+    this.rig.camera.aspect = w / Math.max(1, h);
     this.rig.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
   }
@@ -120,6 +122,7 @@ export class Arena implements ArenaScene {
     this.disposed = true;
     this.unsubInput();
     this.clearTargets();
+    for (const d of this.envDisposables) d.dispose();
     this.renderer.dispose();
   }
 }
