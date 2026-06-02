@@ -15,5 +15,4 @@ function stub(title: string, note: string) {
   });
 }
 
-export const caseStudyStub = stub('case study', 'The science page — each organism’s real mechanism, the math, and why it maps to aim — arrives in the polish pass.');
 export const optionsStub = stub('options', 'Conversion school, per-game yaw overrides, and search bounds arrive in the polish pass.');
