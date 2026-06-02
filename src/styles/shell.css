@@ -17,3 +17,74 @@
 
 .fade-in { animation: fade-in var(--dur-med) var(--ease-out); }
 @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ─── Hero screen ──────────────────────────────────────────────────────────── */
+.hero__inner {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  position: relative;
+  gap: var(--space-2);
+  padding: var(--space-6) 0;
+}
+
+.hero__mark {
+  font-size: clamp(3.5rem, 12vw, 8rem);
+  color: var(--slate);
+  letter-spacing: -0.02em;
+}
+
+.hero__eye { color: var(--ink); }
+
+.hero__tagline {
+  color: var(--slate-2);
+  font-size: 1rem;
+  letter-spacing: .02em;
+  margin-bottom: var(--space-2);
+}
+
+.hero__byline {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--gold);
+  font-size: .9rem;
+  margin-top: var(--space-1);
+}
+
+.hero__nav {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+/* Wing: 8 marks swept upper-left → lower-right, behind the wordmark */
+.hero__wing {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--slate-2);
+  opacity: .3;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  z-index: 0;
+}
+
+.hero__wing span { position: absolute; }
+
+/* Diagonal sweep — left wing of a stooping peregrine:
+   marks arc from top-left (leading edge) toward lower-right (trailing tip),
+   each rotated to reinforce the swept-back angle. */
+.hero__wing span:nth-child(1) { top: 12%; left: 14%; transform: rotate(-48deg); font-size: 2.2rem; }
+.hero__wing span:nth-child(2) { top: 18%; left: 22%; transform: rotate(-44deg); font-size: 2rem; }
+.hero__wing span:nth-child(3) { top: 25%; left: 31%; transform: rotate(-40deg); font-size: 1.8rem; }
+.hero__wing span:nth-child(4) { top: 32%; left: 39%; transform: rotate(-36deg); font-size: 1.6rem; }
+.hero__wing span:nth-child(5) { top: 40%; left: 46%; transform: rotate(-32deg); font-size: 1.4rem; }
+.hero__wing span:nth-child(6) { top: 49%; left: 52%; transform: rotate(-28deg); font-size: 1.2rem; }
+.hero__wing span:nth-child(7) { top: 58%; left: 57%; transform: rotate(-22deg); font-size: 1rem; }
+.hero__wing span:nth-child(8) { top: 67%; left: 62%; transform: rotate(-16deg); font-size: .85rem; }
+
+/* Ensure wordmark, tagline, actions sit above the wing scatter */
+.hero__mark, .hero__tagline, .hero__byline, .hero__nav,
+.hero__inner > .action { position: relative; z-index: 1; }
