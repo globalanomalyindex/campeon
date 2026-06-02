@@ -1,0 +1,9 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bone);
+  color: var(--slate);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+#app { min-height: 100%; display: flex; }

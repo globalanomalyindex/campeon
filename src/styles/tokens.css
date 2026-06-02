@@ -1,0 +1,32 @@
+@font-face {
+  font-family: 'Gefalent';
+  src: url('/fonts/Gefalent-Regular.otf') format('opentype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Gefalent';
+  src: url('/fonts/Gefalent-Italic.otf') format('opentype');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+:root {
+  /* palette (sampled from the hero) */
+  --bone: #EAE7DC;
+  --slate: #4A5A66;
+  --slate-2: #6C7A85;
+  --gold: #FFC400;
+  --ink: #0D0D0D;
+  --parchment: #EFDEA5;
+  /* type */
+  --font-display: 'Gefalent', system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  /* spacing scale (4px base) */
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 1rem;
+  --space-4: 1.5rem; --space-5: 2.5rem; --space-6: 4rem;
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms; --dur-med: 280ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-med: 0ms; }
+}
