@@ -1,31 +1,30 @@
 import './styles/tokens.css';
 import './styles/base.css';
+import './styles/shell.css';
+import { createShell, type Route, type ScreenFactory } from './ui/shell';
+import { createStorage } from './state/storage';
+import { hero } from './ui/hero';
+import { setup } from './ui/setup';
+import { gate } from './ui/gate';
+import { sessionView } from './ui/session-view';
+import { result } from './ui/result';
+import { caseStudyStub, optionsStub } from './ui/stubs';
 
-const app = document.querySelector<HTMLDivElement>('#app');
-if (!app) throw new Error('#app element missing');
+const appEl = document.querySelector<HTMLDivElement>('#app');
+if (!appEl) throw new Error('#app element missing');
+const app: HTMLDivElement = appEl;
 
-function renderPlaceholder(root: HTMLDivElement): void {
-  root.innerHTML = `
-    <main style="margin:auto;text-align:center">
-      <p style="font-family:var(--font-display);font-style:italic;color:var(--slate-2)">aim sensitivity tool</p>
-      <h1 style="font-family:var(--font-display);font-size:5rem;line-height:.9">campe<span style="color:var(--ink)">ó</span>n</h1>
-      <p style="font-family:var(--font-mono);color:var(--slate-2);margin-top:1rem">
-        dev: <a href="#arena" style="color:var(--gold)">#arena</a> — input + engine harness
-      </p>
-    </main>`;
-}
-
-async function route(root: HTMLDivElement): Promise<void> {
+async function boot(): Promise<void> {
   if (window.location.hash === '#arena') {
     const { mountArenaHarness } = await import('./dev/arena-harness');
-    mountArenaHarness(root);
-  } else {
-    root.style.cssText = '';
-    renderPlaceholder(root);
+    mountArenaHarness(app);
+    return;
   }
+  const screens: Record<Route, ScreenFactory> = {
+    hero, setup, gate, session: sessionView, result,
+    'case-study': caseStudyStub, options: optionsStub,
+  };
+  createShell(app, { storage: createStorage(), screens }).start();
 }
 
-window.addEventListener('hashchange', () => {
-  void route(app);
-});
-void route(app);
+void boot();
