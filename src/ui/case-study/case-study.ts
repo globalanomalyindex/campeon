@@ -18,6 +18,10 @@ function buildSection(s: CaseSection): HTMLElement {
 
   sec.appendChild(registrationFrame());
   sec.appendChild(sectionNumeral(SECTIONS.indexOf(s) + 1));
+  const exo = document.createElement('div');           // dotted exoskeleton frame around the column
+  exo.className = 'cs-exo';
+  exo.setAttribute('aria-hidden', 'true');
+  sec.appendChild(exo);
   if (s.spine) {
     const spine = document.createElement('div');
     spine.className = 'cs-spine';

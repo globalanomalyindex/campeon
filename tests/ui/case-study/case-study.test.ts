@@ -19,6 +19,7 @@ describe('caseStudy screen', () => {
     screen.mount();
     expect(host.querySelector('.case')).not.toBeNull();
     expect(host.querySelectorAll('.cs-section').length).toBe(8);
+    expect(host.querySelectorAll('.cs-exo').length).toBe(8); // dotted exoskeleton frame renders per section (load-bearing)
     expect(host.querySelectorAll('.cs-refs li').length).toBeGreaterThanOrEqual(8);
     screen.unmount();
   });
