@@ -1,7 +1,7 @@
 import { WebGLRenderer } from 'three';
 import { Arena, type InputSource } from '../engine/arena';
 import { createPointerLock } from '../input/pointer-lock';
-import { makeBo } from '../optimizer/bayesopt';
+import { makeEvolution } from '../optimizer/evolution';
 import { runSession } from '../optimizer/session-controller';
 import { buildResult } from '../optimizer/result';
 import { INSTRUMENTS } from '../instruments/registry';
@@ -12,22 +12,27 @@ import type { InstrumentId, Report, TrialResult } from '../types';
 
 const SCHEDULE: InstrumentId[] = ['flick', 'track', 'calibrate', 'strike'];
 const MAX_TRIALS = 24; // spec §5.4: ~15–30, capped ~20–25
+const COLD_START = 8; // Generation 0 — the initial gene pool (≥2 trials/instrument before selection)
 
 export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
   return trials.map((t) => ({ cm360: t.cm360, score: t.score, instrument: t.instrument }));
 }
 
 const COPY: Record<InstrumentId, string> = {
-  track: '+track · keep the dot on the mover — dragonfly lead + falcon hold',
-  flick: '+flick · snap to each target and settle — spider acquisition + raptor fovea',
-  calibrate: '+calibrate · fire center-mass; we separate your bias from your spread — archerfish',
-  strike: '+strike · fire as fast as you can — mantis-shrimp speed pole',
+  track: '+track · become the dragonfly — hold its predictive lead on the weaving prey',
+  flick: '+flick · become the jumping spider — snap to each target, then confirm',
+  calibrate: '+calibrate · become the archerfish — learn the bend between where you aim and where shots land',
+  strike: '+strike · become the mantis shrimp — fire the instant you see it, no settling',
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
-/** Live HUD line for the search loop — which sensitivity the optimizer is handing you this trial. */
-export function searchLabel(index: number, maxTrials: number, cm360: number): string {
-  return `trial ${index + 1} / ${maxTrials} · testing ${cm360.toFixed(1)} cm/360`;
+/** Live HUD line for the evolutionary loop. Cold-start trials are Generation 0 (the initial gene
+ *  pool); after that, each trial is a numbered generation testing one mutated sensitivity. */
+export function searchLabel(index: number, cm360: number, coldStart: number): string {
+  const testing = `testing ${cm360.toFixed(1)} cm/360`;
+  return index < coldStart
+    ? `gen 0 · seeding the gene pool · ${testing}`
+    : `generation ${index - coldStart + 1} · ${testing}`;
 }
 
 export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
@@ -81,18 +86,18 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           size: { width: svg.clientWidth || 360, height: svg.clientHeight || 180 },
         });
         renderConvergencePlot(svg, g, 'blended score');
-        hudEstimate.textContent = `homing in · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)}`;
+        hudEstimate.textContent = `most-evolved · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)}`;
       };
 
       const start = (): void => {
-        const engine = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 }, acquisition: 'ei' });
+        const engine = makeEvolution({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 }, sigma0: 0.3, maxTrials: MAX_TRIALS });
         void runSession({
           dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
           engine, instruments: INSTRUMENTS, scene: arena, schedule: SCHEDULE,
-          maxTrials: MAX_TRIALS, rng: mulberry32(2026), minTrials: 12, ciStopWidth: 6, bootstrapIters: 300,
+          maxTrials: MAX_TRIALS, coldStart: COLD_START, rng: mulberry32(2026), minTrials: 12, ciStopWidth: 6, bootstrapIters: 300,
           onTrialStart: (id, i, cm360) => {
             hudInstruction.textContent = instructionFor(id);
-            hudProgress.textContent = searchLabel(i, MAX_TRIALS, cm360);
+            hudProgress.textContent = searchLabel(i, cm360, COLD_START);
             arena.clearTargets();
           },
           onTrial: (_t, trials, interim) => drawPlot(interim, trials),

@@ -140,12 +140,12 @@ Each instrument isolates one axis of the same underlying **speed↔accuracy / bi
 - **Predictive tracker** (tracking): a constant-velocity Kalman filter smooths the *target* (→ slip term); the player's latency `L` is the sub-sample cross-correlation lag, and the score is the **lag-compensated predictive residual** (tremor + gain). The innovation is a target-prediction residual, not the score.
 - Blended per profile: each instrument is z-scored across its own sweep (affine, peak-preserving) and summed with the profile weights; the speed↔accuracy preference enters only through the strike pole (see §5.3).
 
-### 5.2 Search engine — Bayesian optimization (primary)
+### 5.2 Search engine — surrogate-assisted evolution strategy (primary)
 - Optimize in **log-space** `x = ln(s)`; domain e.g. `s ∈ [15, 60]` cm/360.
-- **Gaussian-process surrogate**, Matérn-5/2 kernel, **noisy GP** with nugget `σ_n²` from the Fitts spread (lets it replicate near good points instead of chasing noise).
-- **Acquisition:** Expected Improvement `EI(x) = (μ−f⁺−ξ)Φ(Z) + σφ(Z)`, `Z = (μ−f⁺−ξ)/σ`; or UCB `μ + κσ` (κ ≈ 2). Optimize on a dense 1D grid (no optimizer lib needed). Use the GP posterior mean for `f⁺`, not the raw noisy max.
-- **Cold start:** 3–5 log-spaced initial trials (e.g. 18, 26, 35, 47). **Final 1–2 trials:** confirmation replicates at the incumbent.
-- **Fallback / "simple mode":** UCB1 (`x̄_i + √(2 ln t / n_i)`) or Thompson-sampling **bandit** over ~10 discretized arms.
+- **(1+λ) evolution strategy** (`makeEvolution`): keep one lineage; each generation mutate the **incumbent** (fittest sensitivity so far) by a Gaussian step `σ` to spawn λ offspring, play the most promising, and keep it only if it beats the parent — **elitist selection**. Step size self-adapts by Rechenberg's **1/5 success rule**. The conceptual spine: the search IS the evolution that tuned the predators, so the optimizer mirrors it rather than relabeling a different algorithm "evolution."
+- **Gaussian-process surrogate** (Matérn-5/2, noisy GP with nugget `σ_n²`) is the lineage's **fitness memory**: it supplies the **denoised fitness** for selection (posterior mean, never the raw noisy max) and **screens** the λ offspring by Expected Improvement `EI(x) = (μ−f⁺−ξ)Φ(Z) + σφ(Z)`, so the player's scarce trials are spent on the single most informative mutation.
+- **Cold start:** log-spaced initial trials = **Generation 0** (the initial gene pool); the first generation selects the fittest of them as the founding parent. **Final 1–2 trials:** confirmation replicates at the incumbent.
+- **Alternative engine:** `makeBo` — pure global GP-EI/UCB on a dense grid — is retained and tested (the surrogate-assisted ES reuses its GP + EI). **Fallback / "simple mode":** UCB1 bandit over ~10 discretized arms.
 
 ### 5.3 Reporter — parabolic peak fit + CI
 - Fit a peaked curve in log-sens: `y = β0 + β1·x + β2·x²` (β2 < 0); peak `x* = −β1/(2β2)` → `s* = exp(x*)`. (This is quadratic peak-finding — a parabola, **not** a psychometric function.)
@@ -158,8 +158,8 @@ Each instrument isolates one axis of the same underlying **speed↔accuracy / bi
 - **1–2 warm-up trials** down-weighted to absorb the learning transient.
 - Expect a **broad optimum** — report a range, distrust a suspiciously narrow CI.
 
-### 5.5 The honest "swarm" layer (PSO / GA)
-PSO/GA are **not** the trial-spending search engine (wrong tool for 1D, noisy, ≤30 expensive evals — strictly dominated by BO). Their *only* legitimate use is **in-silico**, where evaluations are free: the **bootstrap-ensemble** that produces the CI ("a swarm of fits"), or fitting GP/curve hyperparameters. Any "swarm/nature" branding routes here, never to real player trials.
+### 5.5 The honest note — evolution strategy vs. naive GA/PSO
+A **naive** population GA/PSO — many free agents, each costing a real player trial — remains the wrong tool for a 1D, noisy, ≤30-evaluation budget; it would burn trials on a whole population per generation. That caution (original to this spec) stands. The production engine (§5.2) is deliberately **not** that: it is a **surrogate-assisted (1+λ) ES** in which the GP screens offspring and only **one** trial is spent per generation on the most informative mutation — so it keeps BO's sample-efficiency *and* is genuinely evolutionary (lineage, mutation, elitist selection, self-adapting step). The honest trade vs. pure global GP-EI: the ES samples **locally** around the incumbent instead of globally, so it is marginally less exploratory on a multimodal landscape — acceptable here because the sensitivity↔performance curve is a single **broad** optimum (§5.4), and Generation 0 seeds the lineage across the whole range. Free-evaluation evolutionary/PSO work (the **bootstrap-ensemble** CI — "a swarm of fits" — and hyperparameter fitting) still routes **in-silico**, never to real player trials.
 
 ---
 

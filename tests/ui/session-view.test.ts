@@ -4,11 +4,12 @@ import { marksFromTrials, instructionFor, searchLabel } from '../../src/ui/sessi
 import type { TrialResult } from '../../src/types';
 
 describe('session-view helpers', () => {
-  it('surfaces the sensitivity the search is handing you this trial (not just a trial counter)', () => {
-    // The loop's whole point — "iteratively giving you new sensitivities" — must be visible: each
-    // trial announces the cm/360 being tested, to 1 decimal, alongside the progress count.
-    expect(searchLabel(8, 24, 32.37)).toBe('trial 9 / 24 · testing 32.4 cm/360');
-    expect(searchLabel(0, 24, 18)).toBe('trial 1 / 24 · testing 18.0 cm/360');
+  it('frames the loop as evolution — gene-pool seeding, then numbered generations testing a sensitivity', () => {
+    // The thesis ("generations of sensitivities") must be visible: cold-start trials are Generation 0
+    // (the initial gene pool); after that each trial is a numbered generation testing one cm/360.
+    expect(searchLabel(0, 18, 8)).toBe('gen 0 · seeding the gene pool · testing 18.0 cm/360');
+    expect(searchLabel(8, 32.37, 8)).toBe('generation 1 · testing 32.4 cm/360');
+    expect(searchLabel(11, 30, 8)).toBe('generation 4 · testing 30.0 cm/360');
   });
 
   it('maps trials to plot marks preserving cm360/score/instrument', () => {

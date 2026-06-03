@@ -168,12 +168,12 @@ export function mountArenaHarness(root: HTMLElement): void {
     },
     async runSession(): Promise<Report> {
       const { runSession } = await import('../optimizer/session-controller');
-      const { makeBo } = await import('../optimizer/bayesopt');
+      const { makeEvolution } = await import('../optimizer/evolution');
       const { INSTRUMENTS } = await import('../instruments/registry');
       arena.clearTargets();
-      const engine = makeBo({
+      const engine = makeEvolution({
         gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 },
-        acquisition: 'ei',
+        sigma0: 0.3,
       });
       // Auto-fire pulse so the fire-gated instruments progress without a human (dev proof only).
       const autofire = window.setInterval(() => pushFire(), 220);
@@ -186,7 +186,8 @@ export function mountArenaHarness(root: HTMLElement): void {
           instruments: INSTRUMENTS,
           scene: arena,
           schedule: ['flick', 'strike', 'calibrate', 'track'],
-          maxTrials: 8,
+          coldStart: 8, // Generation 0 gene pool…
+          maxTrials: 12, // …then 4 evolutionary generations (exercises makeEvolution.suggest)
           rng: mulberry32(2026),
           bootstrapIters: 300,
         });
