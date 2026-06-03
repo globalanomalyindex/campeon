@@ -45,14 +45,14 @@ export const SECTIONS: CaseSection[] = [
     lede: 'a dragonfly intercepts prey ~95% of the time using a feed-forward internal model — it aims where prey will be, not where it is.',
     body: [
       'dragonfly target-selective descending neurons decode prey direction as a population vector at a sensorimotor latency of <strong>29.94 ± 5.75 ms</strong>; an efference-copy forward model predicts self-induced image motion so the strike <em>leads</em>. the peregrine falcon does the mirror task — <strong>vor + okr</strong> gaze-stabilization holds the target image still on the fovea, nulling its angular velocity, terminal guidance fitting proportional navigation.',
-      'campeón rebuilds this with a <strong>constant-velocity kalman filter</strong> on the target state. the optimal lead point is θ̂ + θ̇̂·L, where L is your measured reaction latency. the filter\'s <em>innovation</em> — ν = z − Hx̂⁻ — <span class="cs-mark">is</span> the instantaneous tracking error.',
-      'the cm/360 signal: too sensitive and tremor multiplies into jitter and overshoot oscillation; too slow and you can\'t reach the lead point on a velocity step, so the crosshair lags. the optimum jointly minimizes slip + jitter.',
+      'campeón rebuilds this with a <strong>constant-velocity kalman filter</strong> that smooths the target\'s motion, then measures <em>your</em> tracking latency directly: L is the lag of the peak aim↔target cross-correlation, refined to sub-frame precision. that L is the dragonfly\'s forward-model horizon — <span class="cs-mark">fitted to you, not assumed</span>. (the filter\'s <em>innovation</em> ν = z − Hx̂⁻ predicts the <em>target</em>, not your aim, so it is deliberately not the score.)',
+      'the score is the <span class="cs-mark">lag-compensated residual</span> — your aim against the target where you were truly tracking it, L ago. subtracting pure latency leaves only what sensitivity governs: tremor jitter (multiplied when you\'re too sensitive) and gain over/undershoot (when you\'re too slow), plus the relative angular velocity the falcon\'s vor + okr would null. the optimum jointly minimizes slip + jitter.',
     ],
     spec: [
       { k: 'tsdn latency', v: '29.94 ± 5.75 ms', mono: true },
       { k: 'dragonfly intercept', v: '~95% success' },
-      { k: 'scorer', v: 'kalman innovation ν = z − Hx̂⁻', mono: true },
-      { k: 'metrics', v: 'lead rmse · predictive index · jitter · time-on-target' },
+      { k: 'scorer', v: 'lag-compensated residual @ measured latency L', mono: true },
+      { k: 'metrics', v: 'measured latency · predictive index · jitter · slip · time-on-target' },
     ],
   },
   {
@@ -63,13 +63,13 @@ export const SECTIONS: CaseSection[] = [
     lede: 'a jumping spider detects with wide-field secondary eyes, fires a ballistic body saccade open-loop, then confirms with high-acuity principal eyes. that is exactly a human flick.',
     body: [
       'the spider\'s orient is pre-programmed — <strong>810–1300 °/s</strong>, amplitude preset from retinal eccentricity, no mid-flight correction — and the coarse error is cleaned up by the confirm stage. the raptor adds a two-fovea trade: a deep fovea (~140 cyc/deg, the scope) and a shallow fovea (wide, fast). speed vs precision, two modes.',
-      'campeón decomposes your mouse-velocity trace into the same stages — detection latency, ballistic orient (gain G = covered/required, overshoot), corrective sub-movements — then scores <strong>fitts effective throughput</strong> (iso 9241-9): effective width <span class="cs-mark">We = 4.133·σ</span>, IDe = log2(Ae/We + 1), TP = IDe / MT.',
-      'the central tension: flick throughput peaks at <em>lower</em> cm/360 (big reorientations cheap); micro-adjust throughput peaks at <em>higher</em> cm/360 (fine placement, attenuated tremor). your optimum is the crossover, weighted by how you play.',
+      'campeón segments your mouse-velocity trace into the spider\'s stages — detection latency, the ballistic orient, the corrective sub-movements of the confirm — and scores each (amplitude, width) condition by <strong>fitts effective throughput</strong> (iso 9241-9): effective width <span class="cs-mark">We = 4.133·σ</span>, IDe = log2(Ae/We + 1), TP = IDe / MT. the orient\'s overshoot and the confirm\'s corrections need no separate penalty — they already inflate MT and σ, so a sloppy stage lowers its own throughput.',
+      'the raptor\'s two-fovea trade <em>is</em> the scorer. <span class="cs-mark">ballistic throughput</span> (big reorientations, cheap at lower cm/360) and <span class="cs-mark">precision-lock throughput</span> (fine placement, sharper at higher cm/360) are measured separately, and flick reports their <em>harmonic mean</em> — a number maximized exactly at the crossover where you serve both at once. this faculty is pure skill; only the strike pole bends to taste.',
     ],
     spec: [
       { k: 'spider orient', v: '810–1300 °/s, open-loop', mono: true },
       { k: 'raptor deep fovea', v: '~140 cyc/deg' },
-      { k: 'scorer', v: 'fitts effective throughput (bits/s)' },
+      { k: 'scorer', v: 'two-mode crossover — harmonic mean of ballistic × precision tp' },
       { k: 'effective width', v: 'We = 4.133·σ', mono: true },
     ],
   },

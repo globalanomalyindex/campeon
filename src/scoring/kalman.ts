@@ -20,7 +20,10 @@ export interface KalmanCVInit {
  *   F(dt) = [[1, dt], [0, 1]], H = [1, 0]
  *   Q = q · [[dt³/3, dt²/2], [dt²/2, dt]]  (continuous white-noise-acceleration model)
  * Covariance P stored as the four scalars p00 p01 p10 p11.
- * `update(z)` returns the innovation ν = z − pos⁻ (the instantaneous tracking error).
+ * `update(z)` returns the innovation ν = z − pos⁻ — the filter's one-step prediction residual for the
+ * tracked signal. NB: when this filter tracks the *target* (as in the track instrument), ν is a
+ * property of the target's motion and the model, NOT of the player, so it is not the player's
+ * tracking score; the player-dependent metric is the lag-compensated residual in track.ts.
  */
 export class KalmanCV {
   private x0: number;

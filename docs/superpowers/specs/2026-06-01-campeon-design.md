@@ -75,15 +75,15 @@ Each instrument isolates one axis of the same underlying **speed↔accuracy / bi
 
 **What we measure.**
 - Model the target with a **constant-velocity Kalman filter** (state `[θ, θ̇]` per axis); the optimal lead aim point is `θ*_opt(t+L) = θ̂ + θ̇̂·L`, where `L` = the player's measured reaction latency (lag between a target velocity step and the player's corrective angular-acceleration onset).
-- **Lead RMSE** `E_lead = sqrt(mean‖θ_C − θ*_opt‖²)` — predictive accuracy.
-- **Predictive Index** `PI = −ℓ*`, where `ℓ*` = argmax lag of the cross-correlation between crosshair and target bearing. `PI > 0` = predictive/feed-forward; `PI < 0` = reactive/lagging.
+- **Predictive residual** `E_pred = sqrt(mean‖θ_aim(t) − θ_tgt(t − L)‖²)` — lag-compensated tracking accuracy: aim against the target the player is actually tracking, `L` ago. Removing the player's pure latency isolates the sensitivity-dependent error (tremor + gain over/undershoot). `L` is the player's OWN latency (measured, below), not a fixed constant.
+- **Predictive Index / measured latency** `PI = −ℓ*`, where `ℓ*` = argmax lag of the (zero-mean, sub-sample parabolic-refined) cross-correlation between crosshair and target bearing. `PI > 0` = predictive/feed-forward; `PI < 0` = reactive/lagging. The lag in seconds **is** the player's tracking latency `L` — the dragonfly forward model's horizon, fitted to the player rather than assumed.
 - **Jitter** `= RMS of high-pass-filtered aim angular velocity` above a cutoff `f_c ≈ 3–5 Hz` (the VOR/OKR split: task motion is below it, hand tremor ~8–12 Hz is above). Plus sub-movement count and `slip_rate` (RMS of target − aim angular velocity).
 - **Time-on-target** `TOT` = fraction of frames within the target's angular radius.
-- Composite: `Score = w₁·TOT − w₂·E_lead − w₃·|PI − PI_target| − w₄·Var(θ̈_C)` (normalize terms across the sweep).
+- Composite: `Score = w₁·TOT − w₂·E_pred − w₃·jitter − w₄·slip` (normalize terms across the sweep).
 
 **cm/360 signal.** Too-low cm/360 (too sensitive) → tremor multiplied into jitter, overshoot oscillation around `θ*_opt`. Too-high cm/360 → cannot reach `θ*_opt` during velocity steps, crosshair lags (`PI < 0`), slip rises. Optimum jointly minimizes slip + jitter.
 
-**Scorer:** Kalman tracker (innovation `ν = z − Hx̂⁻` is the instantaneous tracking error).
+**Scorer:** the lag-compensated predictive residual `E_pred` at the player's measured latency `L`. The constant-velocity Kalman filter smooths the *target's* motion (its velocity estimate feeds the slip term, the falcon VOR/OKR analog); the filter's innovation `ν = z − Hx̂⁻` is a *target*-prediction residual — a function of the target and the filter, not the player — so it is **not** the score.
 
 ### 4.2 `+flick` — staged acquisition + dual-fovea two-mode
 **Organisms:** 🕷️ jumping spider · 🦅 raptor dual fovea
@@ -95,12 +95,12 @@ Each instrument isolates one axis of the same underlying **speed↔accuracy / bi
 **The drill.** Snap to targets across a grid of distances `A` and sizes `W` (low-ID large flicks → high-ID small precise locks), then settle and fire at a controlled error rate (~4–8%).
 
 **What we measure.**
-- **Stage decomposition** of the mouse-velocity trace: `t_D` (detection latency: onset → first movement), `t_O` (primary ballistic orient: to first velocity trough; gain `G = covered/required`, overshoot), `t_C` + `N_corr` (corrective sub-movements during confirm).
-- **Fitts effective throughput** (ISO 9241-9): per condition, `We = 4.133·σ` (σ = endpoint SD), `IDe = log2(Ae/We + 1)`, `TP = IDe / MT_mean`; aggregate as mean-of-means across conditions. This is the primary flick score (bits/s).
+- **Stage decomposition** of the mouse-velocity trace: `t_D` (detection latency: onset → first movement), `t_O` (primary ballistic orient: to first velocity trough), `t_C` + `N_corr` (corrective sub-movements during confirm). Recorded as diagnostics; the orient/confirm costs (overshoot, corrections) already surface in throughput via inflated `MT` and endpoint SD.
+- **Fitts effective throughput** (ISO 9241-9): per condition, `We = 4.133·σ` (σ = endpoint SD), `IDe = log2(Ae/We + 1)`, `TP = IDe / MT_mean`. Conditions are split into **ballistic** (large amplitude) and **precision** (small width) sub-sets, each aggregated by mean-of-means.
 
-**cm/360 signal.** The central tension: **flick throughput peaks at lower cm/360** (higher sens, big reorientations cheap), **micro/lock throughput peaks at higher cm/360** (lower sens, fine placement + attenuated tremor). The optimum is the crossover of the two curves, weighted by the player's role. Too-high sens → `N_corr`/`t_C` inflate (overshoot oscillation); too-low → `t_O` slow, `G < 1` undershoot.
+**cm/360 signal.** The central tension: **ballistic throughput peaks at lower cm/360** (higher sens, big reorientations cheap), **precision-lock throughput peaks at higher cm/360** (lower sens, fine placement + attenuated tremor). The optimum is the **crossover** of the two curves — realized as the harmonic mean of the two sub-throughputs, which is maximized exactly where the weaker mode is strongest. Too-high sens → `N_corr`/`t_C` inflate (overshoot oscillation); too-low → `t_O` slow, undershoot.
 
-**Scorer:** Fitts effective-throughput.
+**Scorer:** two-mode crossover — harmonic mean of ballistic (large-amplitude) and precision (small-width) effective throughput.
 
 ### 4.3 `+calibrate` — bias vs variance (the calibration metaphor)
 **Organism:** 🐟 archerfish
@@ -136,9 +136,9 @@ Each instrument isolates one axis of the same underlying **speed↔accuracy / bi
 **Score → Search → Report**, all client-side TypeScript, implementable from scratch (optional tiny pure-TS helpers: `ml-matrix`, `ml-levenberg-marquardt`).
 
 ### 5.1 Scorer
-- **Fitts effective-throughput** (flicks): `TP = IDe / MT_mean` with effective width `We = 4.133σ` (ISO 9241-9), per-condition then mean-of-means. Gives a single speed-accuracy-normalized scalar and a free per-trial noise estimate `σ_obs`.
-- **Kalman tracker** (tracking): constant-velocity target model; innovation = tracking error; score `= −mean‖ν‖²`. Player motor noise `R(s)` is sensitivity-dependent.
-- Blended per profile: `y(s) = w1·TP_norm + w2·(−RMS_track_norm)`.
+- **Fitts effective-throughput** (flicks): `TP = IDe / MT_mean` with effective width `We = 4.133σ` (ISO 9241-9), per-condition; combined as the **two-mode crossover** (harmonic mean of ballistic vs precision throughput) so the flick optimum is a genuine crossover, not a pooled average.
+- **Predictive tracker** (tracking): a constant-velocity Kalman filter smooths the *target* (→ slip term); the player's latency `L` is the sub-sample cross-correlation lag, and the score is the **lag-compensated predictive residual** (tremor + gain). The innovation is a target-prediction residual, not the score.
+- Blended per profile: each instrument is z-scored across its own sweep (affine, peak-preserving) and summed with the profile weights; the speed↔accuracy preference enters only through the strike pole (see §5.3).
 
 ### 5.2 Search engine — Bayesian optimization (primary)
 - Optimize in **log-space** `x = ln(s)`; domain e.g. `s ∈ [15, 60]` cm/360.
