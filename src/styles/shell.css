@@ -145,7 +145,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero__wing, .hero__wing span, .hero__sky-layer, .hero__inner { animation: none !important; }
-  .hero__sky-layer { transform: none !important; }
+  .hero__sky-layer { transform: none !important; transition: none !important; }
 }
 
 /* ─── Setup screen ─────────────────────────────────────────────────────────── */

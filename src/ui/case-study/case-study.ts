@@ -65,6 +65,7 @@ function buildFigure(): HTMLElement {
   const input = demoConvergence();
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('data-plot', '');
+  svg.setAttribute('aria-hidden', 'true'); // the figcaption is the accessible description
   renderConvergencePlot(svg, plotGeometry(input), 'blended score (z)');
   fig.appendChild(svg);
   const cap = document.createElement('figcaption');
