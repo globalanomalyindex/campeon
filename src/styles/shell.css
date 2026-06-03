@@ -6,11 +6,14 @@
 .wrap { width: min(72rem, 92vw); margin-inline: auto; }
 .stack > * + * { margin-top: var(--space-3); }
 
-.action { font-family: var(--font-display); background: none; border: 0; cursor: pointer; color: inherit; }
+.action { font-family: var(--font-display); background: none; border: 0; cursor: pointer; color: inherit; transition: transform var(--dur-fast) var(--ease-out); }
 .action--primary { color: var(--gold); font-size: 1.5rem; }
 .action--ghost { color: var(--slate-2); font-size: 1rem; }
 .action--primary::before, .action--ghost::before { content: '+ '; }
 .action:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.action:active { transform: scale(.97); }
+/* the goal slider rides the brand gold */
+.field input[type="range"] { accent-color: var(--gold); }
 
 .mono { font-family: var(--font-mono); }
 .display { font-family: var(--font-display); line-height: .92; }

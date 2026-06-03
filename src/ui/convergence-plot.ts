@@ -77,7 +77,7 @@ const ORGANISM_VAR: Record<InstrumentId, string> = {
 };
 
 /** Thin renderer: clears `svg` and draws the geometry (CI band → curve → marks → peak → ticks). */
-export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry): void {
+export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?: string): void {
   svg.setAttribute('viewBox', `0 0 ${g.size.width} ${g.size.height}`);
   svg.replaceChildren();
 
@@ -115,5 +115,16 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry): void {
     });
     label.textContent = String(t.cm360);
     svg.appendChild(label);
+  }
+
+  if (yLabel) {
+    const yc = g.size.height / 2;
+    const lab = el('text', {
+      x: '10', y: yc.toFixed(1), 'text-anchor': 'middle',
+      transform: `rotate(-90 10 ${yc.toFixed(1)})`,
+      fill: 'var(--slate-2)', 'font-size': '10', 'font-family': 'var(--font-mono)', 'data-ylabel': '',
+    });
+    lab.textContent = yLabel;
+    svg.appendChild(lab);
   }
 }

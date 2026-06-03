@@ -75,7 +75,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           curve: report.curve, ci90: report.ci90, peak: report.optimalCm360,
           size: { width: svg.clientWidth || 360, height: svg.clientHeight || 180 },
         });
-        renderConvergencePlot(svg, g);
+        renderConvergencePlot(svg, g, 'blended score');
         hudEstimate.textContent = `${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)}`;
       };
 

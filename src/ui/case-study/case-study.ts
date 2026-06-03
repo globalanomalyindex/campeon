@@ -65,7 +65,7 @@ function buildFigure(): HTMLElement {
   const input = demoConvergence();
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('data-plot', '');
-  renderConvergencePlot(svg, plotGeometry(input));
+  renderConvergencePlot(svg, plotGeometry(input), 'blended score (z)');
   fig.appendChild(svg);
   const cap = document.createElement('figcaption');
   cap.textContent =
