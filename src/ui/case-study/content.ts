@@ -113,14 +113,14 @@ export const SECTIONS: CaseSection[] = [
     lede: 'the four instruments measure different physical quantities — bits per second, a (0,1] rate, strikes per second, degrees. the trick is fusing them without lying.',
     body: [
       'each instrument is swept across cm/360 and <strong>z-scored across its own sweep</strong>. z-scoring is an affine map, and a quadratic\'s peak is invariant under affine transforms — so normalizing makes heterogeneous metrics commensurable <span class="cs-mark">without moving any instrument\'s own optimum</span>. that is the whole reason the fusion is honest rather than arbitrary.',
-      'the blended objective (weighted by your speed↔accuracy preference) feeds a <strong>gaussian-process bayesian optimizer</strong> — a matérn-5/2 surrogate, expected-improvement acquisition on a dense ln(cm/360) grid — which proposes the next trial where it expects to learn most. a psychometric curve is fit; a <strong>bootstrap</strong> draws the 90% confidence interval.',
-      'the payoff is conceptual: there is <em>one</em> latent constant on <em>one</em> manifold, and the four faculties are four views of it. when they agree, the interval is tight. when they disagree, the interval widens — <span class="cs-mark">the ci width is the system telling you how much your four faculties concur.</span>',
+      'the four instruments blend on equal footing — your speed↔accuracy preference tunes the <em>strike</em> pole (the one facet that is taste, not skill), which then enters the blend. that blend feeds a <strong>gaussian-process bayesian optimizer</strong> — a matérn-5/2 surrogate, expected-improvement acquisition on a dense ln(cm/360) grid — which proposes the next trial where it expects to learn most. a <strong>parabola</strong> is then fit in log-sensitivity to locate the peak — cross-checked against the gp\'s own argmax — and a <strong>bootstrap</strong> draws the 90% confidence interval.',
+      'the payoff is conceptual: there is <em>one</em> latent constant on <em>one</em> manifold, and the four faculties are four views of it. the interval\'s width is the estimate\'s total uncertainty — sampling noise, the fit, and how much the faculties disagree all widen it. a tight interval means the views concur on a sharp answer; <span class="cs-mark">a wide one is the system admitting the data don\'t yet pin the number down.</span>',
     ],
     spec: [
       { k: 'normalize', v: 'per-instrument z-score (affine, peak-preserving)' },
       { k: 'surrogate', v: 'gaussian process · matérn-5/2' },
       { k: 'acquisition', v: 'expected improvement on ln(cm/360)', mono: true },
-      { k: 'uncertainty', v: 'bootstrap 90% ci — width = facet agreement' },
+      { k: 'uncertainty', v: 'bootstrap 90% ci — widens with noise + facet disagreement' },
     ],
   },
   {

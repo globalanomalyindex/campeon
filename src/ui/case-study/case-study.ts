@@ -74,7 +74,7 @@ function buildFigure(): HTMLElement {
   fig.appendChild(svg);
   const cap = document.createElement('figcaption');
   cap.textContent =
-    'four instruments, each z-scored across the sweep, converging on one peak. the gold band is the 90% ci — its width is how much the faculties agree.';
+    'four instruments, each z-scored across the sweep, converging on one peak. the gold band is the 90% ci — it widens with measurement noise and facet disagreement.';
   fig.appendChild(cap);
   return fig;
 }
