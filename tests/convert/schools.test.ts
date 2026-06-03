@@ -22,9 +22,18 @@ describe('monitor-distance conversion (FOV-aware)', () => {
   it('is identity when source and target FOV match (any fraction)', () => {
     expect(monitorDistanceMatchCm360(30, 103, 103, 0.5)).toBeCloseTo(30, 6);
   });
-  it('at fraction → 0 reduces to the focal-length (tangent) ratio', () => {
+  it('at fraction → 0 reduces to the focal-length (tangent) ratio tan(src/2)/tan(tgt/2)', () => {
+    // cm360_tgt = cm360_src · θ_src/θ_tgt; as m→0, θ→m·tan(fov/2) ⇒ ratio = tan(src/2)/tan(tgt/2).
+    const rad = (d: number): number => (d * Math.PI) / 180;
     const out = monitorDistanceMatchCm360(30, 90, 106.26, 0.0001);
-    expect(out / 30).toBeCloseTo(Math.tan((106.26 / 2) * Math.PI / 180) / Math.tan((90 / 2) * Math.PI / 180), 2);
+    expect(out / 30).toBeCloseTo(Math.tan(rad(45)) / Math.tan(rad(53.13)), 3);
+    expect(monitorDistanceMatchCm360(30, 90, 106.26, 0)).toBeCloseTo(30 * Math.tan(rad(45)) / Math.tan(rad(53.13)), 4);
+  });
+  it('a WIDER target FOV yields a smaller cm/360 (more sensitive); a narrower one, larger', () => {
+    // Load-bearing direction (the original formula was inverted): matching the physical flick to a
+    // fixed screen point, a wider FOV puts that point more degrees away ⇒ fewer cm/deg ⇒ less cm/360.
+    expect(monitorDistanceMatchCm360(30, 90, 110, 0.5)).toBeLessThan(30);
+    expect(monitorDistanceMatchCm360(30, 90, 70, 0.5)).toBeGreaterThan(30);
   });
   it('exposes both schools with 360-distance as the default', () => {
     expect(CONVERSION_SCHOOLS.map((s) => s.id)).toEqual(['360', 'monitor']);

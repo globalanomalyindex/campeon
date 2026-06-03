@@ -20,17 +20,27 @@ export const CONVERSION_SCHOOLS: ConversionSchool[] = [
 
 const rad = (deg: number): number => (deg * Math.PI) / 180;
 
-/** cm/360 that preserves "monitor-distance feel" when moving from sourceFov to targetFov,
- *  matching the angle subtended by a fraction `m` (0..1) of the horizontal half-screen.
- *  θ(m, fov) = atan(m·tan(fov/2)); matched cm/360 scales with the ratio of those angles. */
+/**
+ * cm/360 that preserves "monitor-distance feel" when moving from sourceFov to targetFov,
+ * matching the physical mouse travel to flick the crosshair to a fraction `m` (0..1) of the
+ * horizontal half-screen.
+ *
+ * Derivation. The on-screen point at fraction m subtends view-angle θ(m,fov) = atan(m·tan(fov/2))
+ * (flat projection: half-width = tan(fov/2) focal units). The physical travel to rotate there is
+ * D = cm360 · θ/360, linear in θ. Monitor-distance matching sets D equal across the two FOVs:
+ *     cm360_tgt · θ(m,fov_tgt) = cm360_src · θ(m,fov_src)
+ *   ⟹ cm360_tgt = cm360_src · θ(m,fov_src) / θ(m,fov_tgt).
+ * So a WIDER target FOV (larger θ_tgt) needs a SMALLER cm/360 (more sensitive) to keep the feel.
+ * As m→0, θ→m·tan(fov/2), so the ratio reduces to the tangent (focal-length) ratio.
+ */
 export function monitorDistanceMatchCm360(
   sourceCm360: Cm360, sourceFovDeg: number, targetFovDeg: number, fraction: number,
 ): Cm360 {
   const m = Math.max(0, Math.min(1, fraction));
-  const thetaSrc = Math.atan(m * Math.tan(rad(sourceFovDeg) / 2));
-  const thetaTgt = Math.atan(m * Math.tan(rad(targetFovDeg) / 2));
-  if (thetaSrc === 0) {
-    return sourceCm360 * (Math.tan(rad(targetFovDeg) / 2) / Math.tan(rad(sourceFovDeg) / 2));
-  }
-  return sourceCm360 * (thetaTgt / thetaSrc);
+  const tanSrc = Math.tan(rad(sourceFovDeg) / 2);
+  const tanTgt = Math.tan(rad(targetFovDeg) / 2);
+  if (m === 0) return sourceCm360 * (tanSrc / tanTgt); // 0% monitor distance: focal-length ratio
+  const thetaSrc = Math.atan(m * tanSrc);
+  const thetaTgt = Math.atan(m * tanTgt);
+  return sourceCm360 * (thetaSrc / thetaTgt);
 }
