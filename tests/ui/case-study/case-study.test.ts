@@ -35,6 +35,15 @@ describe('caseStudy screen', () => {
     expect(host.querySelector('.cs-figure [data-peak]')).not.toBeNull();
     screen.unmount();
   });
+  it('foregrounds the environment for each of the four predator instruments', () => {
+    // The thesis is environment-first: each instrument section names the niche that forged the
+    // accuracy (sensitivity is evolved IN it), not just the animal's brain.
+    const host = document.createElement('div');
+    const screen = caseStudy(host, ctx());
+    screen.mount();
+    expect(host.querySelectorAll('.cs-environment').length).toBe(4);
+    screen.unmount();
+  });
   it('back action navigates to the hero', () => {
     const host = document.createElement('div');
     const navigate = vi.fn();

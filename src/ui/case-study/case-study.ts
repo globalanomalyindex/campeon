@@ -48,6 +48,17 @@ function buildSection(s: CaseSection): HTMLElement {
     grid.appendChild(lede);
   }
 
+  if (s.environment) {
+    const env = document.createElement('p');
+    env.className = 'cs-environment';
+    const tag = document.createElement('span');
+    tag.className = 'cs-env-tag mono';
+    tag.setAttribute('aria-hidden', 'true');
+    tag.textContent = 'the environment';
+    env.append(tag, document.createTextNode(s.environment));
+    grid.appendChild(env);
+  }
+
   const body = document.createElement('div');
   body.className = 'cs-body';
   body.innerHTML = s.body.map((p) => `<p>${p}</p>`).join('');
