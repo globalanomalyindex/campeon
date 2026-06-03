@@ -1,5 +1,6 @@
 import { WebGLRenderer } from 'three';
 import { Arena, type InputSource } from '../engine/arena';
+import { createPsxPass } from '../engine/psx-pass';
 import { createPointerLock } from '../input/pointer-lock';
 import { makeEvolution } from '../optimizer/evolution';
 import { runSession } from '../optimizer/session-controller';
@@ -7,6 +8,7 @@ import { buildResult } from '../optimizer/result';
 import { INSTRUMENTS } from '../instruments/registry';
 import { mulberry32 } from '../stats/rng';
 import { plotGeometry, renderConvergencePlot, type PlotMark } from './convergence-plot';
+import { createViewmodel, type Viewmodel } from './viewmodel/viewmodel';
 import type { AppContext, Screen } from './shell';
 import type { InstrumentId, Report, TrialResult } from '../types';
 
@@ -39,6 +41,8 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
   let raf = 0;
   let alive = true;
   let cleanup: (() => void) | null = null;
+  let viewmodel: Viewmodel | null = null;
+  let offFire: (() => void) | null = null;
 
   return {
     mount() {
@@ -62,12 +66,23 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       const renderer = new WebGLRenderer({ canvas, antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       const size = (): [number, number] => [window.innerWidth, window.innerHeight];
+      const psx = createPsxPass(renderer, size); // PS1 abyss: low-res + dither + posterize + scanlines
       const pointer = createPointerLock(canvas);
       const input: InputSource = {
         onSample: (cb) => pointer.onSample(cb),
         onFire: (cb) => pointer.onFire(cb),
       };
-      const arena = new Arena({ renderer, input, size, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, rng: mulberry32(7) });
+      const arena = new Arena({ renderer, input, size, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, rng: mulberry32(7), postProcessor: psx });
+
+      // PSX Desert Eagle viewmodel — cosmetic overlay (loads async; never touches the pointer stream
+      // or the cm/360 math). Smoking idle pre-lock → flick+draw on start → fire on each shot.
+      const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      void createViewmodel({ reducedMotion: reduced }).then((vm) => {
+        if (!alive) { vm.dispose(); return; }
+        viewmodel = vm;
+        root.appendChild(vm.el);
+      });
+      offFire = pointer.onFire(() => viewmodel?.play('fire', 'idleReady'));
 
       const onResize = (): void => arena.resize();
       window.addEventListener('resize', onResize);
@@ -75,6 +90,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       const loop = (ts: number): void => {
         const dt = last === 0 ? 16 : ts - last; last = ts;
         arena.tick(dt); arena.render();
+        viewmodel?.tick(ts);
         raf = window.requestAnimationFrame(loop);
       };
       raf = window.requestAnimationFrame(loop);
@@ -90,6 +106,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       };
 
       const start = (): void => {
+        viewmodel?.play('flickDraw', 'idleReady'); // flick the cigarette, draw the deagle (the reveal)
         const engine = makeEvolution({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 }, sigma0: 0.3, maxTrials: MAX_TRIALS });
         void runSession({
           dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
@@ -118,6 +135,8 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         alive = false;
         window.cancelAnimationFrame(raf);
         window.removeEventListener('resize', onResize);
+        offFire?.();
+        viewmodel?.dispose();
         pointer.dispose();
         arena.dispose();
       };

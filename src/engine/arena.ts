@@ -9,6 +9,7 @@ import {
 import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, Ms, TargetHandle, TargetSpec } from '../types';
 import { CameraRig } from './camera-rig';
 import { Target, MovingTarget, placeStatic, type Placement } from './targets';
+import type { PostProcessor } from './psx-pass';
 
 /** Minimal renderer surface the arena needs — satisfied by THREE.WebGLRenderer. */
 export interface RendererLike {
@@ -31,6 +32,8 @@ export interface ArenaOptions {
   cm360: Cm360;
   dpi: Dpi;
   rng?: () => number;
+  /** Optional cosmetic post-processor (e.g. the PSX pass). When present it owns the final draw. */
+  postProcessor?: PostProcessor;
 }
 
 type AimCallback = (sample: AimSample, view: [Degrees, Degrees]) => void;
@@ -55,9 +58,11 @@ export class Arena implements ArenaScene {
   private readonly envDisposables: Array<{ dispose(): void }> = [];
   private disposed = false;
   private nowMs: Ms = 0;
+  private readonly post: PostProcessor | undefined;
 
   constructor(opts: ArenaOptions) {
     this.renderer = opts.renderer;
+    this.post = opts.postProcessor;
     this.sizeFn = opts.size;
     this.rng = opts.rng ?? Math.random;
     const [w, h] = this.sizeFn();
@@ -176,11 +181,13 @@ export class Arena implements ArenaScene {
     this.rig.camera.aspect = w / Math.max(1, h);
     this.rig.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.post?.setSize(w, h);
   }
 
-  /** Render one frame (call from the host's RAF loop). */
+  /** Render one frame (call from the host's RAF loop). The PSX pass, if present, owns the final draw. */
   render(): void {
-    this.renderer.render(this.scene, this.rig.camera);
+    if (this.post) this.post.render(this.scene, this.rig.camera);
+    else this.renderer.render(this.scene, this.rig.camera);
   }
 
   dispose(): void {
@@ -192,6 +199,7 @@ export class Arena implements ArenaScene {
     this.frameCbs.clear();
     this.fireCbs.clear();
     for (const d of this.envDisposables) d.dispose();
+    this.post?.dispose();
     this.renderer.dispose();
   }
 }
