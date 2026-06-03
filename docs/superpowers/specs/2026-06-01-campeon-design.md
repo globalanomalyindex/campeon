@@ -261,7 +261,7 @@ A browser exposes only *relative* mouse deltas, warped by OS pointer acceleratio
 - The **wing flaps**.
 - Sky elements **parallax past behind the wing**, occluded by its silhouette and **never bleeding through its edges** (wing = opaque foreground layer; parallax sky strictly behind, masked to the wing shape) — the illusion of flying.
 
-**Arena (v1 functional → PSX skin deferred):** v1 ships a clean, calm dark arena (high target contrast, low distraction). Later, the art direction is a **low-res PSX abyss** that becomes a **PSX-style run-and-gun** using supplied 2D sprites — big chrome Desert Eagle, **ULTRAKILL** energy. The PSX skin layers onto the proven measurement core; it does not gate it.
+**Arena (v1 functional → PSX skin SHIPPING):** v1 shipped a clean dark arena; the **PSX skin now layers on** (cosmetic, never gating the measurement core). Done: a **low-res PSX-abyss post pass** (`engine/psx-pass.ts` — 1/3-res render target, 4×4 Bayer ordered dither, posterize to ~6 levels, scanlines + vignette; injected as an optional `Arena.postProcessor` so the renderer-agnostic test seam stays intact), and the **chrome Desert Eagle viewmodel** (`ui/viewmodel/` — the supplied `public/sprites/deagle.png` 8×7 sheet, magenta-keyed, anchored lower-right CS:Source-style, animation state machine: smoking→flick+draw→fire→idle, wired into the session). Both verified in Chromium. **ULTRAKILL** energy. Targets stay angularly exact — the skin owns only the final draw + an overlay canvas, never geometry/pointer/cm-360. **Remaining:** per-environment **enemy/"prey" sprites** (needs more supplied sheets), `brush_shoulders` (the sheet dropped that row), and look-tuning (key-fringe cleanup, plot/viewmodel z-overlap, brightness).
 
 ---
 
