@@ -1,5 +1,5 @@
 import type { Observation } from '../types';
-import { fitQuadratic } from './psychometric';
+import { fitQuadratic } from './peak-fit';
 
 export { mulberry32 } from './rng';
 
@@ -11,8 +11,8 @@ const peakCm360 = (obs: Observation[]): number => {
 };
 
 /**
- * Parametric bootstrap 90% CI on the optimal cm/360.
- * Resamples residuals around the fitted curve, refits, and takes the 5th/95th percentiles.
+ * Residual (semi-parametric) bootstrap 90% CI on the optimal cm/360.
+ * Resamples residuals around the fitted parabola, refits, and takes the 5th/95th percentiles.
  * Non-concave resamples (no peak) are dropped, so the CI reflects only valid peak estimates.
  */
 export function bootstrapCi(obs: Observation[], iters: number, rng: () => number): [number, number] {

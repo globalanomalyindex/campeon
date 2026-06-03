@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { fitQuadratic, fitPeak } from '../../src/stats/psychometric';
+import { fitQuadratic, fitPeak } from '../../src/stats/peak-fit';
 import type { Observation } from '../../src/types';
 
-describe('psychometric peak fit', () => {
+describe('parabolic peak fit', () => {
   // y = -2 (x - ln35)^2 + 5  → peak at x = ln(35)
   const peakX = Math.log(35);
   const obs: Observation[] = [];

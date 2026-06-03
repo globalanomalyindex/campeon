@@ -10,7 +10,7 @@ import type {
   SearchEngine,
   TrialResult,
 } from '../types';
-import { fitPeak } from '../stats/psychometric';
+import { fitPeak } from '../stats/peak-fit';
 import { bootstrapCi } from '../stats/bootstrap';
 import { mulberry32 } from '../stats/rng';
 import { trialsToObservations } from './objective';
@@ -42,7 +42,7 @@ function fallbackReport(obs: readonly Observation[], lo: Cm360, hi: Cm360): Repo
 }
 
 /**
- * Observations → Report. Fits the peaked psychometric curve, bootstraps the 90% CI, clamps to
+ * Observations → Report. Fits the parabolic performance curve, bootstraps the 90% CI, clamps to
  * bounds. When no peak can be located — too few points (<3), a non-concave fit, or a singular
  * /degenerate design — it honestly reports the best-observed cm/360 with the FULL bounds as the CI;
  * a wide CI is the honesty signal, never hidden. Unexpected errors are re-thrown, not masked. If a

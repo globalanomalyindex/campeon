@@ -1,5 +1,15 @@
 import type { Observation } from '../types';
 
+/**
+ * Parabolic peak-finding: least-squares quadratic regression of a performance score against
+ * x = ln(cm/360), with the optimum at the vertex x* = −b1/2b2.
+ *
+ * Terminology: this is quadratic peak interpolation — NOT a psychometric function. A psychometric
+ * function is a sigmoid mapping stimulus intensity → P(correct), used for *threshold* estimation;
+ * here the performance-vs-sensitivity curve is an inverted-U whose *peak* we want, locally
+ * well-approximated by a parabola in log-sensitivity.
+ */
+
 export interface Quadratic { b0: number; b1: number; b2: number; }
 
 /** Solve a 3×3 linear system A x = b by Gaussian elimination with partial pivoting. */
@@ -36,7 +46,7 @@ export function fitQuadratic(obs: Observation[]): Quadratic {
 export interface PeakFit { optimalCm360: number; coeffs: Quadratic; curve: { x: number; mean: number }[]; }
 
 /**
- * Fit the peaked curve and return the optimum cm/360 (= exp(−b1/2b2)) plus a sampled curve.
+ * Fit the parabola and return the optimum cm/360 (= exp(−b1/2b2)) plus a sampled curve.
  * Requires a concave fit (b2 < 0, a true peak). Throws if the data is convex/linear
  * (no interior maximum) — the Phase-4 session controller decides what to do (gather more
  * trials); the bootstrap CI path filters non-concave resamples rather than calling this.

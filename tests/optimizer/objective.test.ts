@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { trialsToObservations } from '../../src/optimizer/objective';
-import { fitPeak } from '../../src/stats/psychometric';
+import { fitPeak } from '../../src/stats/peak-fit';
 import type { InstrumentId, Profile, TrialResult } from '../../src/types';
 
 const prof = (weights: Partial<Record<InstrumentId, number>>): Profile => ({
