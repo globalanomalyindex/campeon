@@ -25,6 +25,11 @@ const COPY: Record<InstrumentId, string> = {
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
+/** Live HUD line for the search loop — which sensitivity the optimizer is handing you this trial. */
+export function searchLabel(index: number, maxTrials: number, cm360: number): string {
+  return `trial ${index + 1} / ${maxTrials} · testing ${cm360.toFixed(1)} cm/360`;
+}
+
 export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
   let raf = 0;
   let alive = true;
@@ -76,7 +81,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           size: { width: svg.clientWidth || 360, height: svg.clientHeight || 180 },
         });
         renderConvergencePlot(svg, g, 'blended score');
-        hudEstimate.textContent = `${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)}`;
+        hudEstimate.textContent = `homing in · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)}`;
       };
 
       const start = (): void => {
@@ -85,9 +90,9 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
           engine, instruments: INSTRUMENTS, scene: arena, schedule: SCHEDULE,
           maxTrials: MAX_TRIALS, rng: mulberry32(2026), minTrials: 12, ciStopWidth: 6, bootstrapIters: 300,
-          onTrialStart: (id, i, _cm360) => {
+          onTrialStart: (id, i, cm360) => {
             hudInstruction.textContent = instructionFor(id);
-            hudProgress.textContent = `trial ${i + 1} / ${MAX_TRIALS}`;
+            hudProgress.textContent = searchLabel(i, MAX_TRIALS, cm360);
             arena.clearTargets();
           },
           onTrial: (_t, trials, interim) => drawPlot(interim, trials),
