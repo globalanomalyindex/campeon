@@ -39,4 +39,17 @@ describe('hero', () => {
     (host.querySelector('[data-action="options"]') as HTMLButtonElement).click();
     expect(ctx.nav).toEqual(expect.arrayContaining(['case-study', 'options']));
   });
+
+  it('renders a parallax sky behind the composition and tears down cleanly on unmount', () => {
+    const ctx = fakeCtx();
+    const host = document.createElement('div');
+    const screen = hero(host, ctx);
+    screen.mount();
+    const sky = host.querySelector('.hero__sky');
+    expect(sky).not.toBeNull();
+    expect(sky!.getAttribute('aria-hidden')).toBe('true');
+    expect(host.querySelectorAll('.hero__sky-layer').length).toBeGreaterThanOrEqual(2);
+    screen.unmount();
+    expect(host.children.length).toBe(0);
+  });
 });

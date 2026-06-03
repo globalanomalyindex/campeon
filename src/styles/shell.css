@@ -69,25 +69,81 @@
   font-family: var(--font-mono);
   font-size: 1.5rem;
   z-index: 0;
+  transform-origin: 22% 20%;                       /* shoulder — near the wing root (largest marks) */
+  animation: wing-flap 3.4s ease-in-out infinite;  /* the beat */
 }
 
-.hero__wing span { position: absolute; }
+.hero__wing span {
+  position: absolute;
+  transform: rotate(var(--rot, 0deg));
+  animation: wing-feather 3.4s var(--ease-out) infinite;  /* feathers catch the air, staggered */
+  animation-delay: calc(var(--i, 0) * -120ms);
+}
 
 /* Diagonal sweep — left wing of a stooping peregrine:
    marks arc from top-left (leading edge) toward lower-right (trailing tip),
    each rotated to reinforce the swept-back angle. */
-.hero__wing span:nth-child(1) { top: 12%; left: 14%; transform: rotate(-48deg); font-size: 2.2rem; }
-.hero__wing span:nth-child(2) { top: 18%; left: 22%; transform: rotate(-44deg); font-size: 2rem; }
-.hero__wing span:nth-child(3) { top: 25%; left: 31%; transform: rotate(-40deg); font-size: 1.8rem; }
-.hero__wing span:nth-child(4) { top: 32%; left: 39%; transform: rotate(-36deg); font-size: 1.6rem; }
-.hero__wing span:nth-child(5) { top: 40%; left: 46%; transform: rotate(-32deg); font-size: 1.4rem; }
-.hero__wing span:nth-child(6) { top: 49%; left: 52%; transform: rotate(-28deg); font-size: 1.2rem; }
-.hero__wing span:nth-child(7) { top: 58%; left: 57%; transform: rotate(-22deg); font-size: 1rem; }
-.hero__wing span:nth-child(8) { top: 67%; left: 62%; transform: rotate(-16deg); font-size: .85rem; }
+.hero__wing span:nth-child(1) { top: 12%; left: 14%; --rot: -48deg; font-size: 2.2rem; }
+.hero__wing span:nth-child(2) { top: 18%; left: 22%; --rot: -44deg; font-size: 2rem; }
+.hero__wing span:nth-child(3) { top: 25%; left: 31%; --rot: -40deg; font-size: 1.8rem; }
+.hero__wing span:nth-child(4) { top: 32%; left: 39%; --rot: -36deg; font-size: 1.6rem; }
+.hero__wing span:nth-child(5) { top: 40%; left: 46%; --rot: -32deg; font-size: 1.4rem; }
+.hero__wing span:nth-child(6) { top: 49%; left: 52%; --rot: -28deg; font-size: 1.2rem; }
+.hero__wing span:nth-child(7) { top: 58%; left: 57%; --rot: -22deg; font-size: 1rem; }
+.hero__wing span:nth-child(8) { top: 67%; left: 62%; --rot: -16deg; font-size: .85rem; }
 
 /* Ensure wordmark, tagline, actions sit above the wing scatter */
 .hero__mark, .hero__tagline, .hero__byline, .hero__nav,
 .hero__inner > .action { position: relative; z-index: 1; }
+
+/* ── Falcon motion (Phase 6): parallax sky + wing-flap + glide ──────────────────
+   The hero is a transparent composition over a faint drifting sky: the sky shows
+   only in the negative space, occluded by the opaque wordmark/wing (so it never
+   bleeds through their edges). Pointer parallax (--par-x/--par-y, set by hero.ts)
+   shifts each layer by depth. Everything freezes under prefers-reduced-motion. */
+.hero__sky { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.hero__sky-layer {
+  position: absolute; inset: -15%; background-repeat: repeat;
+  transition: transform .4s var(--ease-out); will-change: transform, background-position;
+}
+.hero__sky-layer[data-depth="far"] {
+  background-image: radial-gradient(color-mix(in oklab, var(--slate-2) 32%, transparent) 1px, transparent 1.7px);
+  background-size: 132px 132px; opacity: .22;
+  transform: translate3d(calc(var(--par-x, 0) * 6px), calc(var(--par-y, 0) * 4px), 0);
+  animation: sky-drift-far 90s linear infinite;
+}
+.hero__sky-layer[data-depth="mid"] {
+  background-image: radial-gradient(color-mix(in oklab, var(--slate-2) 42%, transparent) 1px, transparent 1.8px);
+  background-size: 208px 208px; opacity: .18;
+  transform: translate3d(calc(var(--par-x, 0) * 12px), calc(var(--par-y, 0) * 8px), 0);
+  animation: sky-drift-mid 64s linear infinite;
+}
+.hero__sky-layer[data-depth="near"] {
+  background-image: radial-gradient(color-mix(in oklab, var(--gold) 30%, transparent) 1px, transparent 2px);
+  background-size: 320px 320px; opacity: .16;
+  transform: translate3d(calc(var(--par-x, 0) * 22px), calc(var(--par-y, 0) * 15px), 0);
+  animation: sky-drift-near 44s linear infinite;
+}
+@keyframes sky-drift-far  { from { background-position: 0 0; } to { background-position: -264px 132px; } }
+@keyframes sky-drift-mid  { from { background-position: 0 0; } to { background-position: 208px -160px; } }
+@keyframes sky-drift-near { from { background-position: 0 0; } to { background-position: -320px 220px; } }
+
+@keyframes wing-flap {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-3deg); }
+}
+@keyframes wing-feather {
+  0%, 100% { transform: rotate(var(--rot, 0deg)) translate(0, 0); }
+  50%      { transform: rotate(var(--rot, 0deg)) translate(2px, -4px); }
+}
+
+.hero__inner { animation: hero-bob 8s ease-in-out infinite; }   /* the glide */
+@keyframes hero-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__wing, .hero__wing span, .hero__sky-layer, .hero__inner { animation: none !important; }
+  .hero__sky-layer { transform: none !important; }
+}
 
 /* ─── Setup screen ─────────────────────────────────────────────────────────── */
 .setup__inner { max-width: 34rem; margin-inline: auto; padding: var(--space-6) 0; }
