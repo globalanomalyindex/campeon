@@ -60,9 +60,9 @@ the app can pick any convenient `Y_app` and solve its internal `sens` to render 
 
 ---
 
-## 4. The instruments (six mechanisms → four tests)
+## 4. The instruments (four environments, six mechanisms)
 
-Each instrument isolates one axis of the same underlying **speed↔accuracy / bias↔variance** trade-off in cm/360. All angular quantities are in degrees; times in milliseconds.
+**Framing (the central hypothesis).** campeón does **not** simulate the animals' brains. A predator's accuracy is the *result* of an **environment** that demanded it; the human equivalent of that evolved internal target-acquisition mechanism is one tunable number — **sensitivity** (cm/360). So each "instrument" is really an **environment**: the niche/selective pressure recreated, in which the player's sensitivity is the trait under selection. The biomechanics (Kalman lead, submovement stages, bias/variance, TTK) are kept only as the *environment-appropriate accuracy ruler* — the right way to score target acquisition in that niche — not as brain-mimicry. Hypothesis: *the same environments that forged these predators' accuracy will, via evolution over generations of sensitivities, forge the player's optimal cm/360.* Each environment isolates one axis of the same **speed↔accuracy / bias↔variance** trade-off. Angular quantities in degrees; times in milliseconds.
 
 ### 4.1 `+track` — predictive tracking + gaze-stabilization smoothness
 **Organisms:** 🦗 dragonfly · 🦅 peregrine falcon

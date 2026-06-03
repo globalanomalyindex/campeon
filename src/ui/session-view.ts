@@ -19,10 +19,10 @@ export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
 }
 
 const COPY: Record<InstrumentId, string> = {
-  track: '+track · become the dragonfly — hold its predictive lead on the weaving prey',
-  flick: '+flick · become the jumping spider — snap to each target, then confirm',
-  calibrate: '+calibrate · become the archerfish — learn the bend between where you aim and where shots land',
-  strike: '+strike · become the mantis shrimp — fire the instant you see it, no settling',
+  track: '+track · the open-air intercept — hold your lead on the weaving prey (dragonfly + falcon)',
+  flick: '+flick · the ambush — break-cover targets to snap and lock (spider + raptor)',
+  calibrate: '+calibrate · shooting through the bend — learn the gap between aim and impact (archerfish)',
+  strike: '+strike · the strike window — commit the instant you see it, no settling (mantis shrimp)',
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 

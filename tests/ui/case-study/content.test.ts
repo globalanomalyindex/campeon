@@ -7,6 +7,13 @@ describe('case-study content', () => {
       ['premise', 'track', 'flick', 'calibrate', 'strike', 'engine', 'honesty', 'colophon'],
     );
   });
+  it('each instrument act names the environment that forged its accuracy (not just the animal brain)', () => {
+    const byId = Object.fromEntries(SECTIONS.map((s) => [s.id, s]));
+    for (const id of ['track', 'flick', 'calibrate', 'strike']) {
+      expect(typeof byId[id]!.environment).toBe('string');
+      expect(byId[id]!.environment!.length).toBeGreaterThan(20);
+    }
+  });
   it('each instrument section carries its real organism numbers', () => {
     const byId = Object.fromEntries(SECTIONS.map((s) => [s.id, s]));
     const blob = (id: string) => JSON.stringify(byId[id]);

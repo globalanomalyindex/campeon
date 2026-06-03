@@ -23,7 +23,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
           <p class="result__lead">your sweet spot</p>
           <h1 class="display result__number"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
           <p class="result__ci mono">90% CI <span data-result="ci">${fmt(r.ci90[0])}–${fmt(r.ci90[1])}</span> cm/360</p>
-          <p class="result__credit">your most-evolved sensitivity — selected across generations against four predator faculties: dragonfly · falcon · spider · raptor · archerfish · mantis shrimp</p>
+          <p class="result__credit">your most-evolved sensitivity — the target-acquisition “brain” that won across four predator environments: dragonfly · falcon · spider · raptor · archerfish · mantis shrimp</p>
           <div class="result__breakdown">
             <div><span class="result__bk-label">bias-zero <em>archerfish</em></span><span class="mono" data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
             <div><span class="result__bk-label">precision floor</span><span class="mono" data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
