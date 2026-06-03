@@ -29,11 +29,11 @@ export const SECTIONS: CaseSection[] = [
     body: [
       'there is exactly one number that decides how far your hand travels to turn all the way around: <strong>cm/360</strong> — centimeters of mouse movement per 360°. it is hardware-independent, game-independent, the true unit of aim. everything downstream (your in-game sliders) is just this number wearing different clothes.',
       'the problem: nobody can tell you <em>yours</em>. so campeón treats it as a hidden quantity to be <span class="cs-mark">measured</span>, not guessed — and borrows its instruments from the only engineers who have already solved targeting: <strong>evolution</strong>.',
-      'six predators, four faculties: campeón turns each predator\'s <em>proven</em> targeting solution into a faculty that grades your aim, then <span class="cs-mark">hands you sensitivity after sensitivity</span> — hunting for the one cm/360 where you hold up best across all four. this page is the real mechanism behind each faculty, and how that search converges on a single number with a confidence interval.',
+      'so campeón copies nature <em>twice</em>. first it turns each of six predators\' <em>proven</em> targeting solutions into a faculty that grades your aim. then it runs the very process that built them — <span class="cs-mark">evolution</span>: generation by generation it mutates your sensitivity, keeps the variants that score higher, and lets the fittest carry on, until you converge on the most-evolved version of each predator in you. the rest of this page is the real mechanism behind each faculty, and how four of them fuse into a single master number with a confidence interval.',
     ],
     spec: [
       { k: 'the variable', v: 'cm/360 — physical cm per 360° turn' },
-      { k: 'method', v: 'bayesian search over a speed↔accuracy manifold' },
+      { k: 'method', v: 'evolutionary search over a speed↔accuracy manifold' },
       { k: 'output', v: 'one cm/360 + a 90% confidence interval', mono: true },
     ],
   },
@@ -80,11 +80,12 @@ export const SECTIONS: CaseSection[] = [
     title: 'the correction. separating aim from noise.',
     lede: 'an archerfish shoots prey through the air–water boundary and must cancel a systematic refraction offset of up to 10–15°. it learns the correction trial by trial.',
     body: [
-      'the tell that it is a real internal model: a <strong>negative aftereffect</strong> when the offset is removed — the signature of a recalibrated forward model. the abstraction campeón borrows is the cleanest in aim: <span class="cs-mark">error = systematic bias + random variance</span>. bias is learnable and removable; variance is your precision floor.',
+      'the tell that it is a real internal model: a <strong>negative aftereffect</strong> when the offset is removed — the signature of a recalibrated forward model. the abstraction campeón borrows is the cleanest in aim: <span class="cs-mark">error = systematic bias + random variance</span>. it is the same gap a shooter fights as <strong>recoil</strong> — the offset between where your crosshair points and where the rounds actually land. bias is learnable and removable; variance is your precision floor.',
       'we estimate gain bias g = E[r_impact]/E[r_required] (g > 1 = oversensitive, g < 1 = undersensitive) and decompose <strong>MSE = |bias|² + σ_R²</strong>. cm/360 drives bias steeply and monotonically, so the <em>bias-zero sensitivity</em> — where g crosses 1 — is the headline estimator. variance is the hardware/skill floor, not the recommendation.',
     ],
     spec: [
       { k: 'refraction offset', v: 'up to 10–15°', mono: true },
+      { k: 'fps analog', v: 'recoil — crosshair vs. point of impact' },
       { k: 'decomposition', v: 'MSE = |bias|² + σ_R²', mono: true },
       { k: 'headline', v: 'bias-zero cm/360 (gain g = 1)' },
     ],
@@ -113,13 +114,13 @@ export const SECTIONS: CaseSection[] = [
     lede: 'the four instruments measure different physical quantities — bits per second, a (0,1] rate, strikes per second, degrees. the trick is fusing them without lying.',
     body: [
       'each instrument is swept across cm/360 and <strong>z-scored across its own sweep</strong>. z-scoring is an affine map, and a quadratic\'s peak is invariant under affine transforms — so normalizing makes heterogeneous metrics commensurable <span class="cs-mark">without moving any instrument\'s own optimum</span>. that is the whole reason the fusion is honest rather than arbitrary.',
-      'the four instruments blend on equal footing — your speed↔accuracy preference tunes the <em>strike</em> pole (the one facet that is taste, not skill), which then enters the blend. that blended score is the objective a <strong>gaussian-process bayesian optimizer</strong> climbs: a matérn-5/2 surrogate reads every trial so far and <span class="cs-mark">picks the next sensitivity to hand you</span> — expected-improvement acquisition on a dense ln(cm/360) grid, spending trials where your optimum most likely hides rather than on a blind sweep. as the trials home in, a <strong>parabola</strong> fit in log-sensitivity locates the peak (cross-checked against the gp\'s own argmax) and a <strong>bootstrap</strong> draws the 90% confidence interval.',
+      'the four instruments blend on equal footing — your speed↔accuracy preference tunes the <em>strike</em> pole (the one facet that is taste, not skill), which then enters the blend. that blended score is <strong>fitness</strong>, and the search is the evolution the predators themselves underwent: each <span class="cs-mark">generation</span> mutates the fittest sensitivity so far by a gaussian step, plays the most promising offspring, and keeps it only if it scores higher — elitist selection, the step size self-adapting by the 1/5 success rule (offspring keep winning → widen the search; they stop → narrow in and refine). a <strong>gaussian-process</strong> (matérn-5/2) is the lineage\'s memory of the fitness landscape — it denoises selection so a lucky trial can\'t win, and screens offspring so none of your scarce trials are wasted. as the lineage converges, a <strong>parabola</strong> fit in log-sensitivity locates the peak (cross-checked against the gp\'s argmax) and a <strong>bootstrap</strong> draws the 90% confidence interval.',
       'the payoff is conceptual: there is <em>one</em> latent constant on <em>one</em> manifold, and the four faculties are four views of it. the interval\'s width is the estimate\'s total uncertainty — sampling noise, the fit, and how much the faculties disagree all widen it. a tight interval means the views concur on a sharp answer; <span class="cs-mark">a wide one is the system admitting the data don\'t yet pin the number down.</span>',
     ],
     spec: [
       { k: 'normalize', v: 'per-instrument z-score (affine, peak-preserving)' },
-      { k: 'surrogate', v: 'gaussian process · matérn-5/2' },
-      { k: 'acquisition', v: 'expected improvement on ln(cm/360)', mono: true },
+      { k: 'search', v: '(1+λ) evolution strategy · mutate · select · 1/5-rule step', mono: true },
+      { k: 'fitness memory', v: 'gaussian process · matérn-5/2 (denoise + screen)' },
       { k: 'uncertainty', v: 'bootstrap 90% ci — widens with noise + facet disagreement' },
     ],
   },
