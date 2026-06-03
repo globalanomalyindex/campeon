@@ -31,7 +31,7 @@ The non-negotiable principle: **the biomechanics are real, not decorative.** Eve
 
 **In scope (v1, "full vision"):**
 - All six organisms, reduced to **four test instruments** (track, flick, calibrate, strike), with every organism credited and explained.
-- The full algorithm core: Fitts-throughput + Kalman scoring, Bayesian-optimization search, psychometric-curve reporting with a confidence interval.
+- The full algorithm core: Fitts-throughput + Kalman scoring, Bayesian-optimization search, parabolic peak-fit reporting with a confidence interval.
 - The input-validity layer (pointer-lock raw input, acceleration detection, DPI handling).
 - The cm/360 conversion layer with a verified per-game yaw table.
 - 3D first-person engine (Three.js), client-only (localStorage), TypeScript + Vite.
@@ -147,9 +147,9 @@ Each instrument isolates one axis of the same underlying **speed↔accuracy / bi
 - **Cold start:** 3–5 log-spaced initial trials (e.g. 18, 26, 35, 47). **Final 1–2 trials:** confirmation replicates at the incumbent.
 - **Fallback / "simple mode":** UCB1 (`x̄_i + √(2 ln t / n_i)`) or Thompson-sampling **bandit** over ~10 discretized arms.
 
-### 5.3 Reporter — psychometric fit + CI
-- Fit a peaked curve in log-sens: `y = β0 + β1·x + β2·x²` (β2 < 0); peak `x* = −β1/(2β2)` → `s* = exp(x*)`.
-- **Confidence interval** via **parametric bootstrap** (resample residuals → refit → 5th/95th percentile of `s*`); delta method as a check. 90% → `x* ± 1.645·SE`. The CI **width is the honesty mechanism** — a flat curve yields a wide CI, correctly reported as a range (e.g. "32–40 cm/360").
+### 5.3 Reporter — parabolic peak fit + CI
+- Fit a peaked curve in log-sens: `y = β0 + β1·x + β2·x²` (β2 < 0); peak `x* = −β1/(2β2)` → `s* = exp(x*)`. (This is quadratic peak-finding — a parabola, **not** a psychometric function.)
+- **Confidence interval** via **residual bootstrap** (resample residuals → refit → 5th/95th percentile of `s*`); delta method as a check. 90% → `x* ± 1.645·SE`. The CI **width is the honesty mechanism** — a flat curve yields a wide CI, correctly reported as a range (e.g. "32–40 cm/360").
 - If GP-peak and curve-peak disagree, widen the reported CI.
 
 ### 5.4 Session design (the human-factors reality)
@@ -211,7 +211,7 @@ A browser exposes only *relative* mouse deltas, warped by OS pointer acceleratio
 | `convert/` | cm/360 math, per-game yaw table, conversion schools | Pure unit tests |
 | `scoring/` | Fitts throughput, Kalman tracker, bias/variance, sub-movement segmentation | Pure unit tests |
 | `optimizer/` | GP Bayesian opt (EI/UCB), bandit fallback, session controller | Pure unit tests |
-| `stats/` | psychometric peak fit + bootstrap CI | Pure unit tests |
+| `stats/` | parabolic peak fit + bootstrap CI | Pure unit tests |
 | `input/` | pointer-lock + unadjustedMovement, DPR-normalize, accel check, DPI | Integration |
 | `engine/` | Three.js arena, camera, internal-yaw→cm/360, target spawning, tick/render loop | Integration |
 | `instruments/` | track / flick / calibrate / strike on one `Instrument` interface | Per-instrument |
