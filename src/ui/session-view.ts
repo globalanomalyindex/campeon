@@ -1,5 +1,6 @@
 import { WebGLRenderer } from 'three';
 import { Arena, type InputSource } from '../engine/arena';
+import { createPsxPass } from '../engine/psx-pass';
 import { createPointerLock } from '../input/pointer-lock';
 import { makeEvolution } from '../optimizer/evolution';
 import { runSession } from '../optimizer/session-controller';
@@ -65,12 +66,13 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       const renderer = new WebGLRenderer({ canvas, antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       const size = (): [number, number] => [window.innerWidth, window.innerHeight];
+      const psx = createPsxPass(renderer, size); // PS1 abyss: low-res + dither + posterize + scanlines
       const pointer = createPointerLock(canvas);
       const input: InputSource = {
         onSample: (cb) => pointer.onSample(cb),
         onFire: (cb) => pointer.onFire(cb),
       };
-      const arena = new Arena({ renderer, input, size, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, rng: mulberry32(7) });
+      const arena = new Arena({ renderer, input, size, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, rng: mulberry32(7), postProcessor: psx });
 
       // PSX Desert Eagle viewmodel — cosmetic overlay (loads async; never touches the pointer stream
       // or the cm/360 math). Smoking idle pre-lock → flick+draw on start → fire on each shot.

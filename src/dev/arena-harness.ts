@@ -1,5 +1,6 @@
 import { WebGLRenderer } from 'three';
 import { Arena } from '../engine/arena';
+import { createPsxPass } from '../engine/psx-pass';
 import type { InputSource } from '../engine/arena';
 import { degreesPerCount } from '../engine/camera-rig';
 import { createPointerLock } from '../input/pointer-lock';
@@ -81,7 +82,7 @@ export function mountArenaHarness(root: HTMLElement): void {
     for (const cb of manualFire) cb();
   };
 
-  const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7) });
+  const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7), postProcessor: createPsxPass(renderer, size) });
   arena.spawnTarget({ kind: 'static' });
   arena.spawnTarget({ kind: 'static' });
   arena.spawnTarget({ kind: 'static' });
