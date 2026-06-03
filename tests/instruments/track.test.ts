@@ -38,6 +38,28 @@ describe('analyzeTrack', () => {
     expect(laggy.raw.pi).toBeLessThan(0);
   });
 
+  it('MEASURES the player\'s own tracking latency (scales with true lag; not a fixed constant)', () => {
+    // The dragonfly forward model leads by its OWN measured latency. campeón must recover one per
+    // player, not the old hard-coded 0.15 s. Properties derived from the fixture, not the code:
+    const synced = analyzeTrack({ frames: tracking(0), fires: [] }, ctx());
+    const mid = analyzeTrack({ frames: tracking(6), fires: [] }, ctx()); // 6 frames × 16 ms ≈ 96 ms
+    const slow = analyzeTrack({ frames: tracking(10), fires: [] }, ctx());
+    expect(synced.raw.latencySec).toBeLessThan(0.03); // a perfectly synced tracker reads ~0
+    expect(mid.raw.latencySec).toBeGreaterThan(synced.raw.latencySec);
+    expect(slow.raw.latencySec).toBeGreaterThan(mid.raw.latencySec); // monotone in true lag
+    // …and the lag-6 estimate is nearer the true 96 ms than the old fixed 150 ms.
+    expect(Math.abs(mid.raw.latencySec - 0.096)).toBeLessThan(Math.abs(mid.raw.latencySec - 0.15));
+  });
+
+  it('lag-compensates the predictive error: tremor survives, pure latency does not', () => {
+    // After removing the player's measured latency, a pure-latency tracker's residual collapses to a
+    // small floor; adding tremor at the SAME latency inflates it sharply. So jitter (sensitivity-
+    // dependent) must dominate the residual, not the latency. (Derived from first principles.)
+    const cleanLaggy = analyzeTrack({ frames: tracking(6, 0), fires: [] }, ctx());
+    const jittery = analyzeTrack({ frames: tracking(6, 1.2), fires: [] }, ctx());
+    expect(jittery.raw.predErr).toBeGreaterThan(2 * cleanLaggy.raw.predErr);
+  });
+
   it('a jittery (over-sensitive) tracker has higher jitter than a smooth one', () => {
     const smooth = analyzeTrack({ frames: tracking(0, 0), fires: [] }, ctx());
     const jittery = analyzeTrack({ frames: tracking(0, 1.5), fires: [] }, ctx());
