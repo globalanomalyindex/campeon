@@ -20,6 +20,14 @@ function taps(mt: number, errSd: number, n = 6): FlickTap[] {
   return out;
 }
 
+/** Taps for one explicit (amplitude, width) condition with controllable speed + spread. */
+function cond(amplitude: number, width: number, mt: number, errSd: number, n = 4): FlickTap[] {
+  return Array.from({ length: n }, (_, i) => {
+    const e = (i % 2 === 0 ? 1 : -1) * errSd;
+    return { amplitude, width, mt, errAlong: e, nCorr: 0, hit: Math.abs(e) <= width / 2 };
+  });
+}
+
 describe('analyzeFlick', () => {
   it('faster taps at equal accuracy yield higher throughput', () => {
     const slow = analyzeFlick(taps(600, 0.6), ctx());
@@ -44,6 +52,33 @@ describe('analyzeFlick', () => {
   it('throws if a condition has too few taps to estimate spread', () => {
     expect(() => analyzeFlick([{ amplitude: 20, width: 3, mt: 400, errAlong: 0.5, nCorr: 0, hit: true }], ctx()))
       .toThrow();
+  });
+});
+
+describe('flick — two-mode crossover (spider ballistic orient + raptor dual-fovea)', () => {
+  // Ballistic = large amplitude (≥24); precision = small width (≤2). The score is the harmonic mean
+  // of the two sub-throughputs, so it peaks at the CROSSOVER — a sensitivity good at both — rather
+  // than at whichever single mode happens to be fastest. Numbers derived from the ISO throughput
+  // formula by hand: the balanced player's pooled mean is LOWER than the specialist's, but its
+  // harmonic mean is HIGHER. That divergence is the whole point.
+  const balanced = [...cond(40, 3, 400, 0.5), ...cond(12, 1.5, 400, 0.3)]; // competent at both modes
+  const lopsided = [...cond(40, 3, 250, 0.4), ...cond(12, 1.5, 700, 0.9)]; // great flick, poor lock
+
+  it('rewards the balanced player over the specialist — opposite to what pooled throughput does', () => {
+    const A = analyzeFlick(balanced, ctx());
+    const B = analyzeFlick(lopsided, ctx());
+    expect(B.raw.throughput).toBeGreaterThan(A.raw.throughput); // old pooled metric favors the specialist…
+    expect(A.score).toBeGreaterThan(B.score); // …the crossover score favors the all-rounder
+  });
+
+  it('scores the harmonic mean of the ballistic and precision sub-throughputs', () => {
+    const r = analyzeFlick(balanced, ctx());
+    const b = r.raw.ballisticTP;
+    const p = r.raw.precisionTP;
+    expect(Number.isFinite(b)).toBe(true);
+    expect(Number.isFinite(p)).toBe(true);
+    expect(r.score).toBeCloseTo((2 * b * p) / (b + p), 6);
+    expect(r.score).toBeLessThanOrEqual(Math.max(b, p)); // harmonic mean ≤ max of the two
   });
 });
 
