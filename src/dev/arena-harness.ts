@@ -186,7 +186,8 @@ export function mountArenaHarness(root: HTMLElement): void {
           instruments: INSTRUMENTS,
           scene: arena,
           schedule: ['flick', 'strike', 'calibrate', 'track'],
-          maxTrials: 8,
+          coldStart: 8, // Generation 0 gene pool…
+          maxTrials: 12, // …then 4 evolutionary generations (exercises makeEvolution.suggest)
           rng: mulberry32(2026),
           bootstrapIters: 300,
         });
