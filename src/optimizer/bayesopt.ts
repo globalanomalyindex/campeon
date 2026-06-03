@@ -92,5 +92,24 @@ export function makeBo(config: BoConfig): SearchEngine {
     isDone(history: Observation[]): boolean {
       return history.length >= maxTrials;
     },
+    /** The GP posterior-mean argmax over the grid — the surrogate's own best-guess optimum,
+     *  used by the controller to cross-check (and widen the CI against) the parabola peak. */
+    posteriorPeak(history: Observation[], bounds: [Cm360, Cm360]): Cm360 {
+      const loX = Math.log(bounds[0]);
+      const hiX = Math.log(bounds[1]);
+      if (history.length === 0) return Math.exp((loX + hiX) / 2);
+      const gp = new GP(config.gp, history);
+      let bestX = loX;
+      let best = -Infinity;
+      for (let i = 0; i <= gridSize; i++) {
+        const x = loX + ((hiX - loX) * i) / gridSize;
+        const m = gp.predict(x).mean;
+        if (m > best) {
+          best = m;
+          bestX = x;
+        }
+      }
+      return Math.exp(bestX);
+    },
   };
 }

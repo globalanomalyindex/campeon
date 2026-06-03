@@ -3,7 +3,7 @@ import { finalizeReport, runSession } from '../../src/optimizer/session-controll
 import { makeBo } from '../../src/optimizer/bayesopt';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { FakeScene } from '../instruments/fake-scene';
-import type { Cm360, Instrument, InstrumentId, Observation, Profile, TrialResult } from '../../src/types';
+import type { Cm360, Instrument, InstrumentId, Observation, Profile, SearchEngine, TrialResult } from '../../src/types';
 
 const bounds: [number, number] = [15, 60];
 
@@ -150,6 +150,32 @@ describe('runSession — convergence on synthetic players', () => {
     });
     expect(report.optimalCm360).toBeGreaterThan(27);
     expect(report.optimalCm360).toBeLessThan(45);
+  });
+
+  it('wires the engine posteriorPeak into the final report — CI widens on GP/parabola disagreement', async () => {
+    // Stub engine whose posteriorPeak sits far from the parabola peak (~30): the final CI must span
+    // it, proving runSession forwards posteriorPeak → finalizeReport (spec §5.3). Load-bearing —
+    // remove the wiring and ci90[1] falls back near the bootstrap upper, failing this.
+    const SENTINEL = 58;
+    const stub: SearchEngine = {
+      suggest: (_o, b) => Math.sqrt(b[0] * b[1]),
+      isDone: () => false,
+      posteriorPeak: () => SENTINEL,
+    };
+    const { report } = await runSession({
+      dpi: 800,
+      profile: profile({ flick: 1 }),
+      bounds: sessionBounds,
+      engine: stub,
+      instruments: instruments({ flick: synthetic('flick', 30) }),
+      scene: new FakeScene(),
+      schedule: ['flick'],
+      maxTrials: 14,
+      rng: mulberry32(11),
+      bootstrapIters: 200,
+    });
+    expect(report.optimalCm360).toBeLessThan(45); // parabola peak ~30, far from the sentinel
+    expect(report.ci90[1]).toBeGreaterThanOrEqual(SENTINEL - 1e-9);
   });
 
   it('stops early once the CI is tight enough', async () => {

@@ -87,4 +87,16 @@ describe('makeBo', () => {
     expect(bo.isDone(obs.slice(0, 4))).toBe(false);
     expect(bo.isDone([...obs, ...obs])).toBe(true);
   });
+
+  it('posteriorPeak returns the GP posterior-mean argmax near the data peak', () => {
+    const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 1e-3 } });
+    const c = Math.log(40);
+    const peakObs: Observation[] = [16, 24, 32, 40, 50, 60].map((cm) => ({
+      x: Math.log(cm),
+      y: -((Math.log(cm) - c) ** 2),
+    }));
+    const p = bo.posteriorPeak!(peakObs, bounds);
+    expect(p).toBeGreaterThan(34);
+    expect(p).toBeLessThan(46);
+  });
 });

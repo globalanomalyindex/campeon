@@ -176,8 +176,13 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
     }
   }
 
-  const report = finalizeReport(trialsToObservations(trials, profile), bounds, rng, {
+  // Final report: cross-check the parabola peak against the surrogate's posterior-mean argmax so the
+  // CI widens honestly when the global quadratic and the flexible GP disagree (spec §5.3).
+  const finalObs = trialsToObservations(trials, profile);
+  const gpPeak = engine.posteriorPeak?.(finalObs, bounds);
+  const report = finalizeReport(finalObs, bounds, rng, {
     bootstrapIters: iters,
+    ...(gpPeak !== undefined ? { gpPeakCm360: gpPeak } : {}),
   });
   return { report, trials };
 }
