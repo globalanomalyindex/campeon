@@ -2,6 +2,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
 import './styles/case-study.css';
+import './styles/options.css';
 import { createShell, type Route, type ScreenFactory } from './ui/shell';
 import { createStorage } from './state/storage';
 import { hero } from './ui/hero';
@@ -10,7 +11,7 @@ import { gate } from './ui/gate';
 import { sessionView } from './ui/session-view';
 import { result } from './ui/result';
 import { caseStudy } from './ui/case-study/case-study';
-import { optionsStub } from './ui/stubs';
+import { options } from './ui/options/options';
 
 const appEl = document.querySelector<HTMLDivElement>('#app');
 if (!appEl) throw new Error('#app element missing');
@@ -24,7 +25,7 @@ async function boot(): Promise<void> {
   }
   const screens: Record<Route, ScreenFactory> = {
     hero, setup, gate, session: sessionView, result,
-    'case-study': caseStudy, options: optionsStub,
+    'case-study': caseStudy, options,
   };
   createShell(app, { storage: createStorage(), screens }).start();
 }
