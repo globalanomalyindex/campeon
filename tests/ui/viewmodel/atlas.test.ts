@@ -40,9 +40,10 @@ describe('viewmodel atlas — animation timing', () => {
   });
 
   it('loops looping animations and clamps one-shot animations at the last frame', () => {
-    const smoke = ANIMATIONS.smoking; // loop, 6 frames (0..5)
-    // 6 frames at 6 fps = 1000 ms for a full loop → t=1000ms wraps back to frame 0
-    expect(frameIndex(smoke, 1000)).toBe(smoke.from);
+    const smoke = ANIMATIONS.smoking; // looping cig idle
+    const n = smoke.to - smoke.from + 1;
+    // one full loop period (n frames at fps) wraps back to the first frame
+    expect(frameIndex(smoke, (n * 1000) / smoke.fps + 1)).toBe(smoke.from);
     const fire = ANIMATIONS.fire; // one-shot, frames 0..7
     expect(frameIndex(fire, 10_000)).toBe(fire.to); // clamps, never wraps
   });

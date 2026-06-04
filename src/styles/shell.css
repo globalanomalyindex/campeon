@@ -179,6 +179,28 @@
   image-rendering: pixelated;
 }
 
+/* Miss tick — a brief ember "miss" that pops near the crosshair when a shot lands in no hitbox. */
+.shot-miss {
+  position: fixed; left: 50%; top: 53%;
+  transform: translate(-50%, -50%) scale(0.7);
+  z-index: 6;
+  pointer-events: none;
+  color: var(--c-strike);
+  font-weight: 700; font-size: clamp(14px, 2.1vw, 26px);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  opacity: 0;
+  text-shadow: 0 0 8px rgba(13, 13, 13, 0.8), 0 1px 0 var(--ink);
+}
+.shot-miss.is-on { animation: shot-miss-pop 0.5s ease-out forwards; }
+@keyframes shot-miss-pop {
+  0%   { opacity: 0; transform: translate(-50%, -44%) scale(0.7); }
+  16%  { opacity: 1; transform: translate(-50%, -54%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -68%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shot-miss.is-on { animation: none; opacity: 1; transform: translate(-50%, -54%) scale(1); }
+}
+
 .session__crosshair {
   position: fixed; left: 50%; top: 50%;
   width: 6px; height: 6px; margin: -3px 0 0 -3px;

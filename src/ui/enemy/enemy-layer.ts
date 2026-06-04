@@ -13,7 +13,7 @@ import type { EnemyLayer } from '../../engine/arena';
 import type { Degrees, InstrumentId, Ms, TargetHandle } from '../../types';
 import { SHEET } from './atlas';
 import { EnemyController } from './controller';
-import { classifyHit } from './hit';
+import { classifyHit, type HitClass } from './hit';
 import { keyMagenta } from '../viewmodel/key';
 
 const SHEETS: Record<InstrumentId, string> = {
@@ -55,8 +55,11 @@ export interface EnemyLayerHandle extends EnemyLayer {
  *
  * Loads + keys all four environment sheets up front, then resolves; the arena attaches it once ready.
  */
-export async function createEnemyLayer(opts: { reducedMotion?: boolean } = {}): Promise<EnemyLayerHandle> {
+export async function createEnemyLayer(
+  opts: { reducedMotion?: boolean; onShot?: (result: HitClass) => void } = {},
+): Promise<EnemyLayerHandle> {
   const reduced = opts.reducedMotion ?? false;
+  const onShot = opts.onShot;
 
   // Load + magenta-key each sheet once into its own base texture (NearestFilter → crisp PSX pixels).
   const bases = new Map<InstrumentId, Texture>();
@@ -87,6 +90,7 @@ export async function createEnemyLayer(opts: { reducedMotion?: boolean } = {}): 
   const group = new Group();
   group.name = 'enemy-layer';
   const enemies = new Map<string, EnemyRecord>();
+  const fadeouts: EnemyRecord[] = []; // dying mercs handed off here so a new spawn/clear can't cut them short
   let activeEnv: InstrumentId = 'flick';
   let scene: Scene | null = null;
 
@@ -96,10 +100,13 @@ export async function createEnemyLayer(opts: { reducedMotion?: boolean } = {}): 
     rec.tex.repeat.set(frame.uv.repeatX, frame.uv.repeatY);
   };
 
-  const retire = (id: string, rec: EnemyRecord): void => {
+  const release = (rec: EnemyRecord): void => {
     group.remove(rec.sprite);
     rec.mat.dispose();
     rec.tex.dispose();
+  };
+  const retire = (id: string, rec: EnemyRecord): void => {
+    release(rec);
     enemies.delete(id);
   };
 
@@ -140,19 +147,39 @@ export async function createEnemyLayer(opts: { reducedMotion?: boolean } = {}): 
         }
         applyUV(rec, nowMs);
       }
+      // Dying mercs play out where they fell — independent of the live target's spawn/clear.
+      for (let i = fadeouts.length - 1; i >= 0; i--) {
+        const rec = fadeouts[i]!;
+        if (rec.ctrl.isFinished(nowMs)) {
+          release(rec);
+          fadeouts.splice(i, 1);
+        } else {
+          applyUV(rec, nowMs);
+        }
+      }
     },
 
     fire(nowMs: Ms, view: [Degrees, Degrees], targets: ReadonlyArray<TargetHandle>): void {
-      if (reduced) return; // no hit reactions under reduced motion
+      if (reduced) return; // no hit reactions (or miss tick) under reduced motion
+      let best: HitClass = 'miss';
       for (const t of targets) {
+        const cls = classifyHit(view, t.bearing(), t.radiusDeg());
+        if (cls === 'kill') best = 'kill';
+        else if (cls === 'graze' && best !== 'kill') best = 'graze';
         const rec = enemies.get(t.id);
         if (!rec) continue;
-        const s = rec.ctrl.current();
-        if (s === 'death' || s === 'escape') continue; // already retiring
-        const cls = classifyHit(view, t.bearing(), t.radiusDeg());
-        if (cls === 'kill') rec.ctrl.play('death', nowMs, null);
-        else if (cls === 'graze') rec.ctrl.play('flinch', nowMs, 'idle');
+        const cur = rec.ctrl.current();
+        if (cur === 'death' || cur === 'escape') continue; // already retiring
+        if (cls === 'kill') {
+          rec.ctrl.play('death', nowMs, null);
+          // Hand off to fadeouts: the instrument is about to clear + spawn, but the death plays on.
+          enemies.delete(t.id);
+          fadeouts.push(rec);
+        } else if (cls === 'graze') {
+          rec.ctrl.play('flinch', nowMs, 'idle');
+        }
       }
+      onShot?.(best); // 'miss' → the HUD flashes a miss tick; 'graze'/'kill' → the merc itself reacts
     },
 
     clear(): void {
@@ -163,6 +190,8 @@ export async function createEnemyLayer(opts: { reducedMotion?: boolean } = {}): 
     dispose(): void {
       for (const [id, rec] of enemies) retire(id, rec);
       enemies.clear();
+      for (const rec of fadeouts) release(rec);
+      fadeouts.length = 0;
       if (scene) scene.remove(group);
       for (const tex of bases.values()) tex.dispose();
       bases.clear();

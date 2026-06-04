@@ -10,6 +10,7 @@ import { mulberry32 } from '../stats/rng';
 import { plotGeometry, renderConvergencePlot, type PlotMark } from './convergence-plot';
 import { createViewmodel, type Viewmodel } from './viewmodel/viewmodel';
 import { createEnemyLayer, type EnemyLayerHandle } from './enemy/enemy-layer';
+import { createShotFeedback } from './feedback';
 import type { AppContext, Screen } from './shell';
 import type { InstrumentId, Report, TrialResult } from '../types';
 
@@ -58,6 +59,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         <figure class="session__plot"><svg data-plot aria-label="convergence on your optimal cm/360"></svg>
           <figcaption class="mono" data-hud="estimate"></figcaption></figure>`;
       host.appendChild(root);
+      const feedback = createShotFeedback(root); // brief "miss" tick when a shot lands in no hitbox
 
       const canvas = root.querySelector('canvas') as HTMLCanvasElement;
       const svg = root.querySelector('[data-plot]') as unknown as SVGElement;
@@ -88,10 +90,17 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
 
       // Merc-prey enemy billboards — cosmetic skin over the targets (loads async; the arena hides each
       // gold sphere but keeps its transform, so bearing/radius — and the cm/360 — are untouched).
-      void createEnemyLayer({ reducedMotion: reduced }).then((layer) => {
+      void createEnemyLayer({ reducedMotion: reduced, onShot: (r) => { if (r === 'miss') feedback.miss(); } }).then((layer) => {
         if (!alive) { layer.dispose(); return; }
         enemies = layer;
         arena.attachEnemies(layer); // arena.dispose() will dispose it
+      });
+
+      // Weapon sway: feed camera look deltas to the viewmodel for the parallax / depth feel.
+      let prevView: [number, number] | null = null;
+      arena.onAim((_s, view) => {
+        if (prevView) viewmodel?.look(view[0] - prevView[0], view[1] - prevView[1]);
+        prevView = view;
       });
 
       const onResize = (): void => arena.resize();
@@ -147,6 +156,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         window.cancelAnimationFrame(raf);
         window.removeEventListener('resize', onResize);
         offFire?.();
+        feedback.dispose();
         viewmodel?.dispose();
         pointer.dispose();
         arena.dispose();

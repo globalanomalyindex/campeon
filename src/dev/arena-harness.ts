@@ -6,6 +6,7 @@ import { degreesPerCount } from '../engine/camera-rig';
 import { createPointerLock } from '../input/pointer-lock';
 import { createEnemyLayer, type EnemyLayerHandle } from '../ui/enemy/enemy-layer';
 import { createViewmodel, type Viewmodel } from '../ui/viewmodel/viewmodel';
+import { createShotFeedback } from '../ui/feedback';
 import { AccelMeter, accelVerdict } from '../input/accel-check';
 import { mulberry32 } from '../stats/bootstrap';
 import type { AimSample, PointerLockMode, InstrumentId, TrialResult, Report } from '../types';
@@ -86,17 +87,18 @@ export function mountArenaHarness(root: HTMLElement): void {
 
   const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7), postProcessor: createPsxPass(renderer, size) });
 
+  const feedback = createShotFeedback(root); // miss tick — fire aimed off-target to see it
   let enemyLayer: EnemyLayerHandle | null = null;
   const ENV_KEYS: Record<string, InstrumentId> = { q: 'track', w: 'flick', e: 'calibrate', r: 'strike' };
   const spawnTrio = (): void => {
     arena.clearTargets();
-    arena.spawnTarget({ kind: 'static' });
+    arena.spawnTarget({ kind: 'static', yaw: 0, pitch: 0, distance: 20, worldRadius: 0.6 }); // dead-centre: fire-at-rest = a kill
     arena.spawnTarget({ kind: 'static' });
     arena.spawnTarget({ kind: 'moving', motion: { yawAmp: 14, baseFreq: 0.45 } });
   };
   spawnTrio(); // gold spheres until the merc skin finishes loading
   // Cosmetic merc-prey skin: attach then respawn so targets are skinned. [q/w/e/r] swap environment.
-  void createEnemyLayer({}).then((layer) => {
+  void createEnemyLayer({ onShot: (r) => { if (r === 'miss') feedback.miss(); } }).then((layer) => {
     enemyLayer = layer;
     arena.attachEnemies(layer);
     layer.setEnvironment('flick');
@@ -108,11 +110,14 @@ export function mountArenaHarness(root: HTMLElement): void {
   void createViewmodel({}).then((vm) => {
     gun = vm;
     root.appendChild(vm.el);
-    vm.play('idleReady');
+    vm.play('smoking'); // show the cig idle (the fixed loop) for verification
   });
 
   let view: [number, number] = [0, 0];
+  let prevAim: [number, number] | null = null;
   arena.onAim((_s, v) => {
+    if (prevAim) gun?.look(v[0] - prevAim[0], v[1] - prevAim[1]); // feed look deltas → weapon sway
+    prevAim = v;
     view = v;
   });
 
@@ -233,6 +238,7 @@ export function mountArenaHarness(root: HTMLElement): void {
     cleanup() {
       window.cancelAnimationFrame(raf);
       offMeter();
+      feedback.dispose();
       gun?.dispose();
       pointer.dispose();
       arena.dispose();

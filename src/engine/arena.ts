@@ -115,9 +115,10 @@ export class Arena implements ArenaScene {
   }
 
   private handleFire(): void {
-    for (const cb of this.fireCbs) cb(this.nowMs);
-    // Cosmetic only: the skin reacts to the shot (pop/flinch). Reads view+bearings, writes nothing.
+    // Classify against the LIVE target first — before an instrument's fire handler clears/advances it —
+    // so the pop reads the target you actually shot. Cosmetic only: reads view+bearings, writes nothing.
     this.enemies?.fire(this.nowMs, this.rig.view(), [...this.targets.values()]);
+    for (const cb of this.fireCbs) cb(this.nowMs);
   }
 
   setSensitivity(cm360: Cm360, dpi: Dpi): void {

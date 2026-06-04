@@ -2,6 +2,7 @@ import { SHEET, type AnimName } from './atlas';
 import { ViewmodelController } from './controller';
 import { keyMagenta } from './key';
 import { orderedDither } from './dither';
+import { kick, restSway, stepSway, type SwayState } from './sway';
 
 const SHEET_URL = '/sprites/deagle.png';
 
@@ -12,6 +13,8 @@ export interface Viewmodel {
   play(name: AnimName, then?: AnimName | null): void;
   /** Blit the live frame; call from the host's rAF loop with its timestamp. No-op under reduced motion. */
   tick(nowMs: number): void;
+  /** Nudge the weapon-sway spring by a camera look delta (degrees). Cosmetic; no-op under reduced motion. */
+  look(dYawDeg: number, dPitchDeg: number): void;
   dispose(): void;
 }
 
@@ -29,6 +32,8 @@ export interface Viewmodel {
 export async function createViewmodel(opts: { reducedMotion?: boolean; initial?: AnimName } = {}): Promise<Viewmodel> {
   const reduced = opts.reducedMotion ?? false;
   const ctrl = new ViewmodelController(opts.initial ?? 'smoking', 0);
+  let sway: SwayState = restSway(); // weapon-sway offset (normalized); stepped each tick, kicked on look
+  let lastMs = 0;
 
   // Load the sheet and key its magenta background to transparency, once, into an offscreen source.
   const img = new Image();
@@ -65,13 +70,19 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
   const draw = (nowMs: number): void => {
     const { rect } = ctrl.frameAt(nowMs);
     ctx.clearRect(0, 0, el.width, el.height);
-    // Anchor lower-right (CS:Source): the gun's cell sits with its centre biased right, flush to bottom.
+    // Anchor lower-right (CS:Source), offset by the sway spring for a parallax / weight feel.
     const destH = el.height * 0.66;
     const destW = destH * (rect.sw / rect.sh);
-    const cx = el.width * 0.72; // horizontal centre of the viewmodel — right of screen centre
+    const cx = el.width * 0.72 + sway.x * el.width; // horizontal centre (right of screen centre) + sway
     const dx = cx - destW / 2;
-    const dy = el.height - destH;
+    const dy = el.height - destH + sway.y * el.height;
+    const roll = sway.x * 0.6; // subtle barrel tilt (rad) — sells the depth
+    ctx.save();
+    ctx.translate(cx, dy + destH); // pivot at the grip (bottom of the gun)
+    ctx.rotate(roll);
+    ctx.translate(-cx, -(dy + destH));
     ctx.drawImage(off, rect.sx, rect.sy, rect.sw, rect.sh, dx, dy, destW, destH);
+    ctx.restore();
   };
 
   if (reduced) draw(0);
@@ -83,7 +94,14 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
       if (reduced) draw(0);
     },
     tick(nowMs) {
-      if (!reduced) draw(nowMs);
+      if (reduced) return;
+      const dt = lastMs === 0 ? 1 / 60 : Math.min(0.05, (nowMs - lastMs) / 1000);
+      lastMs = nowMs;
+      sway = stepSway(sway, dt);
+      draw(nowMs);
+    },
+    look(dYawDeg, dPitchDeg) {
+      if (!reduced) sway = kick(sway, dYawDeg, dPitchDeg);
     },
     dispose() {
       window.removeEventListener('resize', resize);

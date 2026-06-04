@@ -49,7 +49,7 @@ export type AnimName =
 
 /** Row → animation map + usable frame ranges (trailing empty/held cells trimmed via ink-density). */
 export const ANIMATIONS: Record<AnimName, AnimSpec> = {
-  smoking: { row: 0, from: 0, to: 5, fps: 6, loop: true },
+  smoking: { row: 0, from: 0, to: 3, fps: 4, loop: true }, // cols 0–3 only: the cig-held/smoke loop. cols 4–7 are the flick-away + hand-leaving frames (those belong to flickDraw, not the idle).
   flickDraw: { row: 1, from: 0, to: 7, fps: 12, loop: false },
   checkAmmo: { row: 2, from: 0, to: 7, fps: 12, loop: false },
   cock: { row: 3, from: 0, to: 4, fps: 12, loop: false },
