@@ -19,7 +19,7 @@ export interface ArenaScene {
   spawnTarget(spec: TargetSpec): TargetHandle;
   onAim(cb: (sample: AimSample, viewYawPitch: [Degrees, Degrees]) => void): () => void;
   clearTargets(): void;
-  // Phase 3 — the instrument-driving surface (the contract anticipated this):
+  // Phase 3 - the instrument-driving surface (the contract anticipated this):
   /** Per-frame tick: dt since the previous frame and the arena clock, both in ms. */
   onFrame(cb: (dtMs: Ms, nowMs: Ms) => void): () => void;
   /** Fire (primary-button) events, with the arena clock in ms. */
@@ -75,7 +75,7 @@ export interface SearchEngine {
   // A self-contained budget signal for engine-driven callers. The Phase-4 session controller owns
   // stopping itself (trial cap + CI-width convergence), so `runSession` does NOT consult isDone.
   isDone(history: Observation[]): boolean;
-  /** Optional: the surrogate's posterior-mean argmax — the model's own best-guess optimum, distinct
+  /** Optional: the surrogate's posterior-mean argmax - the model's own best-guess optimum, distinct
    *  from `suggest`'s acquisition argmax. The controller passes it to the report so the CI honestly
    *  widens when the flexible surrogate and the global parabola disagree (spec §5.3). */
   posteriorPeak?(history: Observation[], bounds: [Cm360, Cm360]): Cm360;

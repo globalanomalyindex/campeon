@@ -8,7 +8,7 @@ const DEG2RAD = Math.PI / 180;
 /**
  * Angular half-angle (degrees) a sphere of world radius `r` subtends at distance `d`:
  * the angle to its tangent ray, asin(r/d). This is the exact angular radius for hit-testing
- * a sphere and for the Fitts target width (Phase 3) — not the disc approximation atan(r/d)
+ * a sphere and for the Fitts target width (Phase 3) - not the disc approximation atan(r/d)
  * (they agree to <0.01° at game scale but diverge at close range). Clamped for r ≥ d.
  */
 export function angularRadius(r: number, d: number): Degrees {
@@ -101,7 +101,7 @@ export function motionOffset(motion: TargetMotion, tSec: number): [Degrees, Degr
 /** A spawned arena target. Owns its mesh; reports bearing/angular radius for scoring. */
 export class Target implements TargetHandle {
   readonly id: string;
-  /** Read-only by convention — only the owning Arena should add/remove it from the scene. */
+  /** Read-only by convention - only the owning Arena should add/remove it from the scene. */
   readonly mesh: Mesh;
   private readonly placement: Placement;
 

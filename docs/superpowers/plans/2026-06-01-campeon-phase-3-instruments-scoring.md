@@ -1,4 +1,4 @@
-# campeón — Phase 3: Instruments + Scoring — Implementation Plan
+# campeón - Phase 3: Instruments + Scoring - Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,7 +6,7 @@
 
 **Architecture:** Two layers riding the Phase-2 engine. (1) `scoring/` is four pure, formula-tested modules (no DOM/Three). (2) Each instrument is split into a **pure analyzer** (`Recording → {raw, score}`, unit-tested against synthetic players) and a **thin `run()` shell** that drives the arena, records frames + fire events, calls the analyzer, and resolves a `TrialResult`. The arena gains a minimal instrument-driving surface (`onFrame`, `onFire`, `view`) and honors an extended `TargetSpec` (explicit placement + band-limited motion). The shells are node-testable against a scripted fake `ArenaScene`; only the RAF/pointer wiring is runtime-verified.
 
-**Tech Stack:** TypeScript (strict) · Vite · Three.js · Vitest. Pure math implemented from scratch (no ml-matrix needed — the Kalman state is 2×2). Builds on Phase 1 (`stats/`, `convert/`) and Phase 2 (`engine/`, `input/`).
+**Tech Stack:** TypeScript (strict) · Vite · Three.js · Vitest. Pure math implemented from scratch (no ml-matrix needed - the Kalman state is 2×2). Builds on Phase 1 (`stats/`, `convert/`) and Phase 2 (`engine/`, `input/`).
 
 ---
 
@@ -14,7 +14,7 @@
 
 - **scoring/ (T1–T4):** pure unit tests against published formulas. Pin behavior with (a) one or two hand-computable exact cases derived inline from the formula (not memorized magic numbers) and (b) invariants/orderings (monotonicity, sign, the bias–variance identity, round-trips). Fail loudly (`RangeError`) on degenerate input rather than returning `Infinity`/`NaN`.
 - **engine extension (T5–T6):** THREE math classes run headless in Node, so moving-target math and the extended Arena are unit-tested with a spy renderer + a scriptable fake input (the Phase-2 pattern). Only WebGL/RAF stay runtime-only.
-- **instruments (T7–T12):** the **analyzer** is unit-tested with synthetic `Recording`s representing distinct player archetypes (perfect / laggy / over-sensitive), asserting metric orderings and the cm/360-sensitive signal each instrument exists to measure. The **`run()` shell** is tested against a shared scripted fake `ArenaScene` (`tests/instruments/fake-scene.ts`) — it must configure the scene, record, resolve with the analyzer's result, and clean up.
+- **instruments (T7–T12):** the **analyzer** is unit-tested with synthetic `Recording`s representing distinct player archetypes (perfect / laggy / over-sensitive), asserting metric orderings and the cm/360-sensitive signal each instrument exists to measure. The **`run()` shell** is tested against a shared scripted fake `ArenaScene` (`tests/instruments/fake-scene.ts`) - it must configure the scene, record, resolve with the analyzer's result, and clean up.
 - **runtime proof (T13):** one instrument runs end-to-end in real Chromium via Playwright (the Phase-2 T9 pattern), returning a finite-scored `TrialResult`.
 
 ## Conventions (carry from Phase 1–2; do not deviate)
@@ -23,18 +23,18 @@
   ```
   Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
   ```
-- **Test imports are explicit:** `import { describe, it, expect } from 'vitest';` — never rely on globals.
+- **Test imports are explicit:** `import { describe, it, expect } from 'vitest';` - never rely on globals.
 - **Logical view frame:** yaw 0 = forward (−Z), +yaw = right (+X); pitch 0 = level, +pitch = up (+Y). Bearings are `[yaw, pitch]` in degrees; times in ms; angular speed in deg/s.
 - **Task-local error axes (Phase-3 convention):** an endpoint error is expressed in **task-local coordinates where component 0 is along the movement (radial) axis and component 1 is cross-axis (tangential)**. Positive radial = overshoot (past target center along the approach direction). This makes `Tap.endpointErrorAlongAxis` (scalar) and `Shot.error[0]` (radial) consistent.
 - **`raw` is `Record<string, number>`:** instruments flatten vectors to scalars (`biasRadial`, `biasMag`, …). Structured scoring outputs (e.g. tuple bias) stay internal to `scoring/`.
 - **Within-trial scores only:** each instrument's `score` is a deterministic, monotone (higher = better) function of its own `raw`. Cross-trial normalization across the cm/360 sweep is Phase 4's job; document this at each `score`.
 - **No `Date.now()` / `Math.random()` in pure cores.** Randomness comes from `ctx.rng`; `TrialResult.at` is stamped from the arena clock (`nowMs`) by the `run()` shell so tests are deterministic.
-- **`noUncheckedIndexedAccess` stays off** for this phase (enabling it would force retrofits across Phase 1–2 code for little gain — the Kalman state is fixed-size tuples). Write Phase-3 dynamic indexing defensively (iterate, length-check) instead.
+- **`noUncheckedIndexedAccess` stays off** for this phase (enabling it would force retrofits across Phase 1–2 code for little gain - the Kalman state is fixed-size tuples). Write Phase-3 dynamic indexing defensively (iterate, length-check) instead.
 - **strict TS, no `any` in core.** Reuse `mulberry32` from `src/stats/bootstrap.ts` for seeded randomness in tests.
 
 ---
 
-## Task 1: `scoring/fitts.ts` — effective throughput (ISO 9241-9)
+## Task 1: `scoring/fitts.ts` - effective throughput (ISO 9241-9)
 
 **Files:**
 - Create: `src/scoring/fitts.ts`
@@ -145,7 +145,7 @@ describe('aggregateThroughput', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/scoring/fitts.test.ts`
-Expected: FAIL — `Cannot find module '../../src/scoring/fitts'`.
+Expected: FAIL - `Cannot find module '../../src/scoring/fitts'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -226,7 +226,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 2: `scoring/kalman.ts` — constant-velocity Kalman tracker
+## Task 2: `scoring/kalman.ts` - constant-velocity Kalman tracker
 
 **Files:**
 - Create: `src/scoring/kalman.ts`
@@ -234,7 +234,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 The track scorer. A 1-D (per-axis) constant-velocity Kalman filter on state `[pos, vel]`. The **innovation** `ν = z − Ĥx⁻` is the instantaneous tracking error; the optimal lead point is `pos + vel·L`. The track instrument runs one filter per axis (yaw, pitch).
 
-🎓 *Why CV-Kalman is the honest tracking score:* the innovation is what the model **didn't predict** — feed it a target moving at constant velocity and a good filter drives ν→0; feed it a velocity step and ν spikes, then decays as the estimate re-converges. That spike-and-decay is exactly the re-acquisition the dragonfly/falcon mechanism is about, so `mean‖ν‖²` is a principled tracking-error metric rather than raw position error.
+🎓 *Why CV-Kalman is the honest tracking score:* the innovation is what the model **didn't predict** - feed it a target moving at constant velocity and a good filter drives ν→0; feed it a velocity step and ν spikes, then decays as the estimate re-converges. That spike-and-decay is exactly the re-acquisition the dragonfly/falcon mechanism is about, so `mean‖ν‖²` is a principled tracking-error metric rather than raw position error.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -242,7 +242,7 @@ The track scorer. A 1-D (per-axis) constant-velocity Kalman filter on state `[po
 import { describe, it, expect } from 'vitest';
 import { KalmanCV } from '../../src/scoring/kalman';
 
-describe('KalmanCV — constant-velocity tracking', () => {
+describe('KalmanCV - constant-velocity tracking', () => {
   it('converges to the true velocity on clean CV data', () => {
     const k = new KalmanCV({ q: 1e-3, r: 1e-2 });
     let pos = 0;
@@ -277,7 +277,7 @@ describe('KalmanCV — constant-velocity tracking', () => {
       lastSteady = Math.abs(k.update(pos));
       pos += 1;
     }
-    // velocity doubles (step) — first post-step innovation should jump
+    // velocity doubles (step) - first post-step innovation should jump
     k.predict(1);
     const spike = Math.abs(k.update(pos + 1)); // jumped ahead by an extra degree
     expect(lastSteady).toBeLessThan(0.2);
@@ -296,14 +296,14 @@ describe('KalmanCV — constant-velocity tracking', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/scoring/kalman.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```typescript
 /** Constant-velocity Kalman filter parameters. */
 export interface KalmanCVParams {
-  /** Process-noise spectral density (deg²/s³) — how much the model lets velocity drift. */
+  /** Process-noise spectral density (deg²/s³) - how much the model lets velocity drift. */
   q: number;
   /** Measurement-noise variance (deg²). */
   r: number;
@@ -409,7 +409,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 3: `scoring/bias-variance.ts` — bias/variance decomposition
+## Task 3: `scoring/bias-variance.ts` - bias/variance decomposition
 
 **Files:**
 - Create: `src/scoring/bias-variance.ts`
@@ -512,7 +512,7 @@ describe('calibrationCost', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/scoring/bias-variance.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -524,7 +524,7 @@ export interface Decomposition {
   bias: [Degrees, Degrees];
   /** Gain bias = mean(required + e_radial) / mean(required). >1 overshoot, <1 undershoot. */
   gain: number;
-  /** De-biased RMS spread sqrt(mean‖e − b‖²) — the precision floor. */
+  /** De-biased RMS spread sqrt(mean‖e − b‖²) - the precision floor. */
   sigmaR: Degrees;
   /** |b|² + σ_R² (equals mean‖e‖²). */
   mse: number;
@@ -610,7 +610,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 4: `scoring/submovement.ts` — velocity-trace segmentation
+## Task 4: `scoring/submovement.ts` - velocity-trace segmentation
 
 **Files:**
 - Create: `src/scoring/submovement.ts`
@@ -683,7 +683,7 @@ describe('segment', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/scoring/submovement.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -774,7 +774,7 @@ export function segment(trace: readonly VelSample[], opts: SegmentOptions = {}):
 }
 ```
 
-> **Implementer note:** the primary-peak loop is intentionally simple (clean synthetic traces). If a real trace is noisy, the caller should pre-smooth; do not add smoothing here without a test that pins it. Verify the three-bump test lands `nCorr === 2` — if the trough detection picks the wrong local min, tighten the peak loop to break only on a strict local max.
+> **Implementer note:** the primary-peak loop is intentionally simple (clean synthetic traces). If a real trace is noisy, the caller should pre-smooth; do not add smoothing here without a test that pins it. Verify the three-bump test lands `nCorr === 2` - if the trough detection picks the wrong local min, tighten the peak loop to break only on a strict local max.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -792,7 +792,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 5: Extend `types.ts` + `engine/targets.ts` — placement, motion, separation
+## Task 5: Extend `types.ts` + `engine/targets.ts` - placement, motion, separation
 
 **Files:**
 - Modify: `src/types.ts` (extend `TargetSpec`; add the instrument-driving surface to `ArenaScene`)
@@ -812,7 +812,7 @@ export interface ArenaScene {
   spawnTarget(spec: TargetSpec): TargetHandle;
   onAim(cb: (sample: AimSample, viewYawPitch: [Degrees, Degrees]) => void): () => void;
   clearTargets(): void;
-  // Phase 3 — the instrument-driving surface (the contract anticipated this):
+  // Phase 3 - the instrument-driving surface (the contract anticipated this):
   /** Per-frame tick: dt since the previous frame and the arena clock, both in ms. */
   onFrame(cb: (dtMs: Ms, nowMs: Ms) => void): () => void;
   /** Fire (primary-button) events, with the arena clock in ms. */
@@ -841,7 +841,7 @@ export interface TargetSpec {
 }
 ```
 
-(`Ms` and `Degrees` are already imported within `types.ts`'s own declarations — they are defined at the top of the file, so no import is needed.)
+(`Ms` and `Degrees` are already imported within `types.ts`'s own declarations - they are defined at the top of the file, so no import is needed.)
 
 - [ ] **Step 2: Write the failing tests (append to `tests/engine/targets.test.ts`)**
 
@@ -997,7 +997,7 @@ export class MovingTarget implements TargetHandle {
 - [ ] **Step 4: Run the tests**
 
 Run: `npx vitest run tests/engine/targets.test.ts`
-Expected: PASS (existing + new). Also run `npx tsc --noEmit` — the `types.ts` contract change must compile cleanly (Phase-2 `Arena` will not yet implement the new methods; **that is expected to fail tsc until Task 6** — note it and proceed; the targets test itself passes under vitest's esbuild transpile).
+Expected: PASS (existing + new). Also run `npx tsc --noEmit` - the `types.ts` contract change must compile cleanly (Phase-2 `Arena` will not yet implement the new methods; **that is expected to fail tsc until Task 6** - note it and proceed; the targets test itself passes under vitest's esbuild transpile).
 
 > **Sequencing note:** because Task 5 widens `ArenaScene` but Task 6 implements it, `tsc --noEmit` over the whole project will report `Arena` missing `onFrame/onFire/view` between these tasks. Run the *targets* test in isolation here; the full-project typecheck is restored green at the end of Task 6.
 
@@ -1012,7 +1012,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 6: Extend `engine/arena.ts` — tick, onFrame, onFire, view, spec-honoring spawn
+## Task 6: Extend `engine/arena.ts` - tick, onFrame, onFire, view, spec-honoring spawn
 
 **Files:**
 - Modify: `src/engine/arena.ts`
@@ -1131,7 +1131,7 @@ import { separation } from '../../src/engine/targets';
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/engine/arena.test.ts`
-Expected: FAIL — `arena.tick`, `arena.now`, `arena.onFrame`, `arena.onFire`, `arena.view` are not functions; moving spawn ignored.
+Expected: FAIL - `arena.tick`, `arena.now`, `arena.onFrame`, `arena.onFire`, `arena.view` are not functions; moving spawn ignored.
 
 - [ ] **Step 3: Implement in `engine/arena.ts`**
 
@@ -1141,7 +1141,7 @@ Extend `InputSource`, add clock + callback sets + moving-target tracking, and re
 import { Target, MovingTarget, placeStatic, type Placement } from './targets';
 import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, Ms, TargetHandle, TargetSpec } from '../types';
 
-/** A source of pointer deltas + fire events — satisfied by the pointer-lock controller. */
+/** A source of pointer deltas + fire events - satisfied by the pointer-lock controller. */
 export interface InputSource {
   onSample(cb: (sample: AimSample) => void): () => void;
   /** Optional fire (primary-button) events. Absent in headless tests that don't fire. */
@@ -1274,7 +1274,7 @@ In `dispose()`, after `this.unsubInput();` add `this.unsubFire();` and clear the
   }
 ```
 
-(`Target` must export its `mesh` accessibly to `MovingTarget` typing — both already expose `readonly mesh: Mesh`; the union `Target | MovingTarget` is structurally fine for `scene.remove`/`dispose`.)
+(`Target` must export its `mesh` accessibly to `MovingTarget` typing - both already expose `readonly mesh: Mesh`; the union `Target | MovingTarget` is structurally fine for `scene.remove`/`dispose`.)
 
 - [ ] **Step 4: Run the tests + full typecheck**
 
@@ -1294,11 +1294,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 7: `instruments/recording.ts` — shared trial recorder + fake scene
+## Task 7: `instruments/recording.ts` - shared trial recorder + fake scene
 
 **Files:**
 - Create: `src/instruments/recording.ts`
-- Create: `tests/instruments/fake-scene.ts` (test helper — a scriptable `ArenaScene`)
+- Create: `tests/instruments/fake-scene.ts` (test helper - a scriptable `ArenaScene`)
 - Test: `tests/instruments/recording.test.ts`
 
 The DRY core every `run()` shell uses: subscribe to a scene's frames/fires, buffer them with the active target's bearing + angular radius, and expose pure helpers (`speedTrace`, `timeOnTarget`).
@@ -1540,7 +1540,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 8: `instruments/track.ts` — dragonfly + falcon (Kalman tracking)
+## Task 8: `instruments/track.ts` - dragonfly + falcon (Kalman tracking)
 
 **Files:**
 - Create: `src/instruments/track.ts`
@@ -1630,7 +1630,7 @@ describe('track.run', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/instruments/track.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1774,7 +1774,7 @@ export const track = {
 };
 ```
 
-> **Implementer note:** the `track.run` shell records frames directly (it needs the target handle's live bearing) rather than via `TrialRecorder` — that's fine, `TrialRecorder` is for the fire-driven instruments. Confirm the laggy-vs-good ordering holds; if `pi` sign is inverted, re-check the `bestLag` convention (positive lag = aim trails target → `pi = −lag < 0`).
+> **Implementer note:** the `track.run` shell records frames directly (it needs the target handle's live bearing) rather than via `TrialRecorder` - that's fine, `TrialRecorder` is for the fire-driven instruments. Confirm the laggy-vs-good ordering holds; if `pi` sign is inverted, re-check the `bestLag` convention (positive lag = aim trails target → `pi = −lag < 0`).
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1785,14 +1785,14 @@ Expected: PASS.
 
 ```bash
 git add src/instruments/track.ts tests/instruments/track.test.ts
-git commit -m "feat(instruments): track — Kalman lead, predictive index, jitter, slip
+git commit -m "feat(instruments): track - Kalman lead, predictive index, jitter, slip
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-## Task 9: `instruments/flick.ts` — spider + raptor fovea (Fitts throughput)
+## Task 9: `instruments/flick.ts` - spider + raptor fovea (Fitts throughput)
 
 **Files:**
 - Create: `src/instruments/flick.ts`
@@ -1881,7 +1881,7 @@ describe('flick.run', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/instruments/flick.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1904,7 +1904,7 @@ import { separation } from '../engine/targets';
 
 const ID: InstrumentId = 'flick';
 
-/** A grid of (amplitude, width) conditions — low-ID big flicks → high-ID small locks. */
+/** A grid of (amplitude, width) conditions - low-ID big flicks → high-ID small locks. */
 export const FLICK_CONDITIONS: FittsCondition[] = [
   { amplitude: 12, width: 3 },
   { amplitude: 12, width: 1.5 },
@@ -2045,7 +2045,7 @@ export const flick = {
 };
 ```
 
-> **Implementer note:** the along/cross error split in `run()` is a runtime proxy (the fake-scene tests fire on-target so errors ≈ 0); the *analyzer* is what's rigorously tested via `FlickTap`. Keep the analyzer pure and well-tested; the `run()` split only needs to be reasonable. Drop the unused `along`/`prevAim` if the reviewer flags dead code — keep `errAlong`/`errCross`.
+> **Implementer note:** the along/cross error split in `run()` is a runtime proxy (the fake-scene tests fire on-target so errors ≈ 0); the *analyzer* is what's rigorously tested via `FlickTap`. Keep the analyzer pure and well-tested; the `run()` split only needs to be reasonable. Drop the unused `along`/`prevAim` if the reviewer flags dead code - keep `errAlong`/`errCross`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -2056,14 +2056,14 @@ Expected: PASS.
 
 ```bash
 git add src/instruments/flick.ts tests/instruments/flick.test.ts
-git commit -m "feat(instruments): flick — Fitts effective throughput across an A×W grid
+git commit -m "feat(instruments): flick - Fitts effective throughput across an A×W grid
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-## Task 10: `instruments/calibrate.ts` — archerfish (bias/variance)
+## Task 10: `instruments/calibrate.ts` - archerfish (bias/variance)
 
 **Files:**
 - Create: `src/instruments/calibrate.ts`
@@ -2143,7 +2143,7 @@ describe('calibrate.run', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/instruments/calibrate.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -2242,14 +2242,14 @@ Expected: PASS.
 
 ```bash
 git add src/instruments/calibrate.ts tests/instruments/calibrate.test.ts
-git commit -m "feat(instruments): calibrate — archerfish bias/variance + gain estimator
+git commit -m "feat(instruments): calibrate - archerfish bias/variance + gain estimator
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-## Task 11: `instruments/strike.ts` — mantis shrimp (speed pole)
+## Task 11: `instruments/strike.ts` - mantis shrimp (speed pole)
 
 **Files:**
 - Create: `src/instruments/strike.ts`
@@ -2332,7 +2332,7 @@ describe('strike.run', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/instruments/strike.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -2420,7 +2420,7 @@ export const strike = {
           onsetTime = seg.onsetTime;
           vPeak = seg.vPeak;
         } catch {
-          // no movement detected (instant fire) — reaction = full interval
+          // no movement detected (instant fire) - reaction = full interval
         }
         shots.push({
           tR: onsetTime - presentedAt,
@@ -2457,14 +2457,14 @@ Expected: PASS.
 
 ```bash
 git add src/instruments/strike.ts tests/instruments/strike.test.ts
-git commit -m "feat(instruments): strike — mantis-shrimp speed pole (TTK operating point)
+git commit -m "feat(instruments): strike - mantis-shrimp speed pole (TTK operating point)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-## Task 12: `instruments/registry.ts` — InstrumentId → Instrument
+## Task 12: `instruments/registry.ts` - InstrumentId → Instrument
 
 **Files:**
 - Create: `src/instruments/registry.ts`
@@ -2500,7 +2500,7 @@ describe('instrument registry', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/instruments/registry.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -2527,7 +2527,7 @@ export function getInstrument(id: InstrumentId): Instrument {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/instruments/registry.test.ts`
-Expected: PASS. Then run the full suite + typecheck: `npx vitest run && npx tsc --noEmit` — all green.
+Expected: PASS. Then run the full suite + typecheck: `npx vitest run && npx tsc --noEmit` - all green.
 
 - [ ] **Step 5: Commit**
 
@@ -2692,22 +2692,22 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Engine support the instruments need (moving targets, frame clock, fire) → T5, T6, T13. ✓
 - Deliverable "each of the 4 instruments runs a trial in the arena and returns a scored TrialResult; scorers unit-tested" → T8–T11 run() shells + T13 runtime proof; T1–T4 scorer unit tests. ✓
 
-**2. Placeholder scan:** every code step contains complete, runnable code (implementations + full test bodies). No TBD/TODO. The two acknowledged proxies (flick along/cross split, calibrate radial sign) are explicitly flagged as runtime proxies whose *rigorous* testing lives in the pure analyzers — not placeholders.
+**2. Placeholder scan:** every code step contains complete, runnable code (implementations + full test bodies). No TBD/TODO. The two acknowledged proxies (flick along/cross split, calibrate radial sign) are explicitly flagged as runtime proxies whose *rigorous* testing lives in the pure analyzers - not placeholders.
 
 **3. Type consistency (against `src/types.ts`):**
-- `Tap { mt; endpointErrorAlongAxis }` — used by T1 `conditionThroughput`. ✓
-- `Shot { error:[Degrees,Degrees]; required }` — used by T3 `decompose`. ✓
-- `FittsCondition { amplitude; width }` — T1, T9. ✓
-- `Instrument { id; run(ctx, scene): Promise<TrialResult> }` — T8–T12 `track/flick/calibrate/strike` objects match (`id` + `run`). ✓
-- `TrialResult { instrument; cm360; score; raw: Record<string,number>; at }` — every analyzer returns exactly these; `raw` holds only numbers (vectors flattened). ✓
-- `TrialContext { cm360; dpi; rng; profile }` and `Profile { speedAccuracy; instrumentWeights }` — used in T8–T11. ✓
+- `Tap { mt; endpointErrorAlongAxis }` - used by T1 `conditionThroughput`. ✓
+- `Shot { error:[Degrees,Degrees]; required }` - used by T3 `decompose`. ✓
+- `FittsCondition { amplitude; width }` - T1, T9. ✓
+- `Instrument { id; run(ctx, scene): Promise<TrialResult> }` - T8–T12 `track/flick/calibrate/strike` objects match (`id` + `run`). ✓
+- `TrialResult { instrument; cm360; score; raw: Record<string,number>; at }` - every analyzer returns exactly these; `raw` holds only numbers (vectors flattened). ✓
+- `TrialContext { cm360; dpi; rng; profile }` and `Profile { speedAccuracy; instrumentWeights }` - used in T8–T11. ✓
 - `ArenaScene` extended (onFrame/onFire/view) in T5, implemented in T6, consumed by T7–T11, satisfied by `FakeScene` in tests. ✓
 - `TargetSpec` extended (yaw/pitch/distance/worldRadius/motion + `TargetMotion`) in T5, honored by `spawnTarget` in T6. ✓
 - Method names stable across tasks: `conditionThroughput`/`aggregateThroughput` (T1, T9), `KalmanCV.predict/update/lead/pos/vel` (T2, T8), `decompose`/`ewmaBias`/`calibrationCost` (T3, T10), `segment` (T4, T9, T11), `separation`/`motionOffset`/`MovingTarget` (T5, T6, T7), `TrialRecorder`/`speedTrace`/`timeOnTarget` (T7, T8). ✓
 
-**4. Sequencing:** the only cross-task hazard is the `ArenaScene` widening in T5 vs its implementation in T6 — explicitly called out (run the targets test in isolation in T5; full `tsc` restored green at the end of T6). Instruments (T8–T12) depend only on the pure scorers (T1–T4) + the recorder/fake-scene (T7) and the extended scene (T5–T6), all earlier. T13 depends on everything.
+**4. Sequencing:** the only cross-task hazard is the `ArenaScene` widening in T5 vs its implementation in T6 - explicitly called out (run the targets test in isolation in T5; full `tsc` restored green at the end of T6). Instruments (T8–T12) depend only on the pure scorers (T1–T4) + the recorder/fake-scene (T7) and the extended scene (T5–T6), all earlier. T13 depends on everything.
 
 **Forward notes for Phase 4 (optimizer + session):**
 - Each instrument's `score` is within-trial only; the session controller must normalize per-instrument across the cm/360 sweep before fitting the psychometric curve (it has all trials).
 - The cm/360-sensitive headline estimators to feed the search: flick `throughput` (peak), calibrate `gain` (find where it crosses 1 → bias-zero `s_b`), track `tot`/`slip`/`jitter` (joint min), strike `(TTK, hitRate)` operating point weighted by `profile.speedAccuracy`.
-- `KalmanCV` `q`/`r` and the track `LEAD_SEC`, jitter `FC_HZ`, and instrument durations are tuned constants — expose them if Phase 4 wants per-profile adaptation.
+- `KalmanCV` `q`/`r` and the track `LEAD_SEC`, jitter `FC_HZ`, and instrument durations are tuned constants - expose them if Phase 4 wants per-profile adaptation.

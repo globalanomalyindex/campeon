@@ -1,11 +1,11 @@
 /**
- * Fire recoil — a pure, snappy damped spring that punches the viewmodel on each shot, then settles.
+ * Fire recoil - a pure, snappy damped spring that punches the viewmodel on each shot, then settles.
  * Deliberately separate from sway (sway is slow camera-driven parallax; recoil is a sharp fire-driven
  * snap): `punch` injects an upward + backward impulse, `stepRecoil` pulls both channels back to rest
  * each frame. The viewmodel sums the offset into its blit (kick up + brief scale lunge + a little roll).
- * Offsets are normalized fractions of the viewmodel size. COSMETIC only — never touches the camera/aim.
+ * Offsets are normalized fractions of the viewmodel size. COSMETIC only - never touches the camera/aim.
  *
- * Pure: no DOM, no time source — the caller supplies dt. Unit-tested for rest-stability + convergence.
+ * Pure: no DOM, no time source - the caller supplies dt. Unit-tested for rest-stability + convergence.
  */
 
 export interface RecoilState {
@@ -18,9 +18,9 @@ export interface RecoilState {
 }
 
 export interface RecoilParams {
-  /** Spring stiffness — high → fast settle (snappy). */
+  /** Spring stiffness - high → fast settle (snappy). */
   stiffness: number;
-  /** Damping — at/above 2·√stiffness → no wobble. */
+  /** Damping - at/above 2·√stiffness → no wobble. */
   damping: number;
   /** Upward velocity injected per shot. */
   kickUp: number;
@@ -47,7 +47,7 @@ export function punch(s: RecoilState, p: RecoilParams = DEFAULT_RECOIL): RecoilS
   return { y: s.y, vy: s.vy + p.kickUp, back: s.back, vback: s.vback + p.kickBack };
 }
 
-/** Advance both recoil channels toward rest by `dtSec` (semi-implicit Euler — stable at frame dt). */
+/** Advance both recoil channels toward rest by `dtSec` (semi-implicit Euler - stable at frame dt). */
 export function stepRecoil(s: RecoilState, dtSec: number, p: RecoilParams = DEFAULT_RECOIL): RecoilState {
   const ay = -p.stiffness * s.y - p.damping * s.vy;
   const ab = -p.stiffness * s.back - p.damping * s.vback;

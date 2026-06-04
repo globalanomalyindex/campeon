@@ -10,17 +10,17 @@ import type { InstrumentId, Report, TrialResult } from '../types';
 
 const SCHEDULE: InstrumentId[] = ['flick', 'track', 'calibrate', 'strike'];
 const MAX_TRIALS = 24; // spec §5.4: ~15–30, capped ~20–25
-const COLD_START = 8; // Generation 0 — the initial gene pool (≥2 trials/instrument before selection)
+const COLD_START = 8; // Generation 0 - the initial gene pool (≥2 trials/instrument before selection)
 
 export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
   return trials.map((t) => ({ cm360: t.cm360, score: t.score, instrument: t.instrument }));
 }
 
 const COPY: Record<InstrumentId, string> = {
-  track: '+track · the open-air intercept — hold your lead on the weaving prey (dragonfly + falcon)',
-  flick: '+flick · the ambush — break-cover targets to snap and lock (spider + raptor)',
-  calibrate: '+calibrate · shooting through the bend — learn the gap between aim and impact (archerfish)',
-  strike: '+strike · the strike window — commit the instant you see it, no settling (mantis shrimp)',
+  track: '+track · the open-air intercept - hold your lead on the weaving prey (dragonfly + falcon)',
+  flick: '+flick · the ambush - break-cover targets to snap and lock (spider + raptor)',
+  calibrate: '+calibrate · shooting through the bend - learn the gap between aim and impact (archerfish)',
+  strike: '+strike · the strike window - commit the instant you see it, no settling (mantis shrimp)',
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
@@ -84,7 +84,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           },
           onTrial: (_t, trials, interim) => drawPlot(interim, trials),
         }).then(({ report, trials }) => {
-          if (!alive) return; // unmounted mid-session — never touch a torn-down context
+          if (!alive) return; // unmounted mid-session - never touch a torn-down context
           const sessionId = `s-${trials.length}-${Math.round(report.optimalCm360 * 100)}`;
           const result = buildResult(report, trials, ctx.draft.dpi);
           ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...trials], status: 'complete', createdAt: 0 });

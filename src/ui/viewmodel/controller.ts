@@ -8,7 +8,7 @@ export interface ViewmodelFrame {
 /**
  * Pure animation state machine for the viewmodel. Tracks the current animation and its start time and
  * auto-advances a one-shot to its queued follow-up the moment it completes (e.g. flickDraw → idleReady,
- * fire → idleReady). No DOM — the canvas shell calls `frameAt(now)` each rAF tick and blits the rect.
+ * fire → idleReady). No DOM - the canvas shell calls `frameAt(now)` each rAF tick and blits the rect.
  */
 export class ViewmodelController {
   private anim: AnimName;

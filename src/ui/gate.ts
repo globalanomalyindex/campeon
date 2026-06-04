@@ -140,10 +140,10 @@ function buildStepDom(state: GateState, h: GateHandlers): HTMLElement {
   } else if (state.step === 'accel') {
     wrap.append(
       p(
-        `lock: ${state.mode ?? '—'} ${
+        `lock: ${state.mode ?? '-'} ${
           state.mode === 'raw'
-            ? '(raw — Chromium)'
-            : '(reduced validity — verify acceleration is off)'
+            ? '(raw - Chromium)'
+            : '(reduced validity - verify acceleration is off)'
         }`,
         'mono',
       ),
@@ -159,7 +159,7 @@ function buildStepDom(state: GateState, h: GateHandlers): HTMLElement {
   } else if (state.step === 'blocked') {
     wrap.append(
       p(
-        'Mouse acceleration appears to be ON — cm/360 is undefined under acceleration.',
+        'Mouse acceleration appears to be ON - cm/360 is undefined under acceleration.',
         'gate__lead',
       ),
       p(

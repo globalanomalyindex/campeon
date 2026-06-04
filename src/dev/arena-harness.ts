@@ -87,7 +87,7 @@ export function mountArenaHarness(root: HTMLElement): void {
 
   const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7), postProcessor: createPsxPass(renderer, size) });
 
-  const feedback = createShotFeedback(root); // miss tick — fire aimed off-target to see it
+  const feedback = createShotFeedback(root); // miss tick - fire aimed off-target to see it
   let enemyLayer: EnemyLayerHandle | null = null;
   const ENV_KEYS: Record<string, InstrumentId> = { q: 'track', w: 'flick', e: 'calibrate', r: 'strike' };
   const spawnTrio = (): void => {
@@ -105,7 +105,7 @@ export function mountArenaHarness(root: HTMLElement): void {
     spawnTrio();
   });
 
-  // Desert Eagle viewmodel — dithered/posterized at load to match the PSX arena (verify the composite).
+  // Desert Eagle viewmodel - dithered/posterized at load to match the PSX arena (verify the composite).
   let gun: Viewmodel | null = null;
   void createViewmodel({}).then((vm) => {
     gun = vm;
@@ -133,7 +133,7 @@ export function mountArenaHarness(root: HTMLElement): void {
     hud.textContent =
       `campeón · input + engine harness\n` +
       `cm/360 ${CM360}   dpi ${DPI}   deg/count ${dpc.toFixed(4)}\n` +
-      `lock ${pointer.isLocked() ? 'on' : 'off'}   mode ${pointer.mode() ?? '—'}\n` +
+      `lock ${pointer.isLocked() ? 'on' : 'off'}   mode ${pointer.mode() ?? '-'}\n` +
       `view  yaw ${view[0].toFixed(1)}°  pitch ${view[1].toFixed(1)}°\n` +
       `accel slow ${slow.toFixed(0)} / fast ${fast.toFixed(0)}` +
       (verdict ? `  → ${verdict.accelerated ? 'BLOCK (accel on)' : 'OK (accel off)'}` : '') +

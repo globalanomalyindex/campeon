@@ -24,7 +24,7 @@ describe('trialsToObservations', () => {
     expect(fitPeak(obs).optimalCm360).toBeCloseTo(35, 0);
   });
 
-  it('drops instruments with no spread (≤1 trial or all-equal) — no NaN', () => {
+  it('drops instruments with no spread (≤1 trial or all-equal) - no NaN', () => {
     const trials = [trial('flick', 30, 5), trial('track', 25, 9), trial('track', 40, 9)];
     const obs = trialsToObservations(trials, prof({ flick: 1, track: 1 }));
     expect(obs).toEqual([]);

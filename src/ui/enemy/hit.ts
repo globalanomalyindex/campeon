@@ -9,7 +9,7 @@ export const GRAZE_FACTOR = 2.5;
 /**
  * COSMETIC hit classification for the enemy pop / flinch animation. Compares the player's current
  * view (crosshair bearing) to a target's true bearing using the SAME great-circle metric the
- * instruments use — but strictly READ-ONLY: it drives only the sprite animation and never writes a
+ * instruments use - but strictly READ-ONLY: it drives only the sprite animation and never writes a
  * sample or a score. The cm/360 measurement is computed entirely from the recorded aim stream and is
  * untouched by this function, so the cosmetic skin can never bias the result.
  *

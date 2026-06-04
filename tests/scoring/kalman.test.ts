@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { KalmanCV } from '../../src/scoring/kalman';
 
-describe('KalmanCV — constant-velocity tracking', () => {
+describe('KalmanCV - constant-velocity tracking', () => {
   it('converges to the true velocity on clean CV data', () => {
     const k = new KalmanCV({ q: 1e-3, r: 1e-2 });
     let pos = 0;

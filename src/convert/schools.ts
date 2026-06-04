@@ -13,7 +13,7 @@ export interface ConversionSchool { id: '360' | 'monitor'; label: string; fovAwa
 
 export const CONVERSION_SCHOOLS: ConversionSchool[] = [
   { id: '360', label: '360 distance', fovAware: false,
-    note: 'cm per 360° — FOV-agnostic; exactly what campeón measures.' },
+    note: 'cm per 360° - FOV-agnostic; exactly what campeón measures.' },
   { id: 'monitor', label: 'monitor distance', fovAware: true,
     note: 'matches on-screen cursor travel for a fraction of the screen; depends on source + target FOV.' },
 ];

@@ -38,13 +38,13 @@ describe('result screen', () => {
     expect(host.querySelector('[data-game="cs2"]')!.getAttribute('data-current')).toBe('true');
   });
 
-  it('shows breakdown contributions and renders NaN as —', () => {
+  it('shows breakdown contributions and renders NaN as -', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
     ctx.lastResult!.result = { ...RESULT, breakdown: { ...RESULT.breakdown, precisionFloorDeg: NaN } };
     resultScreen(host, ctx).mount();
     expect(host.querySelector('[data-breakdown="ttkMs"]')!.textContent).toContain('511');
-    expect(host.querySelector('[data-breakdown="precisionFloorDeg"]')!.textContent).toContain('—');
+    expect(host.querySelector('[data-breakdown="precisionFloorDeg"]')!.textContent).toContain('-');
   });
 
   it('+ run again navigates home', () => {

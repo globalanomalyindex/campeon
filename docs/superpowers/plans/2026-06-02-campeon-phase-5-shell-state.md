@@ -1,14 +1,14 @@
-# campeón Phase 5 — Shell + Flow + State Implementation Plan
+# campeón Phase 5 - Shell + Flow + State Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the proven measurement core into a usable, end-to-end product: hero → setup → validity gate → live session → result, persisted locally, with the four bio-instruments visibly triangulating **one** cm/360 answer.
 
-**Architecture:** A dependency-free `ui/` shell (hash router + injected `AppContext`; each screen is a pure factory over that context) wraps the existing pure core and the Three.js arena. A `state/` layer persists sessions/results behind the `Storage` interface (localStorage, cloud-ready) and exports JSON. Two thin pure additions complete the core for the UI: `optimizer/breakdown.ts` (each facet's contribution to the one answer) and `optimizer/result.ts` (`Report` + trials + dpi → `Result`). `runSession` grows two optional callbacks (`onTrialStart`, `onTrial`) so the session screen can render the live convergence view without changing the return shape. The **convergence plot** (`ui/convergence-plot.ts`) is split into pure geometry (data → coordinates/paths, unit-tested) and a thin SVG renderer — the same analyze/shell seam used throughout; it is the load-bearing expression of the "one latent optimum, four probes" thesis.
+**Architecture:** A dependency-free `ui/` shell (hash router + injected `AppContext`; each screen is a pure factory over that context) wraps the existing pure core and the Three.js arena. A `state/` layer persists sessions/results behind the `Storage` interface (localStorage, cloud-ready) and exports JSON. Two thin pure additions complete the core for the UI: `optimizer/breakdown.ts` (each facet's contribution to the one answer) and `optimizer/result.ts` (`Report` + trials + dpi → `Result`). `runSession` grows two optional callbacks (`onTrialStart`, `onTrial`) so the session screen can render the live convergence view without changing the return shape. The **convergence plot** (`ui/convergence-plot.ts`) is split into pure geometry (data → coordinates/paths, unit-tested) and a thin SVG renderer - the same analyze/shell seam used throughout; it is the load-bearing expression of the "one latent optimum, four probes" thesis.
 
 **Tech Stack:** TypeScript (strict, `verbatimModuleSyntax`, `exactOptionalPropertyTypes`) · Vite · Three.js (arena reused from P2/P3) · Vitest + jsdom (DOM/localStorage tests) · DOM + CSS + SVG (no UI framework).
 
-**The unified-system mandate (this phase makes the thesis visible — see memory `campeon-unified-system-goal`):**
+**The unified-system mandate (this phase makes the thesis visible - see memory `campeon-unified-system-goal`):**
 - The session screen's centerpiece is **one shared convergence view**: a single cm/360 axis, every trial color-coded by organism dropping onto **one sharpening curve + CI band**. Never four separate score meters.
 - The result is **one number at the apex**; its breakdown reveals each facet's *contribution to that one answer* (archerfish → bias-zero cm/360, the precision floor, mantis-shrimp → TTK/hit-rate).
 - The hero frames the falcon as **one predator with many faculties**; setup's goal slider sets *where on the single speed↔accuracy trade-off you live*.
@@ -20,32 +20,32 @@
 
 ```
 src/
-├─ main.ts                      # MODIFY — mount the shell; keep #arena dev harness reachable
+├─ main.ts                      # MODIFY - mount the shell; keep #arena dev harness reachable
 ├─ stats/
-│  └─ rng.ts                    # CREATE — hoist mulberry32 (now 3+ consumers); bootstrap re-exports
+│  └─ rng.ts                    # CREATE - hoist mulberry32 (now 3+ consumers); bootstrap re-exports
 ├─ optimizer/
-│  ├─ breakdown.ts              # CREATE — computeBreakdown(trials, optimalCm360) → Breakdown
-│  ├─ result.ts                 # CREATE — buildResult(report, trials, dpi, games?) → Result
-│  └─ session-controller.ts     # MODIFY — onTrialStart / onTrial callbacks (decoupled interim RNG)
+│  ├─ breakdown.ts              # CREATE - computeBreakdown(trials, optimalCm360) → Breakdown
+│  ├─ result.ts                 # CREATE - buildResult(report, trials, dpi, games?) → Result
+│  └─ session-controller.ts     # MODIFY - onTrialStart / onTrial callbacks (decoupled interim RNG)
 ├─ state/
-│  ├─ storage.ts                # CREATE — Storage impl over an injectable backend (localStorage)
-│  └─ export.ts                 # CREATE — pure export bundle + toJson + DOM download trigger
+│  ├─ storage.ts                # CREATE - Storage impl over an injectable backend (localStorage)
+│  └─ export.ts                 # CREATE - pure export bundle + toJson + DOM download trigger
 ├─ ui/
-│  ├─ convergence-plot.ts       # CREATE — pure plotGeometry + thin renderConvergencePlot (SVG)
-│  ├─ shell.ts                  # CREATE — hash router, AppContext, SessionDraft, screen lifecycle
-│  ├─ hero.ts                   # CREATE — the falcon-silhouette landing
-│  ├─ setup.ts                  # CREATE — DPI + game/sens (+ "you sit at X today") + goal slider
-│  ├─ gate.ts                   # CREATE — validity gate (pointer-lock + accel check + stance)
-│  ├─ session-view.ts           # CREATE — arena + runSession + live convergence + per-instrument HUD
-│  └─ result.ts                 # CREATE — one number + CI + per-game table + breakdown + export/save
+│  ├─ convergence-plot.ts       # CREATE - pure plotGeometry + thin renderConvergencePlot (SVG)
+│  ├─ shell.ts                  # CREATE - hash router, AppContext, SessionDraft, screen lifecycle
+│  ├─ hero.ts                   # CREATE - the falcon-silhouette landing
+│  ├─ setup.ts                  # CREATE - DPI + game/sens (+ "you sit at X today") + goal slider
+│  ├─ gate.ts                   # CREATE - validity gate (pointer-lock + accel check + stance)
+│  ├─ session-view.ts           # CREATE - arena + runSession + live convergence + per-instrument HUD
+│  └─ result.ts                 # CREATE - one number + CI + per-game table + breakdown + export/save
 └─ styles/
-   ├─ tokens.css                # MODIFY — organism accent tokens + shell/screen scale tokens
-   └─ shell.css                 # CREATE — shell layout, screens, plot, controls (brand-faithful)
+   ├─ tokens.css                # MODIFY - organism accent tokens + shell/screen scale tokens
+   └─ shell.css                 # CREATE - shell layout, screens, plot, controls (brand-faithful)
 tests/
 ├─ stats/rng.test.ts            # CREATE
 ├─ optimizer/breakdown.test.ts  # CREATE
 ├─ optimizer/result.test.ts     # CREATE
-├─ optimizer/session-controller.test.ts  # MODIFY — add onTrial/onTrialStart cases
+├─ optimizer/session-controller.test.ts  # MODIFY - add onTrial/onTrialStart cases
 ├─ state/storage.test.ts        # CREATE (jsdom)
 ├─ state/export.test.ts         # CREATE
 ├─ ui/convergence-plot.test.ts  # CREATE (geometry: node; render: jsdom)
@@ -61,7 +61,7 @@ tests/
 
 ## Conventions (every task)
 
-- **Tests:** explicit `import { describe, it, expect } from 'vitest';` — never globals.
+- **Tests:** explicit `import { describe, it, expect } from 'vitest';` - never globals.
 - **DOM/localStorage tests:** add `// @vitest-environment jsdom` as the FIRST line of the test file (Task 0 installs jsdom).
 - **Type-only imports:** `import type { ... }` (`verbatimModuleSyntax`).
 - **`exactOptionalPropertyTypes`:** don't pass `undefined` explicitly to optional props; omit them.
@@ -74,7 +74,7 @@ tests/
 
 ---
 
-### Task 0: Test environment — jsdom
+### Task 0: Test environment - jsdom
 
 **Files:**
 - Modify: `package.json` (devDependency)
@@ -142,13 +142,13 @@ describe('mulberry32', () => {
 });
 ```
 
-- [ ] **Step 2: Run it; expect FAIL** — Run: `npx vitest run tests/stats/rng.test.ts` — Expected: FAIL (`src/stats/rng` not found).
+- [ ] **Step 2: Run it; expect FAIL** - Run: `npx vitest run tests/stats/rng.test.ts` - Expected: FAIL (`src/stats/rng` not found).
 
 - [ ] **Step 3: Create `src/stats/rng.ts` with the function moved VERBATIM**
 
 ```typescript
 // src/stats/rng.ts
-/** Deterministic seeded PRNG (mulberry32) — reproducible bootstrap, sessions, and tests. */
+/** Deterministic seeded PRNG (mulberry32) - reproducible bootstrap, sessions, and tests. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -160,16 +160,16 @@ export function mulberry32(seed: number): () => number {
 }
 ```
 
-- [ ] **Step 4: Edit `src/stats/bootstrap.ts`** — delete the local `mulberry32` definition (lines defining it) and add at the top, after the existing imports:
+- [ ] **Step 4: Edit `src/stats/bootstrap.ts`** - delete the local `mulberry32` definition (lines defining it) and add at the top, after the existing imports:
 
 ```typescript
 import { mulberry32 } from './rng';
 export { mulberry32 } from './rng';
 ```
 
-(Keep `bootstrapCi` and the private `peakCm360` exactly as they are; `bootstrapCi` still uses the imported `mulberry32` indirectly via callers — it takes `rng` as a param, so no body change.)
+(Keep `bootstrapCi` and the private `peakCm360` exactly as they are; `bootstrapCi` still uses the imported `mulberry32` indirectly via callers - it takes `rng` as a param, so no body change.)
 
-- [ ] **Step 5: Run rng + full suite; expect PASS** — Run: `npx vitest run tests/stats/rng.test.ts && npm test` — Expected: all green (164 prior + 3 new). Then `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run rng + full suite; expect PASS** - Run: `npx vitest run tests/stats/rng.test.ts && npm test` - Expected: all green (164 prior + 3 new). Then `npx tsc --noEmit` clean.
 
 - [ ] **Step 6: Commit**
 
@@ -180,13 +180,13 @@ git commit -m "refactor(stats): hoist mulberry32 to stats/rng (shared util); boo
 
 ---
 
-### Task 2: `optimizer/breakdown.ts` — each facet's contribution
+### Task 2: `optimizer/breakdown.ts` - each facet's contribution
 
 **Files:**
 - Create: `src/optimizer/breakdown.ts`
 - Test: `tests/optimizer/breakdown.test.ts`
 
-Reads the instrument-specific `raw` metrics (calibrate `gain`/`sigmaR`, strike `ttkMs`/`hitRate`) to produce the `Result.breakdown`. **biasZeroCm360** = the cm/360 where calibrate gain `g` crosses 1 (interpolated in ln-space between the bracketing trials — `g>1` overshoot at low cm/360, `g<1` undershoot at high cm/360). **precisionFloorDeg** = the *minimum* calibrate `sigmaR` observed (the skill/hardware floor, spec §4.3). **ttkMs / hitRate** = the strike trial nearest the optimum. Missing data → `NaN` (the UI renders `—`); never fabricate a value.
+Reads the instrument-specific `raw` metrics (calibrate `gain`/`sigmaR`, strike `ttkMs`/`hitRate`) to produce the `Result.breakdown`. **biasZeroCm360** = the cm/360 where calibrate gain `g` crosses 1 (interpolated in ln-space between the bracketing trials - `g>1` overshoot at low cm/360, `g<1` undershoot at high cm/360). **precisionFloorDeg** = the *minimum* calibrate `sigmaR` observed (the skill/hardware floor, spec §4.3). **ttkMs / hitRate** = the strike trial nearest the optimum. Missing data → `NaN` (the UI renders `-`); never fabricate a value.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -237,7 +237,7 @@ describe('computeBreakdown', () => {
 });
 ```
 
-- [ ] **Step 2: Run it; expect FAIL** — `npx vitest run tests/optimizer/breakdown.test.ts` — Expected: FAIL (module not found).
+- [ ] **Step 2: Run it; expect FAIL** - `npx vitest run tests/optimizer/breakdown.test.ts` - Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement**
 
@@ -248,7 +248,7 @@ import type { Cm360, Degrees, Ms, TrialResult } from '../types';
 export interface Breakdown {
   /** cm/360 where the calibrate gain crosses 1 (the bias-zero sensitivity, spec §4.3). */
   biasZeroCm360: Cm360;
-  /** Minimum calibrate σ_R observed — the precision floor (skill/hardware), not a recommendation. */
+  /** Minimum calibrate σ_R observed - the precision floor (skill/hardware), not a recommendation. */
   precisionFloorDeg: Degrees;
   /** Strike time-to-kill at the optimum. */
   ttkMs: Ms;
@@ -306,18 +306,18 @@ export function computeBreakdown(trials: readonly TrialResult[], optimalCm360: C
 }
 ```
 
-- [ ] **Step 4: Run it; expect PASS** — `npx vitest run tests/optimizer/breakdown.test.ts` — Expected: 5 pass. `npx tsc --noEmit` clean.
+- [ ] **Step 4: Run it; expect PASS** - `npx vitest run tests/optimizer/breakdown.test.ts` - Expected: 5 pass. `npx tsc --noEmit` clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/optimizer/breakdown.ts tests/optimizer/breakdown.test.ts
-git commit -m "feat(optimizer): breakdown — bias-zero cm/360, precision floor, strike TTK/hit-rate"
+git commit -m "feat(optimizer): breakdown - bias-zero cm/360, precision floor, strike TTK/hit-rate"
 ```
 
 ---
 
-### Task 3: `optimizer/result.ts` — `Report` + trials + dpi → `Result`
+### Task 3: `optimizer/result.ts` - `Report` + trials + dpi → `Result`
 
 **Files:**
 - Create: `src/optimizer/result.ts`
@@ -366,7 +366,7 @@ describe('buildResult', () => {
 });
 ```
 
-- [ ] **Step 2: Run it; expect FAIL** — `npx vitest run tests/optimizer/result.test.ts`.
+- [ ] **Step 2: Run it; expect FAIL** - `npx vitest run tests/optimizer/result.test.ts`.
 
 - [ ] **Step 3: Implement**
 
@@ -400,13 +400,13 @@ export function buildResult(
 }
 ```
 
-- [ ] **Step 4: Run it; expect PASS** — `npx vitest run tests/optimizer/result.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 4: Run it; expect PASS** - `npx vitest run tests/optimizer/result.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/optimizer/result.ts tests/optimizer/result.test.ts
-git commit -m "feat(optimizer): buildResult — Report + trials + dpi → Result (per-game + breakdown)"
+git commit -m "feat(optimizer): buildResult - Report + trials + dpi → Result (per-game + breakdown)"
 ```
 
 ---
@@ -417,14 +417,14 @@ git commit -m "feat(optimizer): buildResult — Report + trials + dpi → Result
 - Modify: `src/optimizer/session-controller.ts`
 - Test: `tests/optimizer/session-controller.test.ts` (add a `describe` block; keep existing tests untouched)
 
-The session screen needs (a) to announce the active instrument *before* a trial ("now: +flick"), and (b) a cheap interim `Report` *after* each trial to redraw the live convergence view. The interim bootstrap uses its **own** RNG (seeded per trial index) so it never consumes the shared instrument-noise stream — set or unset, the trial sequence is byte-identical (load-bearing test below).
+The session screen needs (a) to announce the active instrument *before* a trial ("now: +flick"), and (b) a cheap interim `Report` *after* each trial to redraw the live convergence view. The interim bootstrap uses its **own** RNG (seeded per trial index) so it never consumes the shared instrument-noise stream - set or unset, the trial sequence is byte-identical (load-bearing test below).
 
 - [ ] **Step 1: Write the failing tests** (append to `tests/optimizer/session-controller.test.ts`, inside the `runSession` area)
 
 ```typescript
 import type { InstrumentId } from '../../src/types'; // ensure imported (it already is)
 
-describe('runSession — live callbacks', () => {
+describe('runSession - live callbacks', () => {
   const base = () => ({
     dpi: 800,
     profile: profile({ flick: 1 }),
@@ -461,7 +461,7 @@ describe('runSession — live callbacks', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/optimizer/session-controller.test.ts` — Expected: FAIL (`onTrialStart`/`onTrial` not in `SessionConfig`).
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/optimizer/session-controller.test.ts` - Expected: FAIL (`onTrialStart`/`onTrial` not in `SessionConfig`).
 
 - [ ] **Step 3: Edit `src/optimizer/session-controller.ts`**
 
@@ -472,9 +472,9 @@ import { mulberry32 } from '../stats/rng';
 
 Add to the `SessionConfig` interface (after `bootstrapIters?`):
 ```typescript
-  /** Fired before each trial's instrument runs — for a live "now: +flick" HUD. */
+  /** Fired before each trial's instrument runs - for a live "now: +flick" HUD. */
   onTrialStart?: (id: InstrumentId, index: number, cm360: Cm360) => void;
-  /** Fired after each trial with the trial, all trials so far, and a cheap interim Report — for the
+  /** Fired after each trial with the trial, all trials so far, and a cheap interim Report - for the
    *  live convergence view. The interim bootstrap uses its OWN seeded RNG, so setting this never
    *  perturbs the (deterministic) instrument-noise stream. */
   onTrial?: (trial: TrialResult, trials: readonly TrialResult[], interim: Report) => void;
@@ -496,7 +496,7 @@ In `runSession`, inside the `while` loop, replace the block from `const id = ...
       const interim = finalizeReport(
         trialsToObservations(trials, profile),
         bounds,
-        mulberry32(0x5eed ^ trials.length), // own stream — does NOT touch the instrument RNG
+        mulberry32(0x5eed ^ trials.length), // own stream - does NOT touch the instrument RNG
         { bootstrapIters: config.interimBootstrapIters ?? 120 },
       );
       config.onTrial(result, trials, interim);
@@ -505,7 +505,7 @@ In `runSession`, inside the `while` loop, replace the block from `const id = ...
 
 (Leave the cold-start/`cm360` line and the `ciStopWidth` early-stop block exactly as they are.)
 
-- [ ] **Step 4: Run session-controller tests + full suite; expect PASS** — `npx vitest run tests/optimizer/session-controller.test.ts && npm test`. Then `npx tsc --noEmit` clean. (The existing convergence/load-bearing tests must still pass unchanged — they set neither callback, so the interim path is skipped.)
+- [ ] **Step 4: Run session-controller tests + full suite; expect PASS** - `npx vitest run tests/optimizer/session-controller.test.ts && npm test`. Then `npx tsc --noEmit` clean. (The existing convergence/load-bearing tests must still pass unchanged - they set neither callback, so the interim path is skipped.)
 
 - [ ] **Step 5: Commit**
 
@@ -516,7 +516,7 @@ git commit -m "feat(optimizer): runSession onTrialStart/onTrial hooks for the li
 
 ---
 
-### Task 5: `state/storage.ts` — persistence behind the `Storage` interface
+### Task 5: `state/storage.ts` - persistence behind the `Storage` interface
 
 **Files:**
 - Create: `src/state/storage.ts`
@@ -584,7 +584,7 @@ describe('LocalStorage Storage', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/state/storage.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/state/storage.test.ts`.
 
 - [ ] **Step 3: Implement**
 
@@ -592,7 +592,7 @@ describe('LocalStorage Storage', () => {
 // src/state/storage.ts
 import type { Result, Session, Storage } from '../types';
 
-/** Minimal key/value surface — satisfied by window.localStorage and by test fakes. */
+/** Minimal key/value surface - satisfied by window.localStorage and by test fakes. */
 export interface KvBackend {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -654,7 +654,7 @@ export function createStorage(backend?: KvBackend): Storage & { loadResults(): R
 
 (Note: `Storage` from `types.ts` doesn't declare `loadResults`, but the impl exposes it for `export.ts`; the return type intersects it in. This keeps the public `Storage` contract intact while giving the export module typed access.)
 
-- [ ] **Step 4: Run; expect PASS** — `npx vitest run tests/state/storage.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 4: Run; expect PASS** - `npx vitest run tests/state/storage.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 5: Commit**
 
@@ -665,7 +665,7 @@ git commit -m "feat(state): localStorage-backed Storage (injectable backend, ups
 
 ---
 
-### Task 6: `state/export.ts` — JSON export bundle + download
+### Task 6: `state/export.ts` - JSON export bundle + download
 
 **Files:**
 - Create: `src/state/export.ts`
@@ -708,7 +708,7 @@ describe('export', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/state/export.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/state/export.test.ts`.
 
 - [ ] **Step 3: Implement**
 
@@ -749,7 +749,7 @@ export function triggerDownload(filename: string, json: string): void {
 }
 ```
 
-- [ ] **Step 4: Run; expect PASS** — `npx vitest run tests/state/export.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 4: Run; expect PASS** - `npx vitest run tests/state/export.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 5: Commit**
 
@@ -760,14 +760,14 @@ git commit -m "feat(state): JSON export bundle (pure) + browser download trigger
 
 ---
 
-### Task 7: `ui/convergence-plot.ts` — the unified-system showpiece (pure geometry + SVG)
+### Task 7: `ui/convergence-plot.ts` - the unified-system showpiece (pure geometry + SVG)
 
 **Files:**
 - Create: `src/ui/convergence-plot.ts`
 - Modify: `src/styles/tokens.css` (organism accent tokens)
 - Test: `tests/ui/convergence-plot.test.ts` (geometry: node; render: jsdom)
 
-The single visualization that carries the thesis: a cm/360 axis (log) with every trial as an organism-colored mark, the fitted curve, the **sharpening CI band**, and the peak line — all converging on **one** answer. Geometry is pure (data → pixel coordinates / SVG path strings); rendering is a thin DOM shell.
+The single visualization that carries the thesis: a cm/360 axis (log) with every trial as an organism-colored mark, the fitted curve, the **sharpening CI band**, and the peak line - all converging on **one** answer. Geometry is pure (data → pixel coordinates / SVG path strings); rendering is a thin DOM shell.
 
 🎓 **Design-engineering pattern:** split a data-viz into *geometry* (pure: domain → screen coordinates and path strings, fully unit-testable) and *rendering* (thin: write attributes to SVG nodes). Same analyze/shell seam the instruments use. You unit-test the math (does cm/360=lo map to the left edge? does the CI band span the right pixels?) without a DOM, and the renderer stays dumb.
 
@@ -775,10 +775,10 @@ The single visualization that carries the thesis: a cm/360 axis (log) with every
 
 ```css
   /* organism accents (track=slate, flick=gold from the core palette; +2 harmonized hues) */
-  --c-track: #4A5A66;     /* falcon/dragonfly — slate */
-  --c-flick: #FFC400;     /* spider/raptor — gold */
-  --c-calibrate: #7FA6B6; /* archerfish — water blue (cool, harmonized with slate) */
-  --c-strike: #E8702A;    /* mantis shrimp — strike ember (warm, harmonized with gold) */
+  --c-track: #4A5A66;     /* falcon/dragonfly - slate */
+  --c-flick: #FFC400;     /* spider/raptor - gold */
+  --c-calibrate: #7FA6B6; /* archerfish - water blue (cool, harmonized with slate) */
+  --c-strike: #E8702A;    /* mantis shrimp - strike ember (warm, harmonized with gold) */
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -860,7 +860,7 @@ describe('renderConvergencePlot (jsdom)', () => {
 
 > Implementer note: jsdom and node environments can't mix in one file via inline comment. **Split** into `tests/ui/convergence-plot.test.ts` (pure geometry, node) and `tests/ui/convergence-plot.render.test.ts` (`// @vitest-environment jsdom` first line, the render block). Keep both.
 
-- [ ] **Step 3: Run; expect FAIL** — `npx vitest run tests/ui/convergence-plot.test.ts`.
+- [ ] **Step 3: Run; expect FAIL** - `npx vitest run tests/ui/convergence-plot.test.ts`.
 
 - [ ] **Step 4: Implement**
 
@@ -989,18 +989,18 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry): void {
 }
 ```
 
-- [ ] **Step 5: Run; expect PASS** — `npx vitest run tests/ui/convergence-plot.test.ts tests/ui/convergence-plot.render.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run; expect PASS** - `npx vitest run tests/ui/convergence-plot.test.ts tests/ui/convergence-plot.render.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/ui/convergence-plot.ts src/styles/tokens.css tests/ui/convergence-plot.test.ts tests/ui/convergence-plot.render.test.ts
-git commit -m "feat(ui): convergence plot — pure log-axis geometry + thin SVG renderer (organism marks, CI band, peak)"
+git commit -m "feat(ui): convergence plot - pure log-axis geometry + thin SVG renderer (organism marks, CI band, peak)"
 ```
 
 ---
 
-### Task 8: `ui/shell.ts` — hash router, `AppContext`, screen lifecycle
+### Task 8: `ui/shell.ts` - hash router, `AppContext`, screen lifecycle
 
 **Files:**
 - Create: `src/ui/shell.ts`
@@ -1009,7 +1009,7 @@ git commit -m "feat(ui): convergence plot — pure log-axis geometry + thin SVG 
 
 A dependency-free router. Each screen is a factory `(host, ctx) => Screen` with `mount()`/`unmount()`. The shell maps `location.hash` → route, unmounts the previous screen, mounts the next. Cross-screen state lives in `ctx.draft` (in-memory `SessionDraft`). Flow screens guard: `gate`/`session`/`result` redirect to `setup`/`hero` if prerequisites are missing.
 
-🎓 **Pattern:** a hand-rolled router + injected `AppContext` (no framework) keeps the whole shell testable and zero-dependency — the same "inject the boundary" discipline as the engine's `RendererLike`/`InputSource`. Screens are pure over a context; the router owns lifecycle (mount/unmount), so there are no leaked listeners between screens.
+🎓 **Pattern:** a hand-rolled router + injected `AppContext` (no framework) keeps the whole shell testable and zero-dependency - the same "inject the boundary" discipline as the engine's `RendererLike`/`InputSource`. Screens are pure over a context; the router owns lifecycle (mount/unmount), so there are no leaked listeners between screens.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1061,13 +1061,13 @@ describe('shell router', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/ui/shell.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/ui/shell.test.ts`.
 
 - [ ] **Step 3: Implement `src/ui/shell.ts`**
 
 ```typescript
 // src/ui/shell.ts
-// NOTE: do NOT import CSS here — this module is imported by vitest. main.ts owns the CSS imports.
+// NOTE: do NOT import CSS here - this module is imported by vitest. main.ts owns the CSS imports.
 import type { Cm360, Dpi, GameId, Profile, Result, Session, Storage } from '../types';
 
 export type Route = 'hero' | 'setup' | 'gate' | 'session' | 'result' | 'case-study' | 'options';
@@ -1171,7 +1171,7 @@ function inMemoryStorage(): Storage {
 }
 ```
 
-- [ ] **Step 4: Create `src/styles/shell.css`** — the shell layout system. Provide a real, brand-faithful base (the implementer refines spacing/polish to taste, honoring tokens):
+- [ ] **Step 4: Create `src/styles/shell.css`** - the shell layout system. Provide a real, brand-faithful base (the implementer refines spacing/polish to taste, honoring tokens):
 
 ```css
 /* src/styles/shell.css */
@@ -1199,18 +1199,18 @@ function inMemoryStorage(): Storage {
 @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 ```
 
-- [ ] **Step 5: Run shell tests; expect PASS** — `npx vitest run tests/ui/shell.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run shell tests; expect PASS** - `npx vitest run tests/ui/shell.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/ui/shell.ts src/styles/shell.css tests/ui/shell.test.ts
-git commit -m "feat(ui): shell — hash router, AppContext + SessionDraft, screen lifecycle"
+git commit -m "feat(ui): shell - hash router, AppContext + SessionDraft, screen lifecycle"
 ```
 
 ---
 
-### Task 9: `ui/hero.ts` — the falcon-silhouette landing
+### Task 9: `ui/hero.ts` - the falcon-silhouette landing
 
 **Files:**
 - Create: `src/ui/hero.ts`
@@ -1275,7 +1275,7 @@ describe('hero', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/ui/hero.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/ui/hero.test.ts`.
 
 - [ ] **Step 3: Implement `src/ui/hero.ts`** (structure shown; the implementer applies the design spec + CSS in `shell.css` or a `hero` block. Use `data-*` hooks exactly as the test expects.)
 
@@ -1328,18 +1328,18 @@ export function hero(host: HTMLElement, ctx: AppContext): Screen {
 /* implementer: position the 8 wing spans along an upper-left→lower-right sweep behind the wordmark */
 ```
 
-- [ ] **Step 5: Run; expect PASS** — `npx vitest run tests/ui/hero.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run; expect PASS** - `npx vitest run tests/ui/hero.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/ui/hero.ts src/styles/shell.css tests/ui/hero.test.ts
-git commit -m "feat(ui): hero — falcon-silhouette landing (ó eye, + start beak, wing scatter, thesis tagline)"
+git commit -m "feat(ui): hero - falcon-silhouette landing (ó eye, + start beak, wing scatter, thesis tagline)"
 ```
 
 ---
 
-### Task 10: `ui/setup.ts` — DPI + game/sens + goal slider → draft
+### Task 10: `ui/setup.ts` - DPI + game/sens + goal slider → draft
 
 **Files:**
 - Create: `src/ui/setup.ts`
@@ -1398,7 +1398,7 @@ describe('setup', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/ui/setup.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/ui/setup.test.ts`.
 
 - [ ] **Step 3: Implement `src/ui/setup.ts`**
 
@@ -1430,8 +1430,8 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
           <label class="field">current in-game sensitivity
             <input class="mono" type="number" min="0.01" step="0.01" data-field="sens" value="${d.currentSens}">
           </label>
-          <p class="setup__readout">you sit at <span class="mono" data-readout="cm360">—</span> cm/360 today</p>
-          <label class="field">goal — precision ↔ speed
+          <p class="setup__readout">you sit at <span class="mono" data-readout="cm360">-</span> cm/360 today</p>
+          <label class="field">goal - precision ↔ speed
             <input type="range" min="0" max="1" step="0.01" data-field="goal" value="${d.profile.speedAccuracy}">
             <span class="setup__goalhint mono" data-readout="goal"></span>
           </label>
@@ -1449,7 +1449,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
       const refresh = (): void => {
         const dpi = Number(dpiEl.value), sens = Number(sensEl.value);
         const yaw = yawFor(gameEl.value as GameId);
-        cmOut.textContent = dpi > 0 && sens > 0 ? cmPer360(dpi, sens, yaw).toFixed(1) : '—';
+        cmOut.textContent = dpi > 0 && sens > 0 ? cmPer360(dpi, sens, yaw).toFixed(1) : '-';
         const g = Number(goalEl.value);
         goalOut.textContent = g >= 0.66 ? 'speed-first' : g <= 0.34 ? 'precision-first' : 'balanced';
       };
@@ -1473,22 +1473,22 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
 
 - [ ] **Step 4: Add setup styles** to `shell.css` (`.field` as a labeled stacked control, `.setup__readout` emphasized in gold). Keep brand-faithful; refine to taste.
 
-- [ ] **Step 5: Run; expect PASS** — `npx vitest run tests/ui/setup.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run; expect PASS** - `npx vitest run tests/ui/setup.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/ui/setup.ts src/styles/shell.css tests/ui/setup.test.ts
-git commit -m "feat(ui): setup — dpi/game/sens (live cm/360 today) + goal slider → draft"
+git commit -m "feat(ui): setup - dpi/game/sens (live cm/360 today) + goal slider → draft"
 ```
 
 ---
 
-### Task 11: `ui/gate.ts` — validity gate (pointer-lock + accel check)
+### Task 11: `ui/gate.ts` - validity gate (pointer-lock + accel check)
 
 **Files:**
 - Create: `src/ui/gate.ts`
-- Test: `tests/ui/gate.test.ts` (jsdom — tests the pure state reducer; the lock/accel wiring is runtime-verified)
+- Test: `tests/ui/gate.test.ts` (jsdom - tests the pure state reducer; the lock/accel wiring is runtime-verified)
 
 The make-or-break validity layer (spec §6) as UI. A small explicit state machine drives the steps; the verdict logic is pure and tested. The actual `requestPointerLock`/accel swipe is real DOM wired to `input/pointer-lock` + `input/accel-check` and proven at runtime, not in jsdom.
 
@@ -1531,7 +1531,7 @@ describe('gateReducer', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/ui/gate.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/ui/gate.test.ts`.
 
 - [ ] **Step 3: Implement `src/ui/gate.ts`** (reducer + screen; reuse `accelVerdict` from `input/accel-check` for the threshold so the rule lives in one place)
 
@@ -1629,14 +1629,14 @@ function buildStepDom(state: GateState, h: GateHandlers): HTMLElement {
     );
   } else if (state.step === 'accel') {
     wrap.append(
-      p(`lock: ${state.mode ?? '—'} ${state.mode === 'raw' ? '(raw — Chromium)' : '(reduced validity — verify acceleration is off)'}`, 'mono'),
+      p(`lock: ${state.mode ?? '-'} ${state.mode === 'raw' ? '(raw - Chromium)' : '(reduced validity - verify acceleration is off)'}`, 'mono'),
       p('Swipe the SAME physical distance slowly, then quickly. We compare the totals.', 'gate__lead'),
       btn('start slow swipe', h.onStartSlow, false), btn('stop slow', h.onStopSlow, false),
       btn('start fast swipe', h.onStartFast, false), btn('stop fast → check', h.onStopFast),
     );
   } else if (state.step === 'blocked') {
     wrap.append(
-      p('Mouse acceleration appears to be ON — cm/360 is undefined under acceleration.', 'gate__lead'),
+      p('Mouse acceleration appears to be ON - cm/360 is undefined under acceleration.', 'gate__lead'),
       p('Turn off OS/driver mouse acceleration ("Enhance pointer precision"), then retry.'),
       btn('retry', h.onRetry),
     );
@@ -1650,24 +1650,24 @@ function buildStepDom(state: GateState, h: GateHandlers): HTMLElement {
 
 > Implementer note: confirm `createPointerLock`'s API (`request()`, `onSample`, `onFire`, `mode()`, `isLocked()`, `dispose()`) against `src/input/pointer-lock.ts` and `AccelMeter`/`accelVerdict` against `src/input/accel-check.ts` before wiring. The slow/fast capture mirrors the dev harness (`AccelMeter` fed from `pointer.onSample`).
 
-- [ ] **Step 4: Run reducer tests; expect PASS** — `npx vitest run tests/ui/gate.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 4: Run reducer tests; expect PASS** - `npx vitest run tests/ui/gate.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/ui/gate.ts src/styles/shell.css tests/ui/gate.test.ts
-git commit -m "feat(ui): validity gate — pointer-lock + accel-check state machine (pure reducer tested)"
+git commit -m "feat(ui): validity gate - pointer-lock + accel-check state machine (pure reducer tested)"
 ```
 
 ---
 
-### Task 12: `ui/session-view.ts` — arena + live session + convergence
+### Task 12: `ui/session-view.ts` - arena + live session + convergence
 
 **Files:**
 - Create: `src/ui/session-view.ts`
-- Test: `tests/ui/session-view.test.ts` (jsdom — tests the pure `marksFromTrials` + `instructionFor` helpers; the WebGL/session run is runtime-verified)
+- Test: `tests/ui/session-view.test.ts` (jsdom - tests the pure `marksFromTrials` + `instructionFor` helpers; the WebGL/session run is runtime-verified)
 
-The heart. Constructs the real `Arena` (mirroring `dev/arena-harness.ts`: `WebGLRenderer`, pointer-lock `InputSource`, RAF loop), drives `runSession` with the draft's `dpi`/`profile`/`bounds`, a `makeBo` engine, the full instrument schedule, and the `onTrialStart`/`onTrial` callbacks → updates the **convergence plot** + per-instrument HUD. On completion: `buildResult` → `storage.saveSession` + `saveResult` → set `ctx.lastResult` → `navigate('result')`. Real player fires with the mouse (no autofire — that was dev-only).
+The heart. Constructs the real `Arena` (mirroring `dev/arena-harness.ts`: `WebGLRenderer`, pointer-lock `InputSource`, RAF loop), drives `runSession` with the draft's `dpi`/`profile`/`bounds`, a `makeBo` engine, the full instrument schedule, and the `onTrialStart`/`onTrial` callbacks → updates the **convergence plot** + per-instrument HUD. On completion: `buildResult` → `storage.saveSession` + `saveResult` → set `ctx.lastResult` → `navigate('result')`. Real player fires with the mouse (no autofire - that was dev-only).
 
 **Pure helpers (tested):**
 - `marksFromTrials(trials)` → `PlotMark[]` (map `TrialResult` → `{cm360, score, instrument}`).
@@ -1703,7 +1703,7 @@ describe('session-view helpers', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/ui/session-view.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/ui/session-view.test.ts`.
 
 - [ ] **Step 3: Implement `src/ui/session-view.ts`** (pure helpers + the runtime mount). Model the arena construction on `dev/arena-harness.ts` (reuse the same `WebGLRenderer`/`Arena`/`createPointerLock`/RAF pattern).
 
@@ -1729,10 +1729,10 @@ export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
 }
 
 const COPY: Record<InstrumentId, string> = {
-  track: '+track · keep the dot on the mover — dragonfly lead + falcon hold',
-  flick: '+flick · snap to each target and settle — spider acquisition + raptor fovea',
-  calibrate: '+calibrate · fire center-mass; we separate your bias from your spread — archerfish',
-  strike: '+strike · fire as fast as you can — mantis-shrimp speed pole',
+  track: '+track · keep the dot on the mover - dragonfly lead + falcon hold',
+  flick: '+flick · snap to each target and settle - spider acquisition + raptor fovea',
+  calibrate: '+calibrate · fire center-mass; we separate your bias from your spread - archerfish',
+  strike: '+strike · fire as fast as you can - mantis-shrimp speed pole',
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
@@ -1822,24 +1822,24 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
 
 - [ ] **Step 4: Add session styles** to `shell.css` (`.session__canvas` fullscreen, centered gold crosshair like the harness, `.session__hud` top, `.session__plot` a bottom/side panel with a dark translucent backing so the convergence view reads over the arena). Brand-faithful; refine to taste.
 
-- [ ] **Step 5: Run helper tests; expect PASS** — `npx vitest run tests/ui/session-view.test.ts`. `npx tsc --noEmit` clean. (The full session is runtime-verified in Task 14.)
+- [ ] **Step 5: Run helper tests; expect PASS** - `npx vitest run tests/ui/session-view.test.ts`. `npx tsc --noEmit` clean. (The full session is runtime-verified in Task 14.)
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/ui/session-view.ts src/styles/shell.css tests/ui/session-view.test.ts
-git commit -m "feat(ui): session view — live arena + runSession + one shared convergence plot + per-instrument HUD"
+git commit -m "feat(ui): session view - live arena + runSession + one shared convergence plot + per-instrument HUD"
 ```
 
 ---
 
-### Task 13: `ui/result.ts` — one number + CI + per-game table + breakdown
+### Task 13: `ui/result.ts` - one number + CI + per-game table + breakdown
 
 **Files:**
 - Create: `src/ui/result.ts`
 - Test: `tests/ui/result.test.ts` (jsdom)
 
-The payoff screen. **One number at the apex** (cm/360, large, gold) with the 90% CI as a range and a small CI bar; a per-game table (every game's native sens at the optimum, the user's current game highlighted); the **breakdown as contributions** (bias-zero cm/360 from archerfish, the precision floor, mantis-shrimp TTK + hit-rate — each labeled with its faculty so the unity reads); export JSON + "saved locally"; `+ run again` → hero. `NaN` breakdown fields render as `—` (honest).
+The payoff screen. **One number at the apex** (cm/360, large, gold) with the 90% CI as a range and a small CI bar; a per-game table (every game's native sens at the optimum, the user's current game highlighted); the **breakdown as contributions** (bias-zero cm/360 from archerfish, the precision floor, mantis-shrimp TTK + hit-rate - each labeled with its faculty so the unity reads); export JSON + "saved locally"; `+ run again` → hero. `NaN` breakdown fields render as `-` (honest).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1885,13 +1885,13 @@ describe('result screen', () => {
     expect(host.querySelector('[data-game="cs2"]')!.getAttribute('data-current')).toBe('true');
   });
 
-  it('shows breakdown contributions and renders NaN as —', () => {
+  it('shows breakdown contributions and renders NaN as -', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
     ctx.lastResult!.result = { ...RESULT, breakdown: { ...RESULT.breakdown, precisionFloorDeg: NaN } };
     resultScreen(host, ctx).mount();
     expect(host.querySelector('[data-breakdown="ttkMs"]')!.textContent).toContain('511');
-    expect(host.querySelector('[data-breakdown="precisionFloorDeg"]')!.textContent).toContain('—');
+    expect(host.querySelector('[data-breakdown="precisionFloorDeg"]')!.textContent).toContain('-');
   });
 
   it('+ run again navigates home', () => {
@@ -1904,7 +1904,7 @@ describe('result screen', () => {
 });
 ```
 
-- [ ] **Step 2: Run; expect FAIL** — `npx vitest run tests/ui/result.test.ts`.
+- [ ] **Step 2: Run; expect FAIL** - `npx vitest run tests/ui/result.test.ts`.
 
 - [ ] **Step 3: Implement `src/ui/result.ts`**
 
@@ -1915,7 +1915,7 @@ import type { GameId, Result } from '../types';
 import { GAME_YAW } from '../convert/yaw-table';
 import { buildExportBundle, toJson, triggerDownload } from '../state/export';
 
-const fmt = (v: number, digits = 1): string => (Number.isFinite(v) ? v.toFixed(digits) : '—');
+const fmt = (v: number, digits = 1): string => (Number.isFinite(v) ? v.toFixed(digits) : '-');
 
 export function result(host: HTMLElement, ctx: AppContext): Screen {
   const r: Result | undefined = ctx.lastResult?.result;
@@ -1928,7 +1928,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
         const sens = r.perGameSens[g.id as GameId];
         const current = g.id === ctx.draft.currentGame;
         return `<tr data-game="${g.id}"${current ? ' data-current="true"' : ''}>
-          <td>${g.label}</td><td class="mono">${sens === undefined ? '—' : sens.toFixed(3)}</td></tr>`;
+          <td>${g.label}</td><td class="mono">${sens === undefined ? '-' : sens.toFixed(3)}</td></tr>`;
       }).join('');
       root.innerHTML = `
         <div class="wrap stack result__inner">
@@ -1939,7 +1939,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
             <div><span class="result__bk-label">bias-zero <em>archerfish</em></span><span class="mono" data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
             <div><span class="result__bk-label">precision floor</span><span class="mono" data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
             <div><span class="result__bk-label">time-to-kill <em>mantis shrimp</em></span><span class="mono" data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
-            <div><span class="result__bk-label">hit rate</span><span class="mono" data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '—'}</span></div>
+            <div><span class="result__bk-label">hit rate</span><span class="mono" data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
           </div>
           <table class="result__games"><thead><tr><th>game</th><th>sensitivity</th></tr></thead><tbody>${rows}</tbody></table>
           <p class="result__saved mono">saved locally</p>
@@ -1961,17 +1961,17 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
 }
 ```
 
-> Implementer note: `exportedAt` is passed `0` here to keep it pure/deterministic (no `Date.now()` in module code per project convention — timestamps are stamped by callers/tests). If a real timestamp is wanted in the downloaded file, read it at the click handler via `Date.now()` (a DOM event handler, not module-load) — acceptable since it's user-triggered glue, but `0` is fine for v1.
+> Implementer note: `exportedAt` is passed `0` here to keep it pure/deterministic (no `Date.now()` in module code per project convention - timestamps are stamped by callers/tests). If a real timestamp is wanted in the downloaded file, read it at the click handler via `Date.now()` (a DOM event handler, not module-load) - acceptable since it's user-triggered glue, but `0` is fine for v1.
 
-- [ ] **Step 4: Add result styles** to `shell.css` — the cm/360 number huge (`clamp(4rem, 16vw, 10rem)`, gold), CI in mono slate-2, a thin CI bar (optional: reuse the plot), breakdown as a 2×2 grid with faculty labels, per-game table clean with the current row highlighted in gold. Brand-faithful; refine to taste.
+- [ ] **Step 4: Add result styles** to `shell.css` - the cm/360 number huge (`clamp(4rem, 16vw, 10rem)`, gold), CI in mono slate-2, a thin CI bar (optional: reuse the plot), breakdown as a 2×2 grid with faculty labels, per-game table clean with the current row highlighted in gold. Brand-faithful; refine to taste.
 
-- [ ] **Step 5: Run; expect PASS** — `npx vitest run tests/ui/result.test.ts`. `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run; expect PASS** - `npx vitest run tests/ui/result.test.ts`. `npx tsc --noEmit` clean.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/ui/result.ts src/styles/shell.css tests/ui/result.test.ts
-git commit -m "feat(ui): result — one cm/360 + CI, per-game table, breakdown-as-contributions, export"
+git commit -m "feat(ui): result - one cm/360 + CI, per-game table, breakdown-as-contributions, export"
 ```
 
 ---
@@ -2005,7 +2005,7 @@ function stub(title: string, note: string) {
   });
 }
 
-export const caseStudyStub = stub('case study', 'The science page — each organism’s real mechanism, the math, and why it maps to aim — arrives in the polish pass.');
+export const caseStudyStub = stub('case study', 'The science page - each organism’s real mechanism, the math, and why it maps to aim - arrives in the polish pass.');
 export const optionsStub = stub('options', 'Conversion school, per-game yaw overrides, and search bounds arrive in the polish pass.');
 export type { Route };
 ```
@@ -2045,7 +2045,7 @@ async function boot(): Promise<void> {
 void boot();
 ```
 
-> Note: the `#arena` branch must run before the shell so the dev harness stays available. If the hash is `#arena`, we never start the shell. (Switching away from `#arena` requires a reload — acceptable for a dev-only route.)
+> Note: the `#arena` branch must run before the shell so the dev harness stays available. If the hash is `#arena`, we never start the shell. (Switching away from `#arena` requires a reload - acceptable for a dev-only route.)
 
 - [ ] **Step 3: Typecheck + full suite**
 
@@ -2079,18 +2079,18 @@ git commit -m "feat(ui): wire the shell as the app (hero→setup→gate→sessio
 
 ## Self-review (against the spec + the unified-system goal)
 
-- **Spec §9 flow coverage:** hero (§9.1) → setup with goal slider + "where you sit today" (§9.2) → validity gate (§9.3) → session with live sharpening curve (§9.4) → result with cm/360 + CI + breakdown + per-game table + JSON export (§9.5). `+case study` (§9 / §9.6) and full `+options` (§9.7) are explicitly Phase-6 stubs — flagged so reviewers don't read it as a gap.
+- **Spec §9 flow coverage:** hero (§9.1) → setup with goal slider + "where you sit today" (§9.2) → validity gate (§9.3) → session with live sharpening curve (§9.4) → result with cm/360 + CI + breakdown + per-game table + JSON export (§9.5). `+case study` (§9 / §9.6) and full `+options` (§9.7) are explicitly Phase-6 stubs - flagged so reviewers don't read it as a gap.
 - **Spec §8 module boundaries:** `ui/` (shell + screens + plot) and `state/` (storage + export) added; pure additions (`optimizer/breakdown`, `optimizer/result`) keep DOM/Three out of the core; `convergence-plot` geometry is pure. `Storage` interface (§8 data model) implemented behind an injectable backend (cloud-ready).
 - **Unified-system goal:** the session screen is ONE shared convergence view (not four meters); the result is one number whose breakdown is framed as each faculty's contribution; the hero frames one predator with many faculties; the goal slider is the single trade-off axis. The CI is shown honestly (wide = disagreement, never hidden).
 - **Quality bar (§1.1 / §12):** pure cores TDD'd; DOM logic tested via jsdom + pure helpers extracted for the WebGL-bound screens; `prefers-reduced-motion` honored (tokens + `.fade-in`); keyboard-focusable actions with visible focus; brand tokens/Gefalent/`+`-mark throughout; runtime proof required for the WebGL/session path.
 - **Type consistency:** `Route`, `Screen`, `AppContext`, `SessionDraft`, `ScreenFactory` defined once in `shell.ts` and imported by every screen; `Breakdown`/`Result` match `types.ts`; `runSession` callbacks are additive (existing tests untouched); `mulberry32` single source in `stats/rng.ts`. Screen factory names: `hero`, `setup`, `gate`, `sessionView`, `result` (note: `session` route → `sessionView` factory).
-- **Determinism preserved:** the new `onTrial` interim bootstrap uses its own per-trial RNG, so the instrument-noise stream — and every existing session-controller test — is unchanged (explicit load-bearing test in Task 4).
+- **Determinism preserved:** the new `onTrial` interim bootstrap uses its own per-trial RNG, so the instrument-noise stream - and every existing session-controller test - is unchanged (explicit load-bearing test in Task 4).
 - **No placeholders in pure/state/geometry tasks:** full code. UI tasks give complete logic + `data-*` test hooks + a concrete design spec; CSS polish is delegated with brand constraints (the design-engineer judgment call, bounded by tokens + the spec's visual identity).
 
-## Forward notes (Phase 6 — Polish)
+## Forward notes (Phase 6 - Polish)
 
 - `+case study` science page (per-organism mechanism + math + citations, spec §4 + §13) replacing the stub; full `+options` (conversion school via `schools.ts` monitor-distance, per-game yaw overrides, search-bounds editor).
-- Falcon motion (wing flap + parallax sky masked to the wing) and the PSX arena skin — separate deferred tracks.
+- Falcon motion (wing flap + parallax sky masked to the wing) and the PSX arena skin - separate deferred tracks.
 - Carry-over P4 honesty refinements (independent of UI): per-point Fitts-spread nugget into `Observation.noise`; surface `makeBo`'s posterior-mean argmax and pass it to `finalizeReport`'s `gpPeakCm360` inside `runSession` (the §5.3 GP/curve-disagreement widen).
 - Session tuning from real play: revisit `MAX_TRIALS`/`ciStopWidth`/`minTrials`, warm-up down-weighting (§5.4), and per-instrument trial counts.
 - a11y/QA pass: full keyboard nav across the flow, focus management on screen change, reduced-motion audit of the convergence animation, empty/error states (no WebGL, lock denied, accel blocked recovery).

@@ -29,7 +29,7 @@ export interface ArenaStage {
  * the renderer, PSX pass, pointer-lock, Arena, the async Deagle viewmodel + merc-prey enemy layer, the
  * sway + fire-recoil feeds, the miss-tick feedback, the rAF loop, resize, and full teardown. The
  * consumer screen owns its own DOM (passes in its canvas + host) and its own gameplay logic (instrument
- * loop, or range director). Runtime-only (WebGL + image decode) — verified in Chromium, not unit tests.
+ * loop, or range director). Runtime-only (WebGL + image decode) - verified in Chromium, not unit tests.
  */
 export function createArenaStage(
   host: HTMLElement,

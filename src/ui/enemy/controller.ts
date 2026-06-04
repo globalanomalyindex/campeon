@@ -11,7 +11,7 @@ export interface EnemyFrame {
  * completes (spawn → idle, flinch → idle). Terminal states (death, escape) carry no follow-up;
  * `isFinished` reports when their one-shot has played out so the shell can retire the sprite.
  *
- * No THREE, no DOM — the WebGL shell calls `frameAt(now)` each tick and applies the UV to the sprite.
+ * No THREE, no DOM - the WebGL shell calls `frameAt(now)` each tick and applies the UV to the sprite.
  */
 export class EnemyController {
   private state: EnemyState;
@@ -52,7 +52,7 @@ export class EnemyController {
     return { state: this.state, uv: staticFrameUV(this.state) };
   }
 
-  /** True once a terminal one-shot (no queued follow-up) has finished — the sprite can be retired. */
+  /** True once a terminal one-shot (no queued follow-up) has finished - the sprite can be retired. */
   isFinished(nowMs: number): boolean {
     return this.next === null && !ANIMATIONS[this.state].loop && isComplete(this.state, nowMs - this.startMs);
   }

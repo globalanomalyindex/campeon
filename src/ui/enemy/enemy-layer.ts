@@ -16,7 +16,7 @@ import { EnemyController } from './controller';
 import { classifyHit, type HitClass } from './hit';
 import { keyMagenta } from '../viewmodel/key';
 
-// Base-aware (root in dev, /campeon/ on GitHub Pages) — these are runtime string URLs Vite won't rewrite.
+// Base-aware (root in dev, /campeon/ on GitHub Pages) - these are runtime string URLs Vite won't rewrite.
 const B = import.meta.env.BASE_URL;
 const SHEETS: Record<InstrumentId, string> = {
   track: `${B}sprites/track.png`,
@@ -29,9 +29,9 @@ const SHEETS: Record<InstrumentId, string> = {
 const ENEMY_SIZE_K = 1.7;
 /** Floor on billboard height (metres) so tiny-width targets stay visible. */
 const MIN_ENEMY_HEIGHT = 0.6;
-/** Cell aspect (w/h) from the uniform grid — keeps the billboard from stretching. */
+/** Cell aspect (w/h) from the uniform grid - keeps the billboard from stretching. */
 const ASPECT = SHEET.w / SHEET.cols / (SHEET.h / SHEET.rows);
-/** Vertical pivot: the gold weak-spot sits ~0.7 up the cell — anchor it to the true hitbox centre. */
+/** Vertical pivot: the gold weak-spot sits ~0.7 up the cell - anchor it to the true hitbox centre. */
 const WEAKSPOT_V = 0.7;
 
 interface EnemyRecord {
@@ -48,7 +48,7 @@ export interface EnemyLayerHandle extends EnemyLayer {
 }
 
 /**
- * COSMETIC enemy billboard layer — the over-the-top "merc-prey" that skins each arena target. It is a
+ * COSMETIC enemy billboard layer - the over-the-top "merc-prey" that skins each arena target. It is a
  * pure decoration over the true target: the arena keeps every target's gold sphere as the owner of
  * `bearing()` / `radiusDeg()` (the angular truth the instruments score against) and merely hides it,
  * pinning a camera-facing `THREE.Sprite` at the same world position. Hits drive only animation via the
@@ -156,7 +156,7 @@ export async function createEnemyLayer(
         }
         applyUV(rec, nowMs);
       }
-      // Dying mercs play out where they fell — independent of the live target's spawn/clear.
+      // Dying mercs play out where they fell - independent of the live target's spawn/clear.
       for (let i = fadeouts.length - 1; i >= 0; i--) {
         const rec = fadeouts[i]!;
         if (rec.ctrl.isFinished(nowMs)) {

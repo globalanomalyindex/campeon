@@ -1,10 +1,10 @@
-# campeón Phase 1 — Foundations Implementation Plan
+# campeón Phase 1 - Foundations Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stand up the Vite/TS/Vitest project with the brand tokens + Gefalent, and build the pure, fully-tested `convert/` (cm/360 + per-game yaw) and `stats/` (psychometric peak + bootstrap CI) libraries.
 
-**Architecture:** Pure functions only this phase — no DOM, no Three.js. `convert` and `stats` are dependency-free TypeScript validated by Vitest against the worked examples in the spec. The app boots to a branded placeholder so the visual foundation is visible.
+**Architecture:** Pure functions only this phase - no DOM, no Three.js. `convert` and `stats` are dependency-free TypeScript validated by Vitest against the worked examples in the spec. The app boots to a branded placeholder so the visual foundation is visible.
 
 **Tech Stack:** TypeScript (strict) · Vite · Vitest. No runtime dependencies yet.
 
@@ -86,7 +86,7 @@ export default defineConfig({ test: { globals: true, environment: 'node' } });
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>campeón — aim sensitivity tool</title>
+    <title>campeón - aim sensitivity tool</title>
   </head>
   <body>
     <div id="app"></div>
@@ -136,7 +136,7 @@ git commit -m "chore: scaffold Vite + TS (strict) + Vitest"
 - Create: `src/types.ts`
 - Test: `tests/types.test.ts`
 
-- [ ] **Step 1: Write the failing test** (a usage test — proves the contracts compile and are shaped right)
+- [ ] **Step 1: Write the failing test** (a usage test - proves the contracts compile and are shaped right)
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -157,7 +157,7 @@ describe('types', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/types.test.ts`
-Expected: FAIL — `Cannot find module '../src/types'`.
+Expected: FAIL - `Cannot find module '../src/types'`.
 
 - [ ] **Step 3: Create `src/types.ts`** (copy the full contract block from the master plan's "Shared type contracts" section verbatim)
 
@@ -215,7 +215,7 @@ describe('brand tokens', () => {
 - [ ] **Step 3: Run to verify it fails**
 
 Run: `npx vitest run tests/tokens.test.ts`
-Expected: FAIL — `ENOENT ... tokens.css`.
+Expected: FAIL - `ENOENT ... tokens.css`.
 
 - [ ] **Step 4: Create `src/styles/tokens.css`**
 
@@ -343,7 +343,7 @@ describe('cm360 conversion', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/convert/cm360.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/convert/cm360.ts`**
 
@@ -419,7 +419,7 @@ describe('yaw table', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/convert/yaw-table.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/convert/yaw-table.ts`**
 
@@ -494,7 +494,7 @@ describe('per-game output (360-distance)', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/convert/schools.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/convert/schools.ts`**
 
@@ -565,7 +565,7 @@ describe('psychometric peak fit', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/stats/psychometric.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/stats/psychometric.ts`**
 
@@ -679,7 +679,7 @@ describe('bootstrap CI', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/stats/bootstrap.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/stats/bootstrap.ts`**
 
@@ -687,7 +687,7 @@ Expected: FAIL — module not found.
 import type { Observation } from '../types';
 import { fitQuadratic } from './psychometric';
 
-/** Deterministic seeded PRNG (mulberry32) — used for reproducible bootstrap + tests. */
+/** Deterministic seeded PRNG (mulberry32) - used for reproducible bootstrap + tests. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {

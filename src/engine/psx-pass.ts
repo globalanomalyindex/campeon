@@ -19,7 +19,7 @@ export interface PostProcessor {
 }
 
 export interface PsxOptions {
-  /** Internal-resolution divisor — the scene renders at 1/scale then upscales hard (default 3). */
+  /** Internal-resolution divisor - the scene renders at 1/scale then upscales hard (default 3). */
   scale?: number;
   /** Colour-quantization steps per channel (default 6 → a limited PS1 palette). */
   levels?: number;
@@ -69,7 +69,7 @@ void main() {
 /**
  * A hand-rolled PS1-style post pass (no three/examples addons): render the scene into a low-resolution
  * target, then blit it full-screen through a shader that hard-upscales (chunky pixels), ordered-dithers,
- * posterizes to a limited palette, and adds faint scanlines + a vignette. Purely visual — it never
+ * posterizes to a limited palette, and adds faint scanlines + a vignette. Purely visual - it never
  * touches geometry, the camera, the pointer stream, or the cm/360 math; targets stay angularly exact.
  *
  * Runtime-only (GLSL + WebGL render targets); verified in the #arena harness.

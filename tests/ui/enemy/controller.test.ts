@@ -8,7 +8,7 @@ const durMs = (state: EnemyState): number => {
   return ((a.to - a.from + 1) / a.fps) * 1000;
 };
 
-describe('EnemyController — state machine', () => {
+describe('EnemyController - state machine', () => {
   it('starts on spawn and auto-advances to idle when spawn completes', () => {
     const c = new EnemyController('spawn', 0, 'idle');
     expect(c.current()).toBe('spawn');
@@ -24,7 +24,7 @@ describe('EnemyController — state machine', () => {
     expect(c.frameAt(1e6).state).toBe('idle');
   });
 
-  it('flinch returns to idle — a graze does not kill', () => {
+  it('flinch returns to idle - a graze does not kill', () => {
     const c = new EnemyController('idle', 0, null);
     c.play('flinch', 100, 'idle');
     expect(c.current()).toBe('flinch');
@@ -33,7 +33,7 @@ describe('EnemyController — state machine', () => {
     expect(c.isFinished(1e7)).toBe(false);
   });
 
-  it('death is terminal — isFinished true once it plays out, with no auto-advance', () => {
+  it('death is terminal - isFinished true once it plays out, with no auto-advance', () => {
     const c = new EnemyController('idle', 0, null);
     c.play('death', 200, null);
     expect(c.isFinished(200)).toBe(false);

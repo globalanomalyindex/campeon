@@ -19,14 +19,14 @@ describe('magenta chroma-key', () => {
     expect(isKeyColor(248, 163, 251, { gMax: 175 })).toBe(true); // lighter pink halo: removed
   });
 
-  it('even the tighter gun key (gMax 175) spares bright gun pixels — only true magenta keys', () => {
+  it('even the tighter gun key (gMax 175) spares bright gun pixels - only true magenta keys', () => {
     expect(isKeyColor(250, 250, 250, { gMax: 175 })).toBe(false); // white / muzzle flash
     expect(isKeyColor(255, 200, 0, { gMax: 175 })).toBe(false); // gold glint (low blue)
     expect(isKeyColor(205, 205, 215, { gMax: 175 })).toBe(false); // chrome (neutral)
   });
 
   it('zeroes alpha only on key pixels and counts them', () => {
-    // 4 pixels: magenta, white, grey, gold — RGBA, all opaque to start.
+    // 4 pixels: magenta, white, grey, gold - RGBA, all opaque to start.
     const data = new Uint8ClampedArray([
       243, 3, 240, 255, // magenta → key
       250, 250, 250, 255, // white → keep
@@ -51,7 +51,7 @@ describe('magenta despill', () => {
     expect(data[3]).toBe(255); // alpha untouched
   });
 
-  it('spares the gun palette — gold, chrome, white, smoke, gunmetal are unchanged', () => {
+  it('spares the gun palette - gold, chrome, white, smoke, gunmetal are unchanged', () => {
     const data = new Uint8ClampedArray([
       255, 200, 0, 255, // gold glint (blue far below green → no magenta cast)
       205, 205, 215, 255, // chrome (cast 0)
@@ -66,13 +66,13 @@ describe('magenta despill', () => {
   });
 
   it('leaves already-keyed (transparent) pixels alone', () => {
-    const data = new Uint8ClampedArray([243, 3, 240, 0]); // keyed magenta — alpha already 0
+    const data = new Uint8ClampedArray([243, 3, 240, 0]); // keyed magenta - alpha already 0
     const n = despillMagenta(data);
     expect(n).toBe(0);
     expect(Array.from(data)).toEqual([243, 3, 240, 0]);
   });
 
-  it('respects castMin — a faint cast below the threshold is left alone', () => {
+  it('respects castMin - a faint cast below the threshold is left alone', () => {
     const data = new Uint8ClampedArray([186, 180, 184, 255]); // cast = min(186,184)-180 = 4 < 8
     const n = despillMagenta(data);
     expect(n).toBe(0);

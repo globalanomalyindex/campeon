@@ -11,31 +11,31 @@
 **Spec:** `docs/superpowers/specs/2026-06-04-range-and-recoil-design.md`
 
 **Conventions to follow (read before starting):**
-- TDD: write the failing test, watch it fail, minimal code, watch it pass, commit. Pure modules get unit tests; runtime WebGL/canvas shells (viewmodel, arena-stage, range screen) are exempt from unit tests and verified in Chromium — exactly as `viewmodel.ts` / `session-view.ts` are today.
+- TDD: write the failing test, watch it fail, minimal code, watch it pass, commit. Pure modules get unit tests; runtime WebGL/canvas shells (viewmodel, arena-stage, range screen) are exempt from unit tests and verified in Chromium - exactly as `viewmodel.ts` / `session-view.ts` are today.
 - Run a single test file with `npx vitest run <path>`; the full suite with `npx vitest run`; typecheck+build with `npm run build`.
 - Commit after each green task. Work happens on branch `psx/range-and-recoil` (already created; the spec is committed there).
-- Chromium verification uses the preview MCP: `preview_start` (`campeon-dev`), navigate via `location.hash`, `preview_eval` for pixel/DOM probes, `preview_screenshot`. Note: `img.decode()` can hang in the preview — if you load an image in an eval, use `img.complete`/`onload` and draw synchronously, don't `await img.decode()`.
+- Chromium verification uses the preview MCP: `preview_start` (`campeon-dev`), navigate via `location.hash`, `preview_eval` for pixel/DOM probes, `preview_screenshot`. Note: `img.decode()` can hang in the preview - if you load an image in an eval, use `img.complete`/`onload` and draw synchronously, don't `await img.decode()`.
 
 ---
 
 ## File Structure
 
 **New files**
-- `src/ui/viewmodel/recoil.ts` — pure fire-recoil spring (Task 1).
-- `src/ui/arena-stage.ts` — shared arena + cosmetic stack + lifecycle (Task 3).
-- `src/ui/range-nudge.ts` — pure `nudgeCm360` clamp helper (Task 5).
-- `src/ui/range-adopt.ts` — pure `adoptResult` (recompute per-game for a hand-picked cm/360) (Task 6).
-- `src/ui/range-director.ts` — pure slot/respawn state machine (Task 7).
-- `src/ui/range.ts` — the range screen shell (Task 9).
+- `src/ui/viewmodel/recoil.ts` - pure fire-recoil spring (Task 1).
+- `src/ui/arena-stage.ts` - shared arena + cosmetic stack + lifecycle (Task 3).
+- `src/ui/range-nudge.ts` - pure `nudgeCm360` clamp helper (Task 5).
+- `src/ui/range-adopt.ts` - pure `adoptResult` (recompute per-game for a hand-picked cm/360) (Task 6).
+- `src/ui/range-director.ts` - pure slot/respawn state machine (Task 7).
+- `src/ui/range.ts` - the range screen shell (Task 9).
 - Tests: `tests/ui/viewmodel/recoil.test.ts`, `tests/engine/arena-remove-target.test.ts`, `tests/ui/range-nudge.test.ts`, `tests/ui/range-adopt.test.ts`, `tests/ui/range-director.test.ts`, `tests/ui/result.test.ts`.
 
 **Modified files**
-- `src/ui/viewmodel/viewmodel.ts` — `fire()` method + recoil channel (Task 2).
-- `src/engine/arena.ts` — `removeTarget(id)` (Task 4).
-- `src/ui/session-view.ts` — build the arena via `createArenaStage`; call `viewmodel.fire()` (Task 3). Behavior-preserving.
-- `src/ui/shell.ts` — add `'range'` route + `tuned?` on `lastResult` (Task 8).
-- `src/ui/result.ts` — "step into the range" CTA + tuned-by-feel CI swap (Task 8).
-- `src/main.ts` — register the `range` screen (Task 9).
+- `src/ui/viewmodel/viewmodel.ts` - `fire()` method + recoil channel (Task 2).
+- `src/engine/arena.ts` - `removeTarget(id)` (Task 4).
+- `src/ui/session-view.ts` - build the arena via `createArenaStage`; call `viewmodel.fire()` (Task 3). Behavior-preserving.
+- `src/ui/shell.ts` - add `'range'` route + `tuned?` on `lastResult` (Task 8).
+- `src/ui/result.ts` - "step into the range" CTA + tuned-by-feel CI swap (Task 8).
+- `src/main.ts` - register the `range` screen (Task 9).
 
 ---
 
@@ -96,20 +96,20 @@ describe('fire recoil spring', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/ui/viewmodel/recoil.test.ts`
-Expected: FAIL — "Cannot find module '.../recoil'" / `restRecoil is not a function`.
+Expected: FAIL - "Cannot find module '.../recoil'" / `restRecoil is not a function`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```ts
 // src/ui/viewmodel/recoil.ts
 /**
- * Fire recoil — a pure, snappy damped spring that punches the viewmodel on each shot, then settles.
+ * Fire recoil - a pure, snappy damped spring that punches the viewmodel on each shot, then settles.
  * Deliberately separate from sway (sway is slow camera-driven parallax; recoil is a sharp fire-driven
  * snap): `punch` injects an upward + backward impulse, `stepRecoil` pulls both channels back to rest
  * each frame. The viewmodel sums the offset into its blit (kick up + brief scale lunge + a little roll).
- * Offsets are normalized fractions of the viewmodel size. COSMETIC only — never touches the camera/aim.
+ * Offsets are normalized fractions of the viewmodel size. COSMETIC only - never touches the camera/aim.
  *
- * Pure: no DOM, no time source — the caller supplies dt. Unit-tested for rest-stability + convergence.
+ * Pure: no DOM, no time source - the caller supplies dt. Unit-tested for rest-stability + convergence.
  */
 
 export interface RecoilState {
@@ -122,9 +122,9 @@ export interface RecoilState {
 }
 
 export interface RecoilParams {
-  /** Spring stiffness — high → fast settle (snappy). */
+  /** Spring stiffness - high → fast settle (snappy). */
   stiffness: number;
-  /** Damping — at/above 2·√stiffness → no wobble. */
+  /** Damping - at/above 2·√stiffness → no wobble. */
   damping: number;
   /** Upward velocity injected per shot. */
   kickUp: number;
@@ -151,7 +151,7 @@ export function punch(s: RecoilState, p: RecoilParams = DEFAULT_RECOIL): RecoilS
   return { y: s.y, vy: s.vy + p.kickUp, back: s.back, vback: s.vback + p.kickBack };
 }
 
-/** Advance both recoil channels toward rest by `dtSec` (semi-implicit Euler — stable at frame dt). */
+/** Advance both recoil channels toward rest by `dtSec` (semi-implicit Euler - stable at frame dt). */
 export function stepRecoil(s: RecoilState, dtSec: number, p: RecoilParams = DEFAULT_RECOIL): RecoilState {
   const ay = -p.stiffness * s.y - p.damping * s.vy;
   const ab = -p.stiffness * s.back - p.damping * s.vback;
@@ -185,7 +185,7 @@ git commit -m "feat(viewmodel): pure fire-recoil spring"
 **Files:**
 - Modify: `src/ui/viewmodel/viewmodel.ts`
 
-This is a runtime canvas shell (loads `deagle.png` via image decode), so — like the existing viewmodel — it has no jsdom unit test; the recoil math is covered by Task 1 and the integration is Chromium-verified in Task 10. There is no RED test step here by design (consistent with the codebase's treatment of `viewmodel.ts`).
+This is a runtime canvas shell (loads `deagle.png` via image decode), so - like the existing viewmodel - it has no jsdom unit test; the recoil math is covered by Task 1 and the integration is Chromium-verified in Task 10. There is no RED test step here by design (consistent with the codebase's treatment of `viewmodel.ts`).
 
 - [ ] **Step 1: Add the recoil import**
 
@@ -324,7 +324,7 @@ export interface ArenaStage {
  * the renderer, PSX pass, pointer-lock, Arena, the async Deagle viewmodel + merc-prey enemy layer, the
  * sway + fire-recoil feeds, the miss-tick feedback, the rAF loop, resize, and full teardown. The
  * consumer screen owns its own DOM (passes in its canvas + host) and its own gameplay logic (instrument
- * loop, or range director). Runtime-only (WebGL + image decode) — verified in Chromium, not unit tests.
+ * loop, or range director). Runtime-only (WebGL + image decode) - verified in Chromium, not unit tests.
  */
 export function createArenaStage(
   host: HTMLElement,
@@ -419,17 +419,17 @@ import type { InstrumentId, Report, TrialResult } from '../types';
 
 const SCHEDULE: InstrumentId[] = ['flick', 'track', 'calibrate', 'strike'];
 const MAX_TRIALS = 24; // spec §5.4: ~15–30, capped ~20–25
-const COLD_START = 8; // Generation 0 — the initial gene pool (≥2 trials/instrument before selection)
+const COLD_START = 8; // Generation 0 - the initial gene pool (≥2 trials/instrument before selection)
 
 export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
   return trials.map((t) => ({ cm360: t.cm360, score: t.score, instrument: t.instrument }));
 }
 
 const COPY: Record<InstrumentId, string> = {
-  track: '+track · the open-air intercept — hold your lead on the weaving prey (dragonfly + falcon)',
-  flick: '+flick · the ambush — break-cover targets to snap and lock (spider + raptor)',
-  calibrate: '+calibrate · shooting through the bend — learn the gap between aim and impact (archerfish)',
-  strike: '+strike · the strike window — commit the instant you see it, no settling (mantis shrimp)',
+  track: '+track · the open-air intercept - hold your lead on the weaving prey (dragonfly + falcon)',
+  flick: '+flick · the ambush - break-cover targets to snap and lock (spider + raptor)',
+  calibrate: '+calibrate · shooting through the bend - learn the gap between aim and impact (archerfish)',
+  strike: '+strike · the strike window - commit the instant you see it, no settling (mantis shrimp)',
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
@@ -492,7 +492,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           },
           onTrial: (_t, trials, interim) => drawPlot(interim, trials),
         }).then(({ report, trials }) => {
-          if (!alive) return; // unmounted mid-session — never touch a torn-down context
+          if (!alive) return; // unmounted mid-session - never touch a torn-down context
           const sessionId = `s-${trials.length}-${Math.round(report.optimalCm360 * 100)}`;
           const result = buildResult(report, trials, ctx.draft.dpi);
           ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...trials], status: 'complete', createdAt: 0 });
@@ -558,7 +558,7 @@ describe('Arena.removeTarget', () => {
     const a = arena.spawnTarget({ kind: 'static', yaw: 0, pitch: 0, distance: 20 });
     const b = arena.spawnTarget({ kind: 'static', yaw: 10, pitch: 0, distance: 20 });
     arena.removeTarget(a.id);
-    // a is gone: firing classifies against only the remaining target — no throw, b still present.
+    // a is gone: firing classifies against only the remaining target - no throw, b still present.
     expect(() => arena.removeTarget(a.id)).not.toThrow(); // removing twice is a safe no-op
     arena.removeTarget(b.id);
     arena.dispose();
@@ -577,7 +577,7 @@ describe('Arena.removeTarget', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/engine/arena-remove-target.test.ts`
-Expected: FAIL — `arena.removeTarget is not a function`.
+Expected: FAIL - `arena.removeTarget is not a function`.
 
 - [ ] **Step 3: Implement `removeTarget`**
 
@@ -644,7 +644,7 @@ describe('nudgeCm360', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/ui/range-nudge.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement**
 
@@ -719,7 +719,7 @@ describe('adoptResult', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/ui/range-adopt.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement**
 
@@ -732,7 +732,7 @@ import { perGameSens } from '../convert/schools';
  * Build a "tuned by feel" Result from a measured one at a hand-picked cm/360. Recomputes the native
  * per-game sensitivities for the new number; KEEPS the measured breakdown (it characterizes the measured
  * run, not the hand-picked value). The measured CI is carried unchanged in the object but the result
- * screen drops it when the result is flagged `tuned` — a hand-picked number has no measured CI (honesty).
+ * screen drops it when the result is flagged `tuned` - a hand-picked number has no measured CI (honesty).
  * Pure: returns a new object, never mutates the input.
  */
 export function adoptResult(measured: Result, adoptedCm360: Cm360, dpi: Dpi): Result {
@@ -819,7 +819,7 @@ describe('range director', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/ui/range-director.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement**
 
@@ -958,7 +958,7 @@ describe('result screen', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/ui/result.test.ts`
-Expected: FAIL — no `[data-action="range"]`; `tuned` not a valid `lastResult` field (tsc error) / CI still present.
+Expected: FAIL - no `[data-action="range"]`; `tuned` not a valid `lastResult` field (tsc error) / CI still present.
 
 - [ ] **Step 3: Add the `range` route + `tuned` flag in `shell.ts`**
 
@@ -1002,7 +1002,7 @@ In `src/ui/result.ts`:
 (b) Replace the CI `<p>` line in the template with a tuned-aware line:
 ```ts
           ${tuned
-            ? `<p class="result__ci result__ci--tuned mono">tuned by feel — not a measured optimum</p>`
+            ? `<p class="result__ci result__ci--tuned mono">tuned by feel - not a measured optimum</p>`
             : `<p class="result__ci mono">90% CI <span data-result="ci">${fmt(r.ci90[0])}–${fmt(r.ci90[1])}</span> cm/360</p>`}
 ```
 
@@ -1023,7 +1023,7 @@ In `src/ui/result.ts`:
 - [ ] **Step 5: Run the test + full suite + build**
 
 Run: `npx vitest run tests/ui/result.test.ts && npx vitest run && npm run build`
-Expected: result test PASS (3), full suite PASS, tsc + build clean. (tsc will flag any screen map missing `range` — that's fixed in Task 9; if you run `npm run build` before Task 9, temporarily expect the `Record<Route, ScreenFactory>` error in `main.ts` and resolve it in Task 9. To keep this task green in isolation, do Task 9's `main.ts` edit before `npm run build`, or run only the vitest suite here and build at the end of Task 9.)
+Expected: result test PASS (3), full suite PASS, tsc + build clean. (tsc will flag any screen map missing `range` - that's fixed in Task 9; if you run `npm run build` before Task 9, temporarily expect the `Record<Route, ScreenFactory>` error in `main.ts` and resolve it in Task 9. To keep this task green in isolation, do Task 9's `main.ts` edit before `npm run build`, or run only the vitest suite here and build at the end of Task 9.)
 
 - [ ] **Step 6: Commit**
 
@@ -1040,7 +1040,7 @@ git commit -m "feat(ui): range route + tuned-by-feel result (CI dropped on adopt
 - Create: `src/ui/range.ts`
 - Modify: `src/main.ts`
 
-Runtime WebGL shell — verified in Chromium (Task 10), not jsdom (its pure logic lives in Tasks 5–7, already tested).
+Runtime WebGL shell - verified in Chromium (Task 10), not jsdom (its pure logic lives in Tasks 5–7, already tested).
 
 - [ ] **Step 1: Create `range.ts`**
 
@@ -1226,7 +1226,7 @@ git commit -m "feat(range): free-play range screen (dummies + poppers, live nudg
 ## Task 10: Chromium QA, tuning, and styles
 
 **Files:**
-- Modify: `src/styles/*.css` (range HUD/bar styling — follow existing `session`/`result` classes)
+- Modify: `src/styles/*.css` (range HUD/bar styling - follow existing `session`/`result` classes)
 - Possibly tune: `src/ui/viewmodel/recoil.ts` (`DEFAULT_RECOIL`), `src/ui/viewmodel/viewmodel.ts` (`BACK_SCALE_K`/`RECOIL_ROLL_K`).
 
 - [ ] **Step 1: Add range styles**
@@ -1238,7 +1238,7 @@ Add CSS for `.range__hud`, `.range__delta`, `.range__bar`, `.range__hint`, and `
 Verify, with no console errors:
 1. **Recoil:** in a session (or the range), each shot kicks the gun up + lunges + settles fast; rapid fire stays bounded; under `prefers-reduced-motion` the gun is static (no recoil). Tune `DEFAULT_RECOIL` / `BACK_SCALE_K` / `RECOIL_ROLL_K` until it reads punchy but not nauseating; re-run `npx vitest run tests/ui/viewmodel/recoil.test.ts` if you change recoil params.
 2. **Entry:** result screen shows "step into the range"; clicking navigates to `#/range`.
-3. **Range:** click locks; 3 fixed dummies (near/mid/far) + 3 roaming mercs appear (mercs, not bare gold spheres — i.e. spawns happen after `ready`); shooting a target pops it (death persists) and it respawns (fixed in place, roam at a new on-screen bearing); misses flash the ember tick.
+3. **Range:** click locks; 3 fixed dummies (near/mid/far) + 3 roaming mercs appear (mercs, not bare gold spheres - i.e. spawns happen after `ready`); shooting a target pops it (death persists) and it respawns (fixed in place, roam at a new on-screen bearing); misses flash the ember tick.
 4. **Nudge:** `[`/`]` and the −/+ buttons change cm/360 live (the view turn-rate visibly changes); the HUD number + delta track; `Shift` gives fine steps; clamps at the bounds.
 5. **Adopt/reset:** "adopt this feel" returns to the result screen showing the adopted number, **no CI**, "tuned by feel"; per-game table reflects the new number; re-entering the range and "reset to measured" restores the measured number + CI.
 6. **Teardown:** leaving the range (exit, or back/forward) cancels its rAF and disposes the renderer (no leaked WebGL contexts, no console errors); the session still runs end-to-end.
@@ -1257,7 +1257,7 @@ git commit -m "feat(range): styles + recoil tuning; Chromium-verified"
 
 - [ ] **Step 5: Update memory + df2tm** (per the project workflow)
 
-Update `campeon-overview.md` status (tests count, `main` @ new sha, recoil+range milestone), add df2tm journal bullet + any new concept lines (candidates: `shared-stage-extraction` — two screens sharing one hardened lifecycle; `adopt-vs-measured-honesty` — drop a measured CI for a hand-picked value).
+Update `campeon-overview.md` status (tests count, `main` @ new sha, recoil+range milestone), add df2tm journal bullet + any new concept lines (candidates: `shared-stage-extraction` - two screens sharing one hardened lifecycle; `adopt-vs-measured-honesty` - drop a measured CI for a hand-picked value).
 
 - [ ] **Step 6: Finish the branch**
 

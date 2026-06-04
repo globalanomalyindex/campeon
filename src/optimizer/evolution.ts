@@ -9,7 +9,7 @@ export interface EvolutionConfig {
   gp: GpParams;
   /** Offspring spawned per generation; the surrogate screens which one is worth actually playing (default 6). */
   lambda?: number;
-  /** Initial mutation step σ in ln(cm/360) space (default 0.3 — a sane spread; ln[15,60] spans ≈1.39). */
+  /** Initial mutation step σ in ln(cm/360) space (default 0.3 - a sane spread; ln[15,60] spans ≈1.39). */
   sigma0?: number;
   /** σ clamp [min, max] so a generation neither freezes nor scatters across the whole range (default [0.04, 0.9]). */
   sigmaBounds?: [number, number];
@@ -19,27 +19,27 @@ export interface EvolutionConfig {
   gridSize?: number;
   /** Seed for the deterministic mutation RNG (default 0x5eed). */
   seed?: number;
-  /** Budget for `isDone` only — the session controller owns stopping in practice (default 24). */
+  /** Budget for `isDone` only - the session controller owns stopping in practice (default 24). */
   maxTrials?: number;
 }
 
 /**
- * Evolution-strategy SearchEngine over x = ln(cm/360) — a surrogate-assisted (1+λ)-ES.
+ * Evolution-strategy SearchEngine over x = ln(cm/360) - a surrogate-assisted (1+λ)-ES.
  *
  * The search IS the evolution the predators themselves underwent: it keeps a single lineage and, each
  * generation, mutates the **incumbent** (the fittest sensitivity so far) by a Gaussian step σ to spawn
- * λ offspring, then plays the most promising one. Selection is elitist — the fittest sensitivity always
- * survives as the next parent — and the step size self-adapts by Rechenberg's **1/5 success rule**
+ * λ offspring, then plays the most promising one. Selection is elitist - the fittest sensitivity always
+ * survives as the next parent - and the step size self-adapts by Rechenberg's **1/5 success rule**
  * (offspring keep beating the parent → widen the search; they stop → narrow in and refine). Over
  * generations the lineage climbs to the optimum: the most-evolved sensitivity for this player.
  *
  * Distinct from Bayesian optimization (which maximizes an acquisition GLOBALLY and may jump anywhere):
- * here every proposal is a LOCAL mutation of the current best — that is what makes it genuinely
+ * here every proposal is a LOCAL mutation of the current best - that is what makes it genuinely
  * evolutionary rather than evolution-flavored search. The Gaussian-process surrogate is the lineage's
  * memory of the fitness landscape: it supplies a denoised fitness for selection (so a lucky-noise trial
  * cannot win) and screens the λ offspring so the player's scarce trials are not wasted on bad mutations.
  *
- * Stateful across `suggest` calls — σ and the success window persist, because generations are a
+ * Stateful across `suggest` calls - σ and the success window persist, because generations are a
  * sequence, not independent draws. The controller's cold-start seeds are Generation 0 (the initial
  * gene pool); the first `suggest` selects the fittest of them as the founding parent.
  */
@@ -52,7 +52,7 @@ export function makeEvolution(config: EvolutionConfig): SearchEngine {
   const maxTrials = config.maxTrials ?? 24;
   const rng = mulberry32(config.seed ?? 0x5eed);
 
-  // Evolutionary state — one lineage across generations.
+  // Evolutionary state - one lineage across generations.
   let sigma = sigma0;
   let lastChildX: number | null = null; // the offspring proposed last generation, awaiting its verdict
   let lastParentMean = -Infinity; // the parent's denoised fitness when that offspring was spawned
@@ -66,7 +66,7 @@ export function makeEvolution(config: EvolutionConfig): SearchEngine {
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   };
 
-  /** The incumbent: the sensitivity of highest denoised (GP posterior-mean) fitness — elitist parent. */
+  /** The incumbent: the sensitivity of highest denoised (GP posterior-mean) fitness - elitist parent. */
   const incumbent = (gp: GP, loX: number, hiX: number): { x: number; mean: number } => {
     let bestX = loX;
     let best = -Infinity;
@@ -121,7 +121,7 @@ export function makeEvolution(config: EvolutionConfig): SearchEngine {
     isDone(history: Observation[]): boolean {
       return history.length >= maxTrials;
     },
-    /** GP posterior-mean argmax — the most-evolved sensitivity; also the controller's CI cross-check. */
+    /** GP posterior-mean argmax - the most-evolved sensitivity; also the controller's CI cross-check. */
     posteriorPeak(history: Observation[], bounds: [Cm360, Cm360]): Cm360 {
       const loX = Math.log(bounds[0]);
       const hiX = Math.log(bounds[1]);

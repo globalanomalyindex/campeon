@@ -2,7 +2,7 @@
  * Pure geometry + timing for the enemy "merc-prey" billboard sprite sheets
  * (public/sprites/{track,flick,calibrate,strike}.png).
  *
- * Each sheet is a CLEAN, uniform 8-column × 5-row grid (1448×1086) on a flat magenta key —
+ * Each sheet is a CLEAN, uniform 8-column × 5-row grid (1448×1086) on a flat magenta key -
  * verified from the pixels. (Unlike the non-uniform Deagle viewmodel sheet, which forced a measured
  * band table; here the grid is uniform, so cells are computed arithmetically with a small inset that
  * keeps NearestFilter from sampling the gutter or a neighbour.) Rows are the animation "state

@@ -27,7 +27,7 @@ describe('bootstrap CI', () => {
   });
 
   it('CI widens as noise grows', () => {
-    // each mulberry32(7) is an independent closure — reused seed only for reproducibility
+    // each mulberry32(7) is an independent closure - reused seed only for reproducibility
     const tight = bootstrapCi(dataset(0.2, mulberry32(7)), 400, mulberry32(7));
     const loose = bootstrapCi(dataset(2.0, mulberry32(7)), 400, mulberry32(7));
     expect(loose[1] - loose[0]).toBeGreaterThan(tight[1] - tight[0]);

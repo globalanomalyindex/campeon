@@ -1,4 +1,4 @@
-# campeón Phase 6 — Polish + `+case study` + `+options` + falcon motion — Implementation Plan
+# campeón Phase 6 - Polish + `+case study` + `+options` + falcon motion - Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Fresh subagent per task; two-stage review (spec compliance, then code quality) after each.
 
@@ -12,14 +12,14 @@
 
 ## The `/goal` this phase must serve (read before building)
 
-campeón is the **centerpiece of a portfolio for a top-tier design-engineer role** — specifically Anthropic's *Design Engineer, Web* posting, which prizes work at *"the intersection of design and engineering,"* *"data visualization systems,"* and a person for whom *"refined typography, deliberate motion, and considered interaction are not afterthoughts."* The case study must read as **one unified, holistic, genuinely-novel system** — *one latent constant (your optimal cm/360) on one speed↔accuracy manifold, triangulated by four evolution-tuned probes, fused by affine z-scoring + Bayesian optimization into one number with a confidence interval whose width signals how much the four faculties agree.* Not arbitrary inspiration — design engineering.
+campeón is the **centerpiece of a portfolio for a top-tier design-engineer role** - specifically Anthropic's *Design Engineer, Web* posting, which prizes work at *"the intersection of design and engineering,"* *"data visualization systems,"* and a person for whom *"refined typography, deliberate motion, and considered interaction are not afterthoughts."* The case study must read as **one unified, holistic, genuinely-novel system** - *one latent constant (your optimal cm/360) on one speed↔accuracy manifold, triangulated by four evolution-tuned probes, fused by affine z-scoring + Bayesian optimization into one number with a confidence interval whose width signals how much the four faculties agree.* Not arbitrary inspiration - design engineering.
 
 **Locked creative decisions (from the user, this phase):**
-1. **Angle = implicit.** The case study stays a genuine in-product science page. Design-engineering excellence is *demonstrated, not declared*. A closing **colophon** makes the architecture/tests/seams + the data-viz legible, and the credit ties to the portfolio theme — **no company is named anywhere.**
+1. **Angle = implicit.** The case study stays a genuine in-product science page. Design-engineering excellence is *demonstrated, not declared*. A closing **colophon** makes the architecture/tests/seams + the data-viz legible, and the credit ties to the portfolio theme - **no company is named anywhere.**
 2. **Visual = full brutalist-editorial port**, recolored to campeón's **bone/slate/gold/ink** + a **per-section organism accent** (`--c-track`/`--c-flick`/`--c-calibrate`/`--c-strike`). Port the *techniques* from the sibling "after tokens" project: fully lowercase editorial voice, roman-numeral section indices, mono `+`-separated eyebrow labels, huge faint architectural numerals, registration crosshairs, a faint technical drafting grid, vertical section spines, dotted exoskeleton frames, and spec-rail `dt/dd` rows.
 3. **Scope = core + falcon hero motion.** Case study + options + polish/QA **plus** the falcon wing-flap + parallax sky. The **PSX arena skin stays deferred** (separate later track).
 
-**Voice reference (study before writing copy):** `/Users/chrisfiore/Documents/Claude/Projects/diffusion-render-text/` — especially `app/globals.css` (the chrome system: `.section-spine`, `.section-data`, `.spec-row`, `.exo-frame`, the `main { text-transform: lowercase }` rule, registration/numeral patterns) and `components/sections/section-13-close.tsx` (the "what this does not solve" + credit pattern, the lowercase editorial register). campeón is the **next entry in that same portfolio theme: "looking to nature for answers."** Do NOT copy its React/Tailwind code — port the *language and chrome* into campeón's vanilla DOM/CSS.
+**Voice reference (study before writing copy):** `/Users/chrisfiore/Documents/Claude/Projects/diffusion-render-text/` - especially `app/globals.css` (the chrome system: `.section-spine`, `.section-data`, `.spec-row`, `.exo-frame`, the `main { text-transform: lowercase }` rule, registration/numeral patterns) and `components/sections/section-13-close.tsx` (the "what this does not solve" + credit pattern, the lowercase editorial register). campeón is the **next entry in that same portfolio theme: "looking to nature for answers."** Do NOT copy its React/Tailwind code - port the *language and chrome* into campeón's vanilla DOM/CSS.
 
 ---
 
@@ -30,9 +30,9 @@ campeón is the **centerpiece of a portfolio for a top-tier design-engineer role
   Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
   ```
 - Work on branch **`build/phase-6-polish-case-study`** (already created), never `main`.
-- Tests use **explicit imports** — `import { describe, it, expect } from 'vitest';` — never globals.
+- Tests use **explicit imports** - `import { describe, it, expect } from 'vitest';` - never globals.
 - **DOM/UI tests** start with the pragma `// @vitest-environment jsdom` on line 1 (vitest.config defaults to `node`).
-- **Measurement honesty:** never fabricate noise or signal; missing data renders `—`; never silently mask a failure. The case-study copy must be scientifically accurate to spec §4 and cite spec §13.
+- **Measurement honesty:** never fabricate noise or signal; missing data renders `-`; never silently mask a failure. The case-study copy must be scientifically accurate to spec §4 and cite spec §13.
 - **Lowercase voice:** the case-study root forces `text-transform: lowercase`; data/demos/code opt back out with `[data-demo]`/`.mono` exceptions. Real numbers, units, and math notation keep their natural form inside `.mono`/`[data-demo]`.
 - **Organism accents** (already in `tokens.css`): `--c-track:#4A5A66` (slate · dragonfly/falcon), `--c-flick:#FFC400` (gold · spider/raptor), `--c-calibrate:#7FA6B6` (water-blue · archerfish), `--c-strike:#E8702A` (ember · mantis-shrimp). Track/flick render filled; calibrate/strike outline (matches `renderConvergencePlot`).
 - After each task: `npx tsc --noEmit` clean and `npm test` green before commit.
@@ -42,34 +42,34 @@ campeón is the **centerpiece of a portfolio for a top-tier design-engineer role
 ## File map (what this phase creates / touches)
 
 **Case study (6A)**
-- Create `src/ui/case-study/chrome.ts` — pure DOM builders (mono label, section numeral, registration frame, spec rail).
-- Create `src/ui/case-study/content.ts` — the `SECTIONS` data (all copy), the convergence-demo dataset, the citation list. Pure data.
-- Create `src/ui/case-study/reveal.ts` — IntersectionObserver reveal controller (instant under reduced motion).
-- Create `src/ui/case-study/case-study.ts` — the screen factory; assembles sections + mounts the convergence demo + wires reveal + unmount cleanup.
-- Create `src/styles/case-study.css` — the brutalist-editorial chrome, campeón palette + per-section organism accent.
-- Modify `src/main.ts` — replace `caseStudyStub`; import `case-study.css`.
-- Modify `src/ui/stubs.ts` — drop `caseStudyStub` (keep `optionsStub` until 6B).
+- Create `src/ui/case-study/chrome.ts` - pure DOM builders (mono label, section numeral, registration frame, spec rail).
+- Create `src/ui/case-study/content.ts` - the `SECTIONS` data (all copy), the convergence-demo dataset, the citation list. Pure data.
+- Create `src/ui/case-study/reveal.ts` - IntersectionObserver reveal controller (instant under reduced motion).
+- Create `src/ui/case-study/case-study.ts` - the screen factory; assembles sections + mounts the convergence demo + wires reveal + unmount cleanup.
+- Create `src/styles/case-study.css` - the brutalist-editorial chrome, campeón palette + per-section organism accent.
+- Modify `src/main.ts` - replace `caseStudyStub`; import `case-study.css`.
+- Modify `src/ui/stubs.ts` - drop `caseStudyStub` (keep `optionsStub` until 6B).
 
 **Options (6B)**
-- Modify `src/convert/schools.ts` — add FOV-aware monitor-distance conversion + a `CONVERSION_SCHOOLS` descriptor; keep `perGameSens`.
-- Create `src/ui/options/settings.ts` — pure helpers: `normalizeBounds`, `effectiveYaw`/`effectiveYawTable`, `DEFAULT_SETTINGS`.
-- Create `src/ui/options/options.ts` — the screen: conversion-school selector + FOV calculator + per-game table + yaw-override editor + cm/360 search-bounds editor (writes `ctx.draft.bounds`).
+- Modify `src/convert/schools.ts` - add FOV-aware monitor-distance conversion + a `CONVERSION_SCHOOLS` descriptor; keep `perGameSens`.
+- Create `src/ui/options/settings.ts` - pure helpers: `normalizeBounds`, `effectiveYaw`/`effectiveYawTable`, `DEFAULT_SETTINGS`.
+- Create `src/ui/options/options.ts` - the screen: conversion-school selector + FOV calculator + per-game table + yaw-override editor + cm/360 search-bounds editor (writes `ctx.draft.bounds`).
 - Create `src/styles/options.css`.
-- Modify `src/main.ts` — replace `optionsStub`; import `options.css`.
-- Modify `src/ui/stubs.ts` — drop `optionsStub`.
+- Modify `src/main.ts` - replace `optionsStub`; import `options.css`.
+- Modify `src/ui/stubs.ts` - drop `optionsStub`.
 
 **Falcon motion (6C)**
-- Modify `src/ui/hero.ts` — add sky layer + wing markup hooks + a tiny rAF parallax driver (reduced-motion-aware; cleaned up on unmount).
-- Modify `src/styles/shell.css` — hero sky/parallax/wing-flap keyframes + reduced-motion fallbacks.
+- Modify `src/ui/hero.ts` - add sky layer + wing markup hooks + a tiny rAF parallax driver (reduced-motion-aware; cleaned up on unmount).
+- Modify `src/styles/shell.css` - hero sky/parallax/wing-flap keyframes + reduced-motion fallbacks.
 
 **Polish & QA (6D)**
-- Modify `src/styles/shell.css`, `src/ui/setup.ts` (goal-slider `accent-color: var(--gold)`), `src/styles/case-study.css` etc. — micro-motion, focus, plot y-axis label.
+- Modify `src/styles/shell.css`, `src/ui/setup.ts` (goal-slider `accent-color: var(--gold)`), `src/styles/case-study.css` etc. - micro-motion, focus, plot y-axis label.
 - Add `public/favicon.svg` + reference in `index.html`.
 - Final whole-app Chromium QA proof.
 
 ---
 
-# Workstream 6A — the `+case study` science page
+# Workstream 6A - the `+case study` science page
 
 ### Task A1: case-study chrome stylesheet foundation
 
@@ -77,7 +77,7 @@ campeón is the **centerpiece of a portfolio for a top-tier design-engineer role
 - Create: `src/styles/case-study.css`
 - Test: `tests/ui/case-study.css.test.ts`
 
-- [ ] **Step 1: Write the failing test** (presence test — the contract for the chrome system; mirrors the sibling project's `tokens.test.ts` approach)
+- [ ] **Step 1: Write the failing test** (presence test - the contract for the chrome system; mirrors the sibling project's `tokens.test.ts` approach)
 
 `tests/ui/case-study.css.test.ts`:
 ```ts
@@ -109,12 +109,12 @@ describe('case-study.css', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — `npm test tests/ui/case-study.css.test.ts` → FAIL (file missing).
+- [ ] **Step 2: Run test, verify it fails** - `npm test tests/ui/case-study.css.test.ts` → FAIL (file missing).
 
 - [ ] **Step 3: Implement `src/styles/case-study.css`.** Port the sibling project's chrome (study `diffusion-render-text/app/globals.css` for fidelity), recolored to campeón tokens. Complete, load-bearing rules below; add tasteful detail to match the reference, but keep all color references to `tokens.css` vars.
 
 ```css
-/* ── +case study — graphic-brutalist-meets-editorial-corporation ─────────────
+/* ── +case study - graphic-brutalist-meets-editorial-corporation ─────────────
    Ported from the sibling "after tokens" project's chrome, recolored to the
    campeón palette. Fully lowercase voice; per-section organism accent. */
 
@@ -212,7 +212,7 @@ describe('case-study.css', () => {
 /* a marker wash for the thesis phrases (reads like a real selection on bone) */
 .cs-mark { background: color-mix(in oklab, var(--cs-accent) 20%, transparent); padding: 0 .12em; }
 
-/* spec-rail: mono dt + ink dd rows — the instrument-panel data layer */
+/* spec-rail: mono dt + ink dd rows - the instrument-panel data layer */
 .cs-spec { border-top: 1px solid color-mix(in oklab, var(--cs-accent) 40%, transparent);
   margin-top: 1.4rem; max-width: 40rem; position: relative; z-index: 2; }
 .cs-spec > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1.5rem;
@@ -248,8 +248,8 @@ describe('case-study.css', () => {
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes** — `npm test tests/ui/case-study.css.test.ts` → PASS.
-- [ ] **Step 5: Commit** — `feat(case-study): brutalist-editorial chrome stylesheet (campeón palette)`.
+- [ ] **Step 4: Run test, verify it passes** - `npm test tests/ui/case-study.css.test.ts` → PASS.
+- [ ] **Step 5: Commit** - `feat(case-study): brutalist-editorial chrome stylesheet (campeón palette)`.
 
 ---
 
@@ -295,7 +295,7 @@ describe('case-study chrome builders', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL (module missing).
+- [ ] **Step 2: Run test, verify it fails** - FAIL (module missing).
 
 - [ ] **Step 3: Implement `src/ui/case-study/chrome.ts`**
 
@@ -358,8 +358,8 @@ export function specRail(rows: readonly SpecRow[]): HTMLElement {
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes** — PASS.
-- [ ] **Step 5: Commit** — `feat(case-study): pure DOM chrome builders (mono label, numeral, registration, spec rail)`.
+- [ ] **Step 4: Run test, verify it passes** - PASS.
+- [ ] **Step 5: Commit** - `feat(case-study): pure DOM chrome builders (mono label, numeral, registration, spec rail)`.
 
 ---
 
@@ -369,9 +369,9 @@ export function specRail(rows: readonly SpecRow[]): HTMLElement {
 - Create: `src/ui/case-study/content.ts`
 - Test: `tests/ui/case-study/content.test.ts`
 
-This is the heart — scientifically accurate to spec §4, citing spec §13, in the lowercase editorial voice, expressing the unified-system `/goal`. `body` strings may contain inline `<strong>`, `<em>`, and `<span class="cs-mark">` markup (rendered as trusted HTML — this is static authored content, no user input). `accent` selects the per-section organism color.
+This is the heart - scientifically accurate to spec §4, citing spec §13, in the lowercase editorial voice, expressing the unified-system `/goal`. `body` strings may contain inline `<strong>`, `<em>`, and `<span class="cs-mark">` markup (rendered as trusted HTML - this is static authored content, no user input). `accent` selects the per-section organism color.
 
-- [ ] **Step 1: Write the failing test** (content invariants — load-bearing: pins the real numbers + structure so future edits can't silently gut the science)
+- [ ] **Step 1: Write the failing test** (content invariants - load-bearing: pins the real numbers + structure so future edits can't silently gut the science)
 
 `tests/ui/case-study/content.test.ts`:
 ```ts
@@ -414,9 +414,9 @@ describe('case-study content', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL (module missing).
+- [ ] **Step 2: Run test, verify it fails** - FAIL (module missing).
 
-- [ ] **Step 3: Implement `src/ui/case-study/content.ts`.** Use this exact content (the copy is the deliverable; keep it verbatim — it is the science + the voice + the `/goal`).
+- [ ] **Step 3: Implement `src/ui/case-study/content.ts`.** Use this exact content (the copy is the deliverable; keep it verbatim - it is the science + the voice + the `/goal`).
 
 ```ts
 import type { InstrumentId } from '../../types';
@@ -446,14 +446,14 @@ export const SECTIONS: CaseSection[] = [
     eyebrow: ['the science', 'a case study', 'cm/360'],
     spine: 'one latent constant',
     title: 'every trainer hands you a score. none hands you your number.',
-    lede: 'aim trainers measure how well you did today. campeón measures the one setting your hands were built for — and tells you how sure it is.',
+    lede: 'aim trainers measure how well you did today. campeón measures the one setting your hands were built for - and tells you how sure it is.',
     body: [
-      'there is exactly one number that decides how far your hand travels to turn all the way around: <strong>cm/360</strong> — centimeters of mouse movement per 360°. it is hardware-independent, game-independent, the true unit of aim. everything downstream (your in-game sliders) is just this number wearing different clothes.',
-      'the problem: nobody can tell you <em>yours</em>. so campeón treats it as a hidden quantity to be <span class="cs-mark">measured</span>, not guessed — and borrows its instruments from the only engineers who have already solved targeting: <strong>evolution</strong>.',
-      'six predators, four faculties, <span class="cs-mark">one number</span> with a confidence interval. this page is the real mechanism behind each one — and how four heterogeneous probes collapse into a single answer.',
+      'there is exactly one number that decides how far your hand travels to turn all the way around: <strong>cm/360</strong> - centimeters of mouse movement per 360°. it is hardware-independent, game-independent, the true unit of aim. everything downstream (your in-game sliders) is just this number wearing different clothes.',
+      'the problem: nobody can tell you <em>yours</em>. so campeón treats it as a hidden quantity to be <span class="cs-mark">measured</span>, not guessed - and borrows its instruments from the only engineers who have already solved targeting: <strong>evolution</strong>.',
+      'six predators, four faculties, <span class="cs-mark">one number</span> with a confidence interval. this page is the real mechanism behind each one - and how four heterogeneous probes collapse into a single answer.',
     ],
     spec: [
-      { k: 'the variable', v: 'cm/360 — physical cm per 360° turn', },
+      { k: 'the variable', v: 'cm/360 - physical cm per 360° turn', },
       { k: 'method', v: 'bayesian search over a speed↔accuracy manifold' },
       { k: 'output', v: 'one cm/360 + a 90% confidence interval', mono: true },
     ],
@@ -463,10 +463,10 @@ export const SECTIONS: CaseSection[] = [
     eyebrow: ['instrument 01', 'track', 'dragonfly + falcon'],
     spine: 'predictive tracking',
     title: 'the lead. holding a moving target still.',
-    lede: 'a dragonfly intercepts prey ~95% of the time using a feed-forward internal model — it aims where prey will be, not where it is.',
+    lede: 'a dragonfly intercepts prey ~95% of the time using a feed-forward internal model - it aims where prey will be, not where it is.',
     body: [
-      'dragonfly target-selective descending neurons decode prey direction as a population vector at a sensorimotor latency of <strong>29.94 ± 5.75 ms</strong>; an efference-copy forward model predicts self-induced image motion so the strike <em>leads</em>. the peregrine falcon does the mirror task — <strong>vor + okr</strong> gaze-stabilization holds the target image still on the fovea, nulling its angular velocity, terminal guidance fitting proportional navigation.',
-      'campeón rebuilds this with a <strong>constant-velocity kalman filter</strong> on the target state. the optimal lead point is θ̂ + θ̇̂·L, where L is your measured reaction latency. the filter\'s <em>innovation</em> — ν = z − Hx̂⁻ — <span class="cs-mark">is</span> the instantaneous tracking error.',
+      'dragonfly target-selective descending neurons decode prey direction as a population vector at a sensorimotor latency of <strong>29.94 ± 5.75 ms</strong>; an efference-copy forward model predicts self-induced image motion so the strike <em>leads</em>. the peregrine falcon does the mirror task - <strong>vor + okr</strong> gaze-stabilization holds the target image still on the fovea, nulling its angular velocity, terminal guidance fitting proportional navigation.',
+      'campeón rebuilds this with a <strong>constant-velocity kalman filter</strong> on the target state. the optimal lead point is θ̂ + θ̇̂·L, where L is your measured reaction latency. the filter\'s <em>innovation</em> - ν = z − Hx̂⁻ - <span class="cs-mark">is</span> the instantaneous tracking error.',
       'the cm/360 signal: too sensitive and tremor multiplies into jitter and overshoot oscillation; too slow and you can\'t reach the lead point on a velocity step, so the crosshair lags. the optimum jointly minimizes slip + jitter.',
     ],
     spec: [
@@ -483,8 +483,8 @@ export const SECTIONS: CaseSection[] = [
     title: 'the snap. a flick is a three-stage pipeline.',
     lede: 'a jumping spider detects with wide-field secondary eyes, fires a ballistic body saccade open-loop, then confirms with high-acuity principal eyes. that is exactly a human flick.',
     body: [
-      'the spider\'s orient is pre-programmed — <strong>810–1300 °/s</strong>, amplitude preset from retinal eccentricity, no mid-flight correction — and the coarse error is cleaned up by the confirm stage. the raptor adds a two-fovea trade: a deep fovea (~140 cyc/deg, the scope) and a shallow fovea (wide, fast). speed vs precision, two modes.',
-      'campeón decomposes your mouse-velocity trace into the same stages — detection latency, ballistic orient (gain G = covered/required, overshoot), corrective sub-movements — then scores <strong>fitts effective throughput</strong> (iso 9241-9): effective width <span class="cs-mark">We = 4.133·σ</span>, IDe = log2(Ae/We + 1), TP = IDe / MT.',
+      'the spider\'s orient is pre-programmed - <strong>810–1300 °/s</strong>, amplitude preset from retinal eccentricity, no mid-flight correction - and the coarse error is cleaned up by the confirm stage. the raptor adds a two-fovea trade: a deep fovea (~140 cyc/deg, the scope) and a shallow fovea (wide, fast). speed vs precision, two modes.',
+      'campeón decomposes your mouse-velocity trace into the same stages - detection latency, ballistic orient (gain G = covered/required, overshoot), corrective sub-movements - then scores <strong>fitts effective throughput</strong> (iso 9241-9): effective width <span class="cs-mark">We = 4.133·σ</span>, IDe = log2(Ae/We + 1), TP = IDe / MT.',
       'the central tension: flick throughput peaks at <em>lower</em> cm/360 (big reorientations cheap); micro-adjust throughput peaks at <em>higher</em> cm/360 (fine placement, attenuated tremor). your optimum is the crossover, weighted by how you play.',
     ],
     spec: [
@@ -501,8 +501,8 @@ export const SECTIONS: CaseSection[] = [
     title: 'the correction. separating aim from noise.',
     lede: 'an archerfish shoots prey through the air–water boundary and must cancel a systematic refraction offset of up to 10–15°. it learns the correction trial by trial.',
     body: [
-      'the tell that it is a real internal model: a <strong>negative aftereffect</strong> when the offset is removed — the signature of a recalibrated forward model. the abstraction campeón borrows is the cleanest in aim: <span class="cs-mark">error = systematic bias + random variance</span>. bias is learnable and removable; variance is your precision floor.',
-      'we estimate gain bias g = E[r_impact]/E[r_required] (g > 1 = oversensitive, g < 1 = undersensitive) and decompose <strong>MSE = |bias|² + σ_R²</strong>. cm/360 drives bias steeply and monotonically, so the <em>bias-zero sensitivity</em> — where g crosses 1 — is the headline estimator. variance is the hardware/skill floor, not the recommendation.',
+      'the tell that it is a real internal model: a <strong>negative aftereffect</strong> when the offset is removed - the signature of a recalibrated forward model. the abstraction campeón borrows is the cleanest in aim: <span class="cs-mark">error = systematic bias + random variance</span>. bias is learnable and removable; variance is your precision floor.',
+      'we estimate gain bias g = E[r_impact]/E[r_required] (g > 1 = oversensitive, g < 1 = undersensitive) and decompose <strong>MSE = |bias|² + σ_R²</strong>. cm/360 drives bias steeply and monotonically, so the <em>bias-zero sensitivity</em> - where g crosses 1 - is the headline estimator. variance is the hardware/skill floor, not the recommendation.',
     ],
     spec: [
       { k: 'refraction offset', v: 'up to 10–15°', mono: true },
@@ -517,8 +517,8 @@ export const SECTIONS: CaseSection[] = [
     title: 'the limit. pure, uncorrectable speed.',
     lede: 'the mantis shrimp strike is a latch-mediated spring: ~10,400 g, full discharge in ~1.1 ms, no mid-flight correction. it is the canonical speed pole of the speed–accuracy trade-off.',
     body: [
-      'the charge phase is ~300× longer than the strike itself — commit, then there is no taking it back. campeón\'s strike drill is the same: fire as fast as possible, misses allowed, no settling. we record reaction t_R, ballistic strike t_S, peak velocity, endpoint scatter σ_θ, and hit rate H.',
-      'the pair <strong>(TTK = t_R + t_S, H)</strong> is your speed–accuracy operating point at each cm/360. this is what lets the optimizer respect <em>your</em> preference — the goal slider in setup — instead of assuming everyone wants the same trade. too sensitive: fast but σ_θ explodes and H collapses. too slow: tight but late.',
+      'the charge phase is ~300× longer than the strike itself - commit, then there is no taking it back. campeón\'s strike drill is the same: fire as fast as possible, misses allowed, no settling. we record reaction t_R, ballistic strike t_S, peak velocity, endpoint scatter σ_θ, and hit rate H.',
+      'the pair <strong>(TTK = t_R + t_S, H)</strong> is your speed–accuracy operating point at each cm/360. this is what lets the optimizer respect <em>your</em> preference - the goal slider in setup - instead of assuming everyone wants the same trade. too sensitive: fast but σ_θ explodes and H collapses. too slow: tight but late.',
     ],
     spec: [
       { k: 'peak acceleration', v: '~10,400 g', mono: true },
@@ -531,17 +531,17 @@ export const SECTIONS: CaseSection[] = [
     eyebrow: ['the engine', 'one system', 'speed↔accuracy'],
     spine: 'triangulation',
     title: 'four probes, one number.',
-    lede: 'the four instruments measure different physical quantities — bits per second, a (0,1] rate, strikes per second, degrees. the trick is fusing them without lying.',
+    lede: 'the four instruments measure different physical quantities - bits per second, a (0,1] rate, strikes per second, degrees. the trick is fusing them without lying.',
     body: [
-      'each instrument is swept across cm/360 and <strong>z-scored across its own sweep</strong>. z-scoring is an affine map, and a quadratic\'s peak is invariant under affine transforms — so normalizing makes heterogeneous metrics commensurable <span class="cs-mark">without moving any instrument\'s own optimum</span>. that is the whole reason the fusion is honest rather than arbitrary.',
-      'the blended objective (weighted by your speed↔accuracy preference) feeds a <strong>gaussian-process bayesian optimizer</strong> — a matérn-5/2 surrogate, expected-improvement acquisition on a dense ln(cm/360) grid — which proposes the next trial where it expects to learn most. a psychometric curve is fit; a <strong>bootstrap</strong> draws the 90% confidence interval.',
-      'the payoff is conceptual: there is <em>one</em> latent constant on <em>one</em> manifold, and the four faculties are four views of it. when they agree, the interval is tight. when they disagree, the interval widens — <span class="cs-mark">the ci width is the system telling you how much your four faculties concur.</span>',
+      'each instrument is swept across cm/360 and <strong>z-scored across its own sweep</strong>. z-scoring is an affine map, and a quadratic\'s peak is invariant under affine transforms - so normalizing makes heterogeneous metrics commensurable <span class="cs-mark">without moving any instrument\'s own optimum</span>. that is the whole reason the fusion is honest rather than arbitrary.',
+      'the blended objective (weighted by your speed↔accuracy preference) feeds a <strong>gaussian-process bayesian optimizer</strong> - a matérn-5/2 surrogate, expected-improvement acquisition on a dense ln(cm/360) grid - which proposes the next trial where it expects to learn most. a psychometric curve is fit; a <strong>bootstrap</strong> draws the 90% confidence interval.',
+      'the payoff is conceptual: there is <em>one</em> latent constant on <em>one</em> manifold, and the four faculties are four views of it. when they agree, the interval is tight. when they disagree, the interval widens - <span class="cs-mark">the ci width is the system telling you how much your four faculties concur.</span>',
     ],
     spec: [
       { k: 'normalize', v: 'per-instrument z-score (affine, peak-preserving)' },
       { k: 'surrogate', v: 'gaussian process · matérn-5/2' },
       { k: 'acquisition', v: 'expected improvement on ln(cm/360)', mono: true },
-      { k: 'uncertainty', v: 'bootstrap 90% ci — width = facet agreement' },
+      { k: 'uncertainty', v: 'bootstrap 90% ci - width = facet agreement' },
     ],
   },
   {
@@ -552,7 +552,7 @@ export const SECTIONS: CaseSection[] = [
     body: [
       '<strong>the interval can be wide.</strong> a short session, or genuinely conflicting faculties, produces an honestly-wide ci rather than a falsely-precise point. that is a feature: the number comes with its own doubt.',
       '<strong>variance is a floor, not a knob.</strong> precision (σ_R) is set by your hardware and your hands. campeón reports it; it does not pretend a sensitivity can fix it.',
-      '<strong>no fabricated noise.</strong> the scorers record what actually happened. a degenerate trial drops out of the blend rather than being padded with synthetic spread — padding would inflate the metric and lie. realistic spread belongs in the test fixtures, never in production.',
+      '<strong>no fabricated noise.</strong> the scorers record what actually happened. a degenerate trial drops out of the blend rather than being padded with synthetic spread - padding would inflate the metric and lie. realistic spread belongs in the test fixtures, never in production.',
       '<strong>raw input is gated.</strong> measurement only proceeds after pointer-lock raw capture and an acceleration check pass; os mouse acceleration would corrupt every reading, so it is detected and blocked up front.',
     ],
   },
@@ -561,7 +561,7 @@ export const SECTIONS: CaseSection[] = [
     eyebrow: ['colophon', 'how it is built'],
     spine: 'design engineering',
     title: 'how it is built.',
-    lede: 'a pure, unit-tested measurement core wrapped by an engine and a hand-rolled ui — so validity can be proven, not hoped.',
+    lede: 'a pure, unit-tested measurement core wrapped by an engine and a hand-rolled ui - so validity can be proven, not hoped.',
     body: [
       'the core (<strong>convert · scoring · optimizer · stats</strong>) is plain typescript, tested against published formulas: iso 9241-9 throughput, a constant-velocity kalman filter, a hand-rolled cholesky solve for the gaussian process. no framework, no backend, ~210 passing tests.',
       'the seams are deliberate. every instrument is a pure <code>analyze()</code> plus a thin <code>run()</code> shell, so the math is tested against synthetic players and only the raw pointer/raf glue is runtime-only. the data-viz above is the same idea: a pure <code>plotGeometry()</code> (domain→pixel, fully unit-tested) and a thin renderer that only writes svg attributes.',
@@ -609,8 +609,8 @@ export function demoConvergence(): PlotInput {
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes** — PASS.
-- [ ] **Step 5: Commit** — `feat(case-study): content — five acts, real organism numbers, citations, convergence demo`.
+- [ ] **Step 4: Run test, verify it passes** - PASS.
+- [ ] **Step 5: Commit** - `feat(case-study): content - five acts, real organism numbers, citations, convergence demo`.
 
 ---
 
@@ -658,7 +658,7 @@ describe('createReveal', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
 
 - [ ] **Step 3: Implement `src/ui/case-study/reveal.ts`**
 
@@ -695,8 +695,8 @@ export function createReveal(opts: { reduced: boolean }): Reveal {
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes** — PASS.
-- [ ] **Step 5: Commit** — `feat(case-study): IntersectionObserver reveal controller (reduced-motion safe)`.
+- [ ] **Step 4: Run test, verify it passes** - PASS.
+- [ ] **Step 5: Commit** - `feat(case-study): IntersectionObserver reveal controller (reduced-motion safe)`.
 
 ---
 
@@ -765,7 +765,7 @@ describe('caseStudy screen', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
 
 - [ ] **Step 3: Implement `src/ui/case-study/case-study.ts`**
 
@@ -844,7 +844,7 @@ function buildFigure(): HTMLElement {
   fig.appendChild(svg);
   const cap = document.createElement('figcaption');
   cap.textContent =
-    'four instruments, each z-scored across the sweep, converging on one peak. the gold band is the 90% ci — its width is how much the faculties agree.';
+    'four instruments, each z-scored across the sweep, converging on one peak. the gold band is the 90% ci - its width is how much the faculties agree.';
   fig.appendChild(cap);
   return fig;
 }
@@ -899,8 +899,8 @@ export function caseStudy(host: HTMLElement, ctx: AppContext): Screen {
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes** — PASS.
-- [ ] **Step 5: Commit** — `feat(case-study): assemble the lowercase science article + convergence data-viz`.
+- [ ] **Step 4: Run test, verify it passes** - PASS.
+- [ ] **Step 5: Commit** - `feat(case-study): assemble the lowercase science article + convergence data-viz`.
 
 ---
 
@@ -928,18 +928,18 @@ describe('case-study wiring', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
 
-- [ ] **Step 3: Edit `src/main.ts`** — add `import './styles/case-study.css';` after the other style imports; replace the case-study import + registration:
+- [ ] **Step 3: Edit `src/main.ts`** - add `import './styles/case-study.css';` after the other style imports; replace the case-study import + registration:
   - Remove `caseStudyStub` from the `./ui/stubs` import (leave `optionsStub`).
   - Add `import { caseStudy } from './ui/case-study/case-study';`.
   - In the `screens` map: `'case-study': caseStudy,` (was `caseStudyStub`).
 
-- [ ] **Step 4: Edit `src/ui/stubs.ts`** — delete the `caseStudyStub` export (keep `optionsStub` and the `stub` helper).
+- [ ] **Step 4: Edit `src/ui/stubs.ts`** - delete the `caseStudyStub` export (keep `optionsStub` and the `stub` helper).
 
-- [ ] **Step 5: Run tests + typecheck** — `npm test tests/ui/case-study/wiring.test.ts` PASS; `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run tests + typecheck** - `npm test tests/ui/case-study/wiring.test.ts` PASS; `npx tsc --noEmit` clean.
 
-- [ ] **Step 6: Commit** — `feat(case-study): wire the real screen into the shell`.
+- [ ] **Step 6: Commit** - `feat(case-study): wire the real screen into the shell`.
 
 ---
 
@@ -947,14 +947,14 @@ describe('case-study wiring', () => {
 
 **Files:** none (verification task; fix-ups committed if needed).
 
-- [ ] **Step 1: Full suite green** — `npm test` and `npx tsc --noEmit`.
-- [ ] **Step 2: Build clean** — `npm run build`.
+- [ ] **Step 1: Full suite green** - `npm test` and `npx tsc --noEmit`.
+- [ ] **Step 2: Build clean** - `npm run build`.
 - [ ] **Step 3: Runtime proof.** `npm run dev`; open `http://localhost:5173/#/case-study`. Verify (use Chrome MCP / Claude Preview): all eight sections render lowercase; registration crosshairs, faint grid, architectural numerals, spines, spec-rails, and dotted exoframe all read in the campeón palette with per-section organism accents; the Act-iii convergence figure shows four organism-colored mark-sets + curve + gold ci band + peak; sections reveal on scroll; the credit reads "looking to nature for answers"; console clean (favicon 404 acceptable until 6D). Then toggle `prefers-reduced-motion` and confirm sections appear instantly (no hidden content).
 - [ ] **Step 4: Slow-motion craft pass.** Read the rendered page as a hiring engineer would: typographic hierarchy, rhythm, the marker-wash thesis phrases, no orphaned chrome. Fix anything that doesn't hold up; commit as `refine(case-study): craft pass`.
 
 ---
 
-# Workstream 6B — the `+options` page
+# Workstream 6B - the `+options` page
 
 ### Task B1: FOV-aware monitor-distance conversion (the advanced school)
 
@@ -987,7 +987,7 @@ describe('monitor-distance conversion (FOV-aware)', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
 
 - [ ] **Step 3: Extend `src/convert/schools.ts`** (keep `perGameSens`):
 ```ts
@@ -995,7 +995,7 @@ export interface ConversionSchool { id: '360' | 'monitor'; label: string; fovAwa
 
 export const CONVERSION_SCHOOLS: ConversionSchool[] = [
   { id: '360', label: '360 distance', fovAware: false,
-    note: 'cm per 360° — FOV-agnostic; exactly what campeón measures.' },
+    note: 'cm per 360° - FOV-agnostic; exactly what campeón measures.' },
   { id: 'monitor', label: 'monitor distance', fovAware: true,
     note: 'matches on-screen cursor travel for a fraction of the screen; depends on source + target FOV.' },
 ];
@@ -1019,8 +1019,8 @@ export function monitorDistanceMatchCm360(
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes** — PASS.
-- [ ] **Step 5: Commit** — `feat(convert): FOV-aware monitor-distance conversion school`.
+- [ ] **Step 4: Run test, verify it passes** - PASS.
+- [ ] **Step 5: Commit** - `feat(convert): FOV-aware monitor-distance conversion school`.
 
 ---
 
@@ -1056,7 +1056,7 @@ describe('options settings helpers', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
 
 - [ ] **Step 3: Implement `src/ui/options/settings.ts`**
 ```ts
@@ -1089,8 +1089,8 @@ export function effectiveYawTable(overrides: YawOverrides): YawEntry[] {
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes** — PASS.
-- [ ] **Step 5: Commit** — `feat(options): pure helpers — bounds normalization + yaw overrides`.
+- [ ] **Step 4: Run test, verify it passes** - PASS.
+- [ ] **Step 5: Commit** - `feat(options): pure helpers - bounds normalization + yaw overrides`.
 
 ---
 
@@ -1101,10 +1101,10 @@ export function effectiveYawTable(overrides: YawOverrides): YawEntry[] {
 - Create: `src/styles/options.css`
 - Test: `tests/ui/options/options.test.ts`
 
-The screen has three panels, all lowercase, using the existing `.field`/`.action`/`.mono` idiom (no new chrome system — options is utility, not editorial):
-1. **conversion school** — `<select>` of `CONVERSION_SCHOOLS`; when `monitor`, reveal source/target FOV number inputs + a live converted-cm/360 readout (using `monitorDistanceMatchCm360` against `ctx.draft` cm/360 derived from the current bounds midpoint or a sensible default).
-2. **per-game sensitivity table** — built from `effectiveYawTable(overrides)` + `perGameSens`; each row's yaw is an editable input (writes `overrides`), table re-derives live.
-3. **cm/360 search bounds** — two number inputs (lo/hi) → `normalizeBounds` → writes `ctx.draft.bounds` (feeds the session). Live readout.
+The screen has three panels, all lowercase, using the existing `.field`/`.action`/`.mono` idiom (no new chrome system - options is utility, not editorial):
+1. **conversion school** - `<select>` of `CONVERSION_SCHOOLS`; when `monitor`, reveal source/target FOV number inputs + a live converted-cm/360 readout (using `monitorDistanceMatchCm360` against `ctx.draft` cm/360 derived from the current bounds midpoint or a sensible default).
+2. **per-game sensitivity table** - built from `effectiveYawTable(overrides)` + `perGameSens`; each row's yaw is an editable input (writes `overrides`), table re-derives live.
+3. **cm/360 search bounds** - two number inputs (lo/hi) → `normalizeBounds` → writes `ctx.draft.bounds` (feeds the session). Live readout.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1168,7 +1168,7 @@ describe('options screen', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
 
 - [ ] **Step 3: Implement `src/ui/options/options.ts`** (build DOM, wire events; keep all copy lowercase). Reference implementation:
 ```ts
@@ -1202,7 +1202,7 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
               <label class="field">source fov (°) <input type="number" data-fov="source" value="103" min="60" max="140"></label>
               <label class="field">target fov (°) <input type="number" data-fov="target" value="90" min="60" max="140"></label>
               <label class="field">screen fraction <input type="number" data-fov="fraction" value="0" min="0" max="1" step="0.1"></label>
-              <p class="options__readout">at <span class="mono">${mid}</span> cm/360 → <span class="mono" data-fov-out>—</span> cm/360</p>
+              <p class="options__readout">at <span class="mono">${mid}</span> cm/360 → <span class="mono" data-fov-out>-</span> cm/360</p>
             </div>
           </section>
 
@@ -1260,7 +1260,7 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
         const tFov = parseFloat($<HTMLInputElement>('[data-fov="target"]').value);
         const frac = parseFloat($<HTMLInputElement>('[data-fov="fraction"]').value);
         const out = monitorDistanceMatchCm360(mid, sFov, tFov, Number.isFinite(frac) ? frac : 0);
-        $('[data-fov-out]').textContent = Number.isFinite(out) ? out.toFixed(1) : '—';
+        $('[data-fov-out]').textContent = Number.isFinite(out) ? out.toFixed(1) : '-';
       };
       $('[data-school]').addEventListener('change', (ev) => {
         const id = (ev.target as HTMLSelectElement).value;
@@ -1289,11 +1289,11 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
 }
 ```
 
-- [ ] **Step 4: Implement `src/styles/options.css`** — layout for `.options__inner` (max-width ~40rem), `.options__panel` (bordered card), `.options__table` (full-width, parchment row borders like the result table), `.options__bounds`/`.field` row layout, `.options__readout` (gold accent value), `.options__note`/`.options__sub` (slate-2 mono). Keep within tokens; respect focus-visible.
+- [ ] **Step 4: Implement `src/styles/options.css`** - layout for `.options__inner` (max-width ~40rem), `.options__panel` (bordered card), `.options__table` (full-width, parchment row borders like the result table), `.options__bounds`/`.field` row layout, `.options__readout` (gold accent value), `.options__note`/`.options__sub` (slate-2 mono). Keep within tokens; respect focus-visible.
 
-- [ ] **Step 5: Run test, verify it passes** — PASS. `npx tsc --noEmit` clean.
+- [ ] **Step 5: Run test, verify it passes** - PASS. `npx tsc --noEmit` clean.
 
-- [ ] **Step 6: Commit** — `feat(options): conversion school + per-game yaw overrides + search-bounds editor`.
+- [ ] **Step 6: Commit** - `feat(options): conversion school + per-game yaw overrides + search-bounds editor`.
 
 ---
 
@@ -1319,18 +1319,18 @@ describe('options wiring', () => {
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
-- [ ] **Step 3: Edit `src/main.ts`** — `import './styles/options.css';`; `import { options } from './ui/options/options';`; map `options: options,`; remove the `./ui/stubs` import entirely.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
+- [ ] **Step 3: Edit `src/main.ts`** - `import './styles/options.css';`; `import { options } from './ui/options/options';`; map `options: options,`; remove the `./ui/stubs` import entirely.
 - [ ] **Step 4: Delete `src/ui/stubs.ts`** (no longer referenced).
-- [ ] **Step 5: Tests + typecheck + build** — `npm test`, `npx tsc --noEmit`, `npm run build` all clean.
-- [ ] **Step 6: Runtime proof** — `npm run dev`; `http://localhost:5173/#/options`: all three panels work; editing yaw re-derives sens; monitor-distance reveals FOV inputs + live readout; bounds edits persist into a subsequent session (set bounds → start → confirm session uses them). `prefers-reduced-motion` respected.
-- [ ] **Step 7: Commit** — `feat(options): wire the real screen into the shell; remove stubs`.
+- [ ] **Step 5: Tests + typecheck + build** - `npm test`, `npx tsc --noEmit`, `npm run build` all clean.
+- [ ] **Step 6: Runtime proof** - `npm run dev`; `http://localhost:5173/#/options`: all three panels work; editing yaw re-derives sens; monitor-distance reveals FOV inputs + live readout; bounds edits persist into a subsequent session (set bounds → start → confirm session uses them). `prefers-reduced-motion` respected.
+- [ ] **Step 7: Commit** - `feat(options): wire the real screen into the shell; remove stubs`.
 
 ---
 
-# Workstream 6C — falcon hero motion
+# Workstream 6C - falcon hero motion
 
-The hero is a **typographic** falcon (eye = `ó`, body = wordmark, beak = `+ start`, feet = byline, wing = the glyph scatter). Motion honors spec §10's intent without an SVG silhouette that would fight the composition: a **parallax sky drifts behind** a transparent hero (visible only in the negative space — the opaque glyphs never let it bleed through them), and the **wing scatter flaps** in a slow wing-beat. All motion is gated by `prefers-reduced-motion` and the rAF driver is cleaned up on unmount.
+The hero is a **typographic** falcon (eye = `ó`, body = wordmark, beak = `+ start`, feet = byline, wing = the glyph scatter). Motion honors spec §10's intent without an SVG silhouette that would fight the composition: a **parallax sky drifts behind** a transparent hero (visible only in the negative space - the opaque glyphs never let it bleed through them), and the **wing scatter flaps** in a slow wing-beat. All motion is gated by `prefers-reduced-motion` and the rAF driver is cleaned up on unmount.
 
 ### Task C1: parallax sky layer behind the hero
 
@@ -1355,9 +1355,9 @@ it('renders a sky layer behind the composition, marked aria-hidden and pointer-i
 ```
 (If the existing test file lacks a reusable ctx stub, mirror the one already used by the other assertions in that file.)
 
-- [ ] **Step 2: Run test, verify it fails** — FAIL.
+- [ ] **Step 2: Run test, verify it fails** - FAIL.
 
-- [ ] **Step 3: Edit `src/ui/hero.ts`** — add the sky as the first child of `.hero__inner` (behind everything), built from 2–3 `.hero__sky-layer` divs (far/mid/near) holding faint drifting marks:
+- [ ] **Step 3: Edit `src/ui/hero.ts`** - add the sky as the first child of `.hero__inner` (behind everything), built from 2–3 `.hero__sky-layer` divs (far/mid/near) holding faint drifting marks:
 ```ts
 // inside the innerHTML, as the FIRST element of .hero__inner:
 `<div class="hero__sky" aria-hidden="true">
@@ -1368,7 +1368,7 @@ it('renders a sky layer behind the composition, marked aria-hidden and pointer-i
 ```
 Ensure `.hero__inner` establishes a stacking context and the sky sits at `z-index:0` (the wordmark/wing already use `z-index:1`).
 
-- [ ] **Step 4: Edit `src/styles/shell.css`** — sky styling + slow drift keyframes; reduced-motion freezes them:
+- [ ] **Step 4: Edit `src/styles/shell.css`** - sky styling + slow drift keyframes; reduced-motion freezes them:
 ```css
 .hero__sky { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .hero__sky-layer { position: absolute; inset: -10%;
@@ -1387,10 +1387,10 @@ Ensure `.hero__inner` establishes a stacking context and the sky sits at `z-inde
 @keyframes sky-drift { from { transform: translate3d(0,0,0); } to { transform: translate3d(-6%, 3%, 0); } }
 @media (prefers-reduced-motion: reduce) { .hero__sky-layer { animation: none !important; } }
 ```
-(The opaque wordmark/byline/actions sit above the sky; the sky shows only in negative space — satisfying "never bleeding through the wing edges.")
+(The opaque wordmark/byline/actions sit above the sky; the sky shows only in negative space - satisfying "never bleeding through the wing edges.")
 
-- [ ] **Step 5: Run test + typecheck** — PASS / clean.
-- [ ] **Step 6: Commit** — `feat(hero): parallax sky layer behind the falcon composition (reduced-motion safe)`.
+- [ ] **Step 5: Run test + typecheck** - PASS / clean.
+- [ ] **Step 6: Commit** - `feat(hero): parallax sky layer behind the falcon composition (reduced-motion safe)`.
 
 ---
 
@@ -1409,7 +1409,7 @@ Ensure `.hero__inner` establishes a stacking context and the sky sits at `z-inde
   0%, 100% { transform: rotate(var(--rot, 0deg)) translateY(0); }
   50%      { transform: rotate(calc(var(--rot, 0deg) - 7deg)) translateY(-4px); }
 }
-/* gentle whole-composition bob — the glide */
+/* gentle whole-composition bob - the glide */
 .hero__inner { animation: hero-bob 7s ease-in-out infinite; }
 @keyframes hero-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) {
@@ -1419,7 +1419,7 @@ Ensure `.hero__inner` establishes a stacking context and the sky sits at `z-inde
 ```
 Note: the existing per-`nth-child` rules set each mark's static `transform: rotate(...)`. Refactor those to set `--rot` (the angle) + keep the size, so the keyframe can compose rotation with the beat. Example: `.hero__wing span:nth-child(1) { top:12%; left:14%; --rot:-48deg; font-size:2.2rem; }` and a base rule `.hero__wing span { transform: rotate(var(--rot)); }`.
 
-- [ ] **Step 2: Set `--i` per wing mark in `src/ui/hero.ts`** — when building the marks: `WING_MARKS.map((m, i) => \`<span style="--i:${i}">${m}</span>\`)`.
+- [ ] **Step 2: Set `--i` per wing mark in `src/ui/hero.ts`** - when building the marks: `WING_MARKS.map((m, i) => \`<span style="--i:${i}">${m}</span>\`)`.
 
 - [ ] **Step 3: Add a subtle pointer-parallax driver in `src/ui/hero.ts`** (skipped entirely under reduced motion; cleaned up on unmount). On `pointermove`, shift the sky layers by depth and tilt the composition a degree or two via a `requestAnimationFrame`-throttled handler. Store the listener + any `cancelAnimationFrame` handle and remove them in `unmount()`.
 ```ts
@@ -1429,15 +1429,15 @@ Note: the existing per-`nth-child` rules set each mark's static `transform: rota
 ```
 Wire `--par-x`/`--par-y` into the sky-layer transforms (e.g., `translate3d(calc(var(--par-x,0)*Npx), ...)`) with per-depth multipliers.
 
-- [ ] **Step 4: Tests + typecheck** — existing hero tests still pass (the parallax driver must no-op safely under jsdom where `matchMedia` may be undefined — guard it); add an assertion that `unmount()` removes the listener if feasible, else verify no throw.
+- [ ] **Step 4: Tests + typecheck** - existing hero tests still pass (the parallax driver must no-op safely under jsdom where `matchMedia` may be undefined - guard it); add an assertion that `unmount()` removes the listener if feasible, else verify no throw.
 
-- [ ] **Step 5: Runtime proof** — `npm run dev`; the hero: sky parallaxes behind, wing beats in a slow rhythm, composition glides, pointer shifts the depths subtly, glyphs stay crisp/opaque over the sky. Toggle `prefers-reduced-motion`: everything is still + legible. Confirm 60fps (no layout thrash — only `transform`/`opacity`). Console clean.
+- [ ] **Step 5: Runtime proof** - `npm run dev`; the hero: sky parallaxes behind, wing beats in a slow rhythm, composition glides, pointer shifts the depths subtly, glyphs stay crisp/opaque over the sky. Toggle `prefers-reduced-motion`: everything is still + legible. Confirm 60fps (no layout thrash - only `transform`/`opacity`). Console clean.
 
-- [ ] **Step 6: Commit** — `feat(hero): wing-flap beat + glide + pointer parallax (the falcon flies)`.
+- [ ] **Step 6: Commit** - `feat(hero): wing-flap beat + glide + pointer parallax (the falcon flies)`.
 
 ---
 
-# Workstream 6D — polish & QA
+# Workstream 6D - polish & QA
 
 ### Task D1: micro-motion, focus, slider accent, favicon, plot y-axis label
 
@@ -1445,11 +1445,11 @@ Wire `--par-x`/`--par-y` into the sky-layer transforms (e.g., `translate3d(calc(
 - Test: `tests/ui/convergence-plot.test.ts` (extend for the y-axis label), plus a token/asset presence check.
 
 - [ ] **Step 1 (slider accent):** in `src/ui/setup.ts`, give the goal `<input type="range">` `style="accent-color: var(--gold)"` (or a `.goal-slider` class in shell.css). Verify the existing setup test still passes.
-- [ ] **Step 2 (button press / hover micro-motion):** add to shell.css — `.action { transition: transform var(--dur-fast) var(--ease-out); } .action:active { transform: scale(.97); }` (matches the sibling project's tactile feel; reduced-motion already zeroes `--dur-fast`).
+- [ ] **Step 2 (button press / hover micro-motion):** add to shell.css - `.action { transition: transform var(--dur-fast) var(--ease-out); } .action:active { transform: scale(.97); }` (matches the sibling project's tactile feel; reduced-motion already zeroes `--dur-fast`).
 - [ ] **Step 3 (plot y-axis label):** add an optional `yLabel?: string` to `renderConvergencePlot` (or a small `<text>` rotated at the left edge reading "blended score (z)"). TDD: a test asserting the label text appears when supplied. Wire a label in the session plot + the case-study figure.
-- [ ] **Step 4 (favicon):** create `public/favicon.svg` — a minimal gold `+` or the falcon `ó` eye on bone; reference `<link rel="icon" href="/favicon.svg">` in `index.html`. Removes the console 404.
+- [ ] **Step 4 (favicon):** create `public/favicon.svg` - a minimal gold `+` or the falcon `ó` eye on bone; reference `<link rel="icon" href="/favicon.svg">` in `index.html`. Removes the console 404.
 - [ ] **Step 5:** full suite + typecheck + build clean.
-- [ ] **Step 6: Commit** — `polish: slider accent, button micro-motion, plot y-axis label, favicon`.
+- [ ] **Step 6: Commit** - `polish: slider accent, button micro-motion, plot y-axis label, favicon`.
 
 ---
 
@@ -1458,7 +1458,7 @@ Wire `--par-x`/`--par-y` into the sky-layer transforms (e.g., `translate3d(calc(
 **Files:** as needed (fix-ups only).
 - [ ] **Step 1:** Audit every screen with `prefers-reduced-motion: reduce`: hero (sky/wing/bob/parallax frozen), case study (sections instant, no hidden content), session/result transitions, options. tokens.css already zeroes `--dur-fast`/`--dur-med`; confirm all new animations either use those or have explicit reduced-motion `animation: none` (the case-study, hero, and any new keyframes).
 - [ ] **Step 2:** Keyboard + SR pass: every actionable control is a real `<button>`/`<input>`/`<select>` (already the pattern); `:focus-visible` outlines present; decorative chrome (`cs-reg`, `cs-numeral`, spines, sky, wing) is `aria-hidden`; the case-study article has a sensible heading order (h2 per section). Fix gaps.
-- [ ] **Step 3:** Commit any fixes — `a11y: reduced-motion + keyboard/SR audit across screens`.
+- [ ] **Step 3:** Commit any fixes - `a11y: reduced-motion + keyboard/SR audit across screens`.
 
 ---
 
@@ -1466,7 +1466,7 @@ Wire `--par-x`/`--par-y` into the sky-layer transforms (e.g., `translate3d(calc(
 
 **Files:** as needed.
 - [ ] **Step 1:** Verify/strengthen graceful degradation: `result` with no `lastResult` already redirects to hero (keep); `options` invalid numeric input falls back safely (covered by `normalizeBounds` + the `Number.isFinite` guards); `case-study` uses canned `demoConvergence()` so it never depends on a live session; storage malformed-JSON already degrades (Phase 5). Add a test for any path not yet covered.
-- [ ] **Step 2:** Commit if changes — `harden: options/result empty + invalid-input states`.
+- [ ] **Step 2:** Commit if changes - `harden: options/result empty + invalid-input states`.
 
 ---
 
@@ -1483,7 +1483,7 @@ Wire `--par-x`/`--par-y` into the sky-layer transforms (e.g., `translate3d(calc(
 
 **Spec coverage** (§4 instruments, §7 conversion, §9 IA case-study + options, §10 falcon motion, §12 success criteria "case study accurately represents the biology with citations" + "falcon hero lands with impact and respects prefers-reduced-motion"): ✓ case study (A1–A7) covers §4 mechanisms + §13 citations + the unified-system `/goal`; options (B1–B4) covers §7 schools + yaw override + bounds; falcon motion (C1–C2) covers §10 motion vision; polish/QA (D1–D4) covers §12 portfolio bar. PSX skin explicitly deferred (per user scope + §10/§11).
 
-**Placeholder scan:** every code step ships real code; the case-study copy is verbatim/final; the one "reference implementation" (options.ts) is complete and runnable; CSS rules are concrete with the sibling project named as the fidelity reference for polish detail (not a placeholder — the load-bearing rules are present + tests pin the contract).
+**Placeholder scan:** every code step ships real code; the case-study copy is verbatim/final; the one "reference implementation" (options.ts) is complete and runnable; CSS rules are concrete with the sibling project named as the fidelity reference for polish detail (not a placeholder - the load-bearing rules are present + tests pin the contract).
 
 **Type consistency:** `PlotInput`/`InstrumentId` imported from existing modules; `CaseSection.accent` ↔ `accentVar`; `YawOverrides`/`effectiveYaw(Table)` consistent across B2/B3; `monitorDistanceMatchCm360` signature identical in B1 test + impl + B3 use; `Route 'case-study'|'options'` already in `shell.ts`; `ctx.draft.bounds` is the existing `[Cm360,Cm360]` the session already consumes.
 

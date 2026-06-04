@@ -36,7 +36,7 @@ export function hero(host: HTMLElement, ctx: AppContext): Screen {
       host.appendChild(root);
 
       // Pointer parallax: the sky shifts by depth behind the (opaque) falcon, so it reads as flying.
-      // Enhancement only — skipped under reduced motion; rAF-coalesced; torn down on unmount.
+      // Enhancement only - skipped under reduced motion; rAF-coalesced; torn down on unmount.
       if (!prefersReduced()) {
         const inner = root.querySelector<HTMLElement>('.hero__inner');
         if (inner) {

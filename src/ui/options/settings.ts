@@ -6,7 +6,7 @@ const LO = 5, HI = 150, MIN_SPAN = 5;
 
 export function normalizeBounds(a: number, b: number): [Cm360, Cm360] {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return [...DEFAULT_BOUNDS];
-  // Order, then clamp BOTH ends into [LO, HI] — lo is also capped at HI - MIN_SPAN so there is
+  // Order, then clamp BOTH ends into [LO, HI] - lo is also capped at HI - MIN_SPAN so there is
   // always room below the ceiling for the minimum span (this is what prevents an inverted range
   // when both inputs exceed HI). Then guarantee the span by widening hi up to lo + MIN_SPAN.
   const lo = Math.min(Math.max(LO, Math.min(a, b)), HI - MIN_SPAN);

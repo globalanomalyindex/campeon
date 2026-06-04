@@ -5,7 +5,7 @@ export interface Decomposition {
   bias: [Degrees, Degrees];
   /** Gain bias = mean(required + e_radial) / mean(required). >1 overshoot, <1 undershoot. */
   gain: number;
-  /** De-biased RMS spread sqrt(mean‖e − b‖²) — the precision floor. */
+  /** De-biased RMS spread sqrt(mean‖e − b‖²) - the precision floor. */
   sigmaR: Degrees;
   /** |b|² + σ_R² (equals mean‖e‖²). */
   mse: number;

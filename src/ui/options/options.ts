@@ -28,7 +28,7 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
               <label class="field">source fov (°) <input type="number" data-fov="source" value="103" min="60" max="140"></label>
               <label class="field">target fov (°) <input type="number" data-fov="target" value="90" min="60" max="140"></label>
               <label class="field">screen fraction <input type="number" data-fov="fraction" value="0" min="0" max="1" step="0.1"></label>
-              <p class="options__readout">at <span class="mono" data-fov-mid>${mid}</span> cm/360 → <span class="mono" data-fov-out>—</span> cm/360</p>
+              <p class="options__readout">at <span class="mono" data-fov-mid>${mid}</span> cm/360 → <span class="mono" data-fov-out>-</span> cm/360</p>
             </div>
           </section>
 
@@ -82,7 +82,7 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
         const tFov = parseFloat($<HTMLInputElement>('[data-fov="target"]').value);
         const frac = parseFloat($<HTMLInputElement>('[data-fov="fraction"]').value);
         const out = monitorDistanceMatchCm360(mid, sFov, tFov, Number.isFinite(frac) ? frac : 0);
-        $('[data-fov-out]').textContent = Number.isFinite(out) ? out.toFixed(1) : '—';
+        $('[data-fov-out]').textContent = Number.isFinite(out) ? out.toFixed(1) : '-';
       };
       $('[data-school]').addEventListener('change', (ev) => {
         const id = (ev.target as HTMLSelectElement).value;

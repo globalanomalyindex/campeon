@@ -45,7 +45,7 @@ export class TrialRecorder {
   }
 
   /**
-   * The recorded buffers. Returns references to the live arrays, not copies — they keep
+   * The recorded buffers. Returns references to the live arrays, not copies - they keep
    * growing until `stop()` is called, so call `stop()` first when you need a fixed snapshot.
    */
   recording(): Recording {
@@ -68,7 +68,7 @@ export function speedTrace(frames: readonly Frame[]): Array<{ t: Ms; speed: numb
  * Decompose a landing error into task-local axes about the intended reach.
  * The approach is `start → target`; the miss is `landing − target` in the local (yaw,pitch)
  * plane, split into radial (along the approach, + = overshoot) and signed tangential
- * (perpendicular). `reach` is the planar approach amplitude. Planar approximation — valid
+ * (perpendicular). `reach` is the planar approach amplitude. Planar approximation - valid
  * at aim-drill angles; the systematic-bias signal it feeds is dominated by the mean.
  */
 export function missComponents(

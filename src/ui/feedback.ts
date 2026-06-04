@@ -1,5 +1,5 @@
 /**
- * A brief on-screen "miss" tick — the legibility cue for a shot that didn't land in any target's
+ * A brief on-screen "miss" tick - the legibility cue for a shot that didn't land in any target's
  * hitbox. The scoring is unchanged (a miss already lowers the score via Fitts effective-width +
  * hit-rate); this only makes a whiff unmistakable in the moment. One reusable element under `host`;
  * `miss()` restarts a CSS pop+fade. Reduced motion is handled in CSS (the pop is disabled there).

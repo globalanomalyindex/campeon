@@ -25,7 +25,7 @@ function evolve(
 const cfg = { gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, sigma0: 0.3 } as const;
 const seeds = [18, 24, 31, 40, 50];
 
-describe('makeEvolution — surrogate-assisted (1+λ) evolution strategy', () => {
+describe('makeEvolution - surrogate-assisted (1+λ) evolution strategy', () => {
   it('evolves toward an interior fitness peak over generations', () => {
     // Concave fitness peaked at cm=35 (in ln-space), with a little deterministic noise per generation.
     const xStar = Math.log(35);
@@ -41,20 +41,20 @@ describe('makeEvolution — surrogate-assisted (1+λ) evolution strategy', () =>
     expect(lateMean).toBeLessThan(43); // the lineage concentrates around the peak, not scattering
   });
 
-  it('climbs a monotonic landscape — selection is directional, not random sampling', () => {
+  it('climbs a monotonic landscape - selection is directional, not random sampling', () => {
     // Fitness rises with sensitivity (optimum at the upper bound). A genuine selection+mutation loop
     // must MARCH upward; random sampling would stay centered. (Distinguishes ES from a blind sweep.)
     const fit = (cm: number) => Math.log(cm); // strictly increasing in cm
     const eng = makeEvolution({ ...cfg, seed: 11 });
     const { suggested, history } = evolve(eng, fit, seeds, 14);
     expect(eng.posteriorPeak!(history, bounds)).toBeGreaterThan(48); // climbed into the high region
-    // The lineage settles well ABOVE the seed pool's center (~32) — selection marched up the gradient
+    // The lineage settles well ABOVE the seed pool's center (~32) - selection marched up the gradient
     // rather than sampling around where it started (a blind sweep would stay centered).
     const lateMean = suggested.slice(-5).reduce((a, b) => a + b, 0) / 5;
     expect(lateMean).toBeGreaterThan(45);
   });
 
-  it('selection is elitist — the incumbent is the fittest sensitivity seen', () => {
+  it('selection is elitist - the incumbent is the fittest sensitivity seen', () => {
     // A history whose clear best sits low (cm≈20): the parent/incumbent must be there.
     const xBest = Math.log(20);
     const history: Observation[] = [16, 20, 26, 34, 45, 58].map((cm) => ({

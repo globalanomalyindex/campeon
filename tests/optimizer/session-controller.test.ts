@@ -111,7 +111,7 @@ function instruments(map: Partial<Record<InstrumentId, Instrument>>): Record<Ins
   };
 }
 
-describe('runSession — convergence on synthetic players', () => {
+describe('runSession - convergence on synthetic players', () => {
   it('finds a single instrument latent optimum, with a sub-bounds CI containing the estimate', async () => {
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
     const { report, trials } = await runSession({
@@ -152,9 +152,9 @@ describe('runSession — convergence on synthetic players', () => {
     expect(report.optimalCm360).toBeLessThan(45);
   });
 
-  it('wires the engine posteriorPeak into the final report — CI widens on GP/parabola disagreement', async () => {
+  it('wires the engine posteriorPeak into the final report - CI widens on GP/parabola disagreement', async () => {
     // Stub engine whose posteriorPeak sits far from the parabola peak (~30): the final CI must span
-    // it, proving runSession forwards posteriorPeak → finalizeReport (spec §5.3). Load-bearing —
+    // it, proving runSession forwards posteriorPeak → finalizeReport (spec §5.3). Load-bearing -
     // remove the wiring and ci90[1] falls back near the bootstrap upper, failing this.
     const SENTINEL = 58;
     const stub: SearchEngine = {
@@ -224,7 +224,7 @@ describe('runSession — convergence on synthetic players', () => {
   });
 });
 
-describe('runSession — live callbacks', () => {
+describe('runSession - live callbacks', () => {
   const base = () => ({
     dpi: 800,
     profile: profile({ flick: 1 }),

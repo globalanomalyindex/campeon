@@ -4,7 +4,7 @@ export interface KeyOpts {
   /** Min red / blue for the key (default 150 / 130). */
   rMin?: number;
   bMin?: number;
-  /** How much R and B must exceed G for a magenta hue (default 60) — keeps neutral greys/chrome safe. */
+  /** How much R and B must exceed G for a magenta hue (default 60) - keeps neutral greys/chrome safe. */
   sep?: number;
 }
 
@@ -21,7 +21,7 @@ export function isKeyColor(r: number, g: number, b: number, opts: KeyOpts = {}):
  * Knock out the magenta background of an RGBA buffer in place (alpha → 0 on key pixels). Only magenta
  * is keyed, so the gold draw-glint, white muzzle flash, grey smoke, and chrome highlights all survive.
  * Returns the number of pixels keyed (handy for tests + sanity checks). PSX wants hard edges, so this
- * is a hard key — no feather.
+ * is a hard key - no feather.
  */
 export function keyMagenta(data: Uint8ClampedArray, opts: KeyOpts = {}): number {
   let keyed = 0;
@@ -36,7 +36,7 @@ export function keyMagenta(data: Uint8ClampedArray, opts: KeyOpts = {}): number 
 
 export interface DespillOpts {
   /**
-   * Minimum magenta cast — `min(r, b) - g` — for a pixel to be despilled (default 8). Anti-aliased
+   * Minimum magenta cast - `min(r, b) - g` - for a pixel to be despilled (default 8). Anti-aliased
    * magenta fringe carries a cast of 15-130; neutral gunmetal/chrome sit at ≤2, so this cleanly
    * separates contamination from the real palette without nibbling near-neutral pixels.
    */
@@ -46,7 +46,7 @@ export interface DespillOpts {
 /**
  * Remove residual magenta spill from opaque pixels in place. The hard key knocks out fully-magenta
  * background, but anti-aliasing leaves a thin band of partially-magenta pixels (R and B both above G)
- * that the key can't take without eating real edges — they read as a pink halo. Where that magenta
+ * that the key can't take without eating real edges - they read as a pink halo. Where that magenta
  * cast exceeds `castMin`, clamp R and B down to G, collapsing the pixel to neutral grey at the same
  * luminance. Skips transparent (already-keyed) pixels and anything without a magenta cast, so the
  * gold glint (low blue), chrome, white, smoke, and gunmetal all survive untouched. Returns the count

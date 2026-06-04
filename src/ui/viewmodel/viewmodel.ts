@@ -8,7 +8,7 @@ import { punch, restRecoil, stepRecoil, type RecoilState } from './recoil';
 const SHEET_URL = `${import.meta.env.BASE_URL}sprites/deagle.png`; // base-aware (root in dev, /campeon/ on Pages)
 
 export interface Viewmodel {
-  /** The transparent full-screen overlay canvas — append it over the arena (pointer-events: none). */
+  /** The transparent full-screen overlay canvas - append it over the arena (pointer-events: none). */
   readonly el: HTMLCanvasElement;
   /** Start an animation now; `then` (optional) plays once a one-shot completes. */
   play(name: AnimName, then?: AnimName | null): void;
@@ -22,7 +22,7 @@ export interface Viewmodel {
 }
 
 /**
- * Thin canvas shell for the Desert Eagle viewmodel — a cosmetic overlay above the WebGL arena. Loads
+ * Thin canvas shell for the Desert Eagle viewmodel - a cosmetic overlay above the WebGL arena. Loads
  * the sprite sheet, knocks out its magenta key to alpha and bakes in the same ordered-dither + posterize
  * as the arena's PSX pass (the GLSL shader can't reach a 2D overlay), then blits the controller's frame
  * crisply (no smoothing → PSX pixels), anchored lower-right (CS:Source style). Purely decorative: it
@@ -51,7 +51,7 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
   octx.drawImage(img, 0, 0);
   const data = octx.getImageData(0, 0, SHEET.w, SHEET.h);
   // Gun-scoped chroma cleanup: the Deagle palette has no true magenta (chrome / gold / smoke / gunmetal),
-  // so we can key more generously than the shared default — a tighter green gate (gMax 175) takes the
+  // so we can key more generously than the shared default - a tighter green gate (gMax 175) takes the
   // bright anti-aliased pink boundary fully transparent. (The enemy sheets keep the conservative default
   // key since their Deadpool palette may include legit pink/red.) Then despill twice: once now to
   // neutralize the deeper magenta cast the key can't safely reach (in full colour → best luminance), and

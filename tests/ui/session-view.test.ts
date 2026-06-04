@@ -4,7 +4,7 @@ import { marksFromTrials, instructionFor, searchLabel } from '../../src/ui/sessi
 import type { TrialResult } from '../../src/types';
 
 describe('session-view helpers', () => {
-  it('frames the loop as evolution — gene-pool seeding, then numbered generations testing a sensitivity', () => {
+  it('frames the loop as evolution - gene-pool seeding, then numbered generations testing a sensitivity', () => {
     // The thesis ("generations of sensitivities") must be visible: cold-start trials are Generation 0
     // (the initial gene pool); after that each trial is a numbered generation testing one cm/360.
     expect(searchLabel(0, 18, 8)).toBe('gen 0 · seeding the gene pool · testing 18.0 cm/360');

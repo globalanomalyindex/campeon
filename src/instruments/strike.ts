@@ -77,7 +77,7 @@ export const strike = {
           onsetTime = seg.onsetTime;
           vPeak = seg.vPeak;
         } catch {
-          // no movement detected (instant fire) — reaction = full interval
+          // no movement detected (instant fire) - reaction = full interval
         }
         shots.push({
           tR: onsetTime - presentedAt,

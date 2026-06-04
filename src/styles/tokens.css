@@ -17,10 +17,10 @@
   --ink: #0D0D0D;
   --parchment: #EFDEA5;
   /* organism accents (track=slate, flick=gold from the core palette; +2 harmonized hues) */
-  --c-track: #4A5A66;     /* falcon/dragonfly — slate */
-  --c-flick: #FFC400;     /* spider/raptor — gold */
-  --c-calibrate: #7FA6B6; /* archerfish — water blue (cool, harmonized with slate) */
-  --c-strike: #E8702A;    /* mantis shrimp — strike ember (warm, harmonized with gold) */
+  --c-track: #4A5A66;     /* falcon/dragonfly - slate */
+  --c-flick: #FFC400;     /* spider/raptor - gold */
+  --c-calibrate: #7FA6B6; /* archerfish - water blue (cool, harmonized with slate) */
+  --c-strike: #E8702A;    /* mantis shrimp - strike ember (warm, harmonized with gold) */
   /* type */
   --font-display: 'Gefalent', system-ui, sans-serif;
   --font-body: system-ui, -apple-system, sans-serif;

@@ -19,7 +19,7 @@ const ID: InstrumentId = 'flick';
 const AMP_SPLIT: Degrees = 24; // amplitude ≥ this → a ballistic reorientation (the spider's open-loop orient)
 const WIDTH_SPLIT: Degrees = 2; // width ≤ this → a precision lock (the raptor's deep-fovea confirm)
 
-/** A grid of (amplitude, width) conditions — low-ID big flicks → high-ID small locks. */
+/** A grid of (amplitude, width) conditions - low-ID big flicks → high-ID small locks. */
 export const FLICK_CONDITIONS: FittsCondition[] = [
   { amplitude: 12, width: 3 },
   { amplitude: 12, width: 1.5 },
@@ -42,12 +42,12 @@ function key(c: FittsCondition): string {
 }
 
 /**
- * Pure flick analysis — the spider + raptor faculty. Groups taps by (amplitude, width) condition,
+ * Pure flick analysis - the spider + raptor faculty. Groups taps by (amplitude, width) condition,
  * scores each with ISO 9241-9 effective throughput, then resolves the dual-fovea TWO-MODE trade:
- *   • ballisticTP — throughput on large-amplitude reorientations (the spider's open-loop orient).
- *   • precisionTP — throughput on small-width locks (the raptor's high-acuity confirm).
- * The score is the HARMONIC MEAN of the two, which peaks at the CROSSOVER of the two curves — the
- * sensitivity that serves big flicks AND fine placement — instead of whichever single mode is fastest.
+ *   • ballisticTP - throughput on large-amplitude reorientations (the spider's open-loop orient).
+ *   • precisionTP - throughput on small-width locks (the raptor's high-acuity confirm).
+ * The score is the HARMONIC MEAN of the two, which peaks at the CROSSOVER of the two curves - the
+ * sensitivity that serves big flicks AND fine placement - instead of whichever single mode is fastest.
  * (Pooled mean-of-means throughput is kept as a diagnostic. A fixture with only one mode falls back
  * to that mode, then to the pooled aggregate; a condition with <2 taps still fails honestly.)
  */
@@ -74,7 +74,7 @@ export function analyzeFlick(taps: readonly FlickTap[], ctx: TrialContext): Tria
   const ballisticTP = tpOver((c) => c.amplitude >= AMP_SPLIT);
   const precisionTP = tpOver((c) => c.width <= WIDTH_SPLIT);
 
-  // Two-mode crossover via the harmonic mean — being good at only one mode is penalized by the other.
+  // Two-mode crossover via the harmonic mean - being good at only one mode is penalized by the other.
   const score =
     ballisticTP !== null && precisionTP !== null && ballisticTP > 0 && precisionTP > 0
       ? (2 * ballisticTP * precisionTP) / (ballisticTP + precisionTP)

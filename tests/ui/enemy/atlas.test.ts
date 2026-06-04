@@ -10,7 +10,7 @@ import {
   staticFrameUV,
 } from '../../../src/ui/enemy/atlas';
 
-describe('enemy atlas — uniform 8×5 grid geometry', () => {
+describe('enemy atlas - uniform 8×5 grid geometry', () => {
   it('describes the verified uniform grid (8 cols × 5 rows at 1448×1086)', () => {
     expect(SHEET.cols).toBe(8);
     expect(SHEET.rows).toBe(5);
@@ -43,7 +43,7 @@ describe('enemy atlas — uniform 8×5 grid geometry', () => {
   });
 });
 
-describe('enemy atlas — state contract + animation timing', () => {
+describe('enemy atlas - state contract + animation timing', () => {
   it('assigns each state to its contract row (spawn·idle·flinch·death·escape = rows 0..4)', () => {
     expect(ANIMATIONS.spawn.row).toBe(0);
     expect(ANIMATIONS.idle.row).toBe(1);

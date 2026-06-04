@@ -55,16 +55,16 @@ describe('analyzeFlick', () => {
   });
 });
 
-describe('flick — two-mode crossover (spider ballistic orient + raptor dual-fovea)', () => {
+describe('flick - two-mode crossover (spider ballistic orient + raptor dual-fovea)', () => {
   // Ballistic = large amplitude (≥24); precision = small width (≤2). The score is the harmonic mean
-  // of the two sub-throughputs, so it peaks at the CROSSOVER — a sensitivity good at both — rather
+  // of the two sub-throughputs, so it peaks at the CROSSOVER - a sensitivity good at both - rather
   // than at whichever single mode happens to be fastest. Numbers derived from the ISO throughput
   // formula by hand: the balanced player's pooled mean is LOWER than the specialist's, but its
   // harmonic mean is HIGHER. That divergence is the whole point.
   const balanced = [...cond(40, 3, 400, 0.5), ...cond(12, 1.5, 400, 0.3)]; // competent at both modes
   const lopsided = [...cond(40, 3, 250, 0.4), ...cond(12, 1.5, 700, 0.9)]; // great flick, poor lock
 
-  it('rewards the balanced player over the specialist — opposite to what pooled throughput does', () => {
+  it('rewards the balanced player over the specialist - opposite to what pooled throughput does', () => {
     const A = analyzeFlick(balanced, ctx());
     const B = analyzeFlick(lopsided, ctx());
     expect(B.raw.throughput).toBeGreaterThan(A.raw.throughput); // old pooled metric favors the specialist…

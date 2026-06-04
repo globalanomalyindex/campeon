@@ -1,4 +1,4 @@
-/** Deterministic seeded PRNG (mulberry32) — reproducible bootstrap, sessions, and tests. */
+/** Deterministic seeded PRNG (mulberry32) - reproducible bootstrap, sessions, and tests. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {

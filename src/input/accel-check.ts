@@ -8,7 +8,7 @@ export function accumulateMagnitude(samples: readonly AimSample[]): number {
 }
 
 export interface AccelVerdict {
-  /** True when OS pointer acceleration appears to be ON — measurement must be blocked. */
+  /** True when OS pointer acceleration appears to be ON - measurement must be blocked. */
   accelerated: boolean;
   /** Relative difference |fast − slow| / slow. */
   ratio: number;

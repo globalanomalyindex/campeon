@@ -2,7 +2,7 @@
  * Pure geometry + timing for the Desert Eagle viewmodel sprite sheet (`public/sprites/deagle.png`).
  *
  * The sheet is an 8-column × 7-row grid with non-uniform row heights and a magenta (#FF00FF-ish)
- * in-cell key inside white gutters — measured from the actual pixels, not assumed. This module is
+ * in-cell key inside white gutters - measured from the actual pixels, not assumed. This module is
  * pure (no DOM, no canvas): given an animation name and elapsed time it returns the source rect to
  * blit. The thin renderer (viewmodel.ts) owns the canvas, the chroma-key, and rAF.
  */

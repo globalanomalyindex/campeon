@@ -46,7 +46,7 @@ export interface PointerLockController {
  *   (Firefox/Safari) captures via `mousemove`. Exactly one path is registered, so counts are
  *   never doubled.
  * - Requests `unadjustedMovement: true` first; reports mode 'raw' only when the browser
- *   actually supports raw input — there is no API to read back whether the flag was honored
+ *   actually supports raw input - there is no API to read back whether the flag was honored
  *   (spec §6.2), so support is the honest proxy, backed by the accel-check gate.
  * Runtime-verified later; the shell is not unit-tested.
  */

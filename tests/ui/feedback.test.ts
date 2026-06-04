@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createShotFeedback } from '../../src/ui/feedback';
 
-describe('createShotFeedback — miss tick', () => {
+describe('createShotFeedback - miss tick', () => {
   it('mounts a hidden, aria-hidden tick reading "miss" under the host', () => {
     const host = document.createElement('div');
     const fb = createShotFeedback(host);

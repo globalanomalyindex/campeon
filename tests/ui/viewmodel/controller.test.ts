@@ -17,7 +17,7 @@ describe('ViewmodelController', () => {
     expect(vm.frameAt(fdDoneMs).name).toBe('idleReady'); // advanced to the follow-up
   });
 
-  it('does not advance a one-shot with no follow-up — it clamps on its last frame', () => {
+  it('does not advance a one-shot with no follow-up - it clamps on its last frame', () => {
     const vm = new ViewmodelController('idleReady', 0);
     vm.play('fire', 0); // no `then`
     expect(vm.frameAt(10_000).name).toBe('fire');

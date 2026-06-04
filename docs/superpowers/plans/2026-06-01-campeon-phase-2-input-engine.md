@@ -1,10 +1,10 @@
-# campeón Phase 2 — Input Fidelity + Engine Implementation Plan
+# campeón Phase 2 - Input Fidelity + Engine Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the input-validity layer (`input/`) and the Three.js arena (`engine/`) so you can pointer-lock and mouse-look at a set cm/360, with raw-vs-OS-adjusted input detected, deltas DPR-normalized, and the acceleration gate working.
 
-**Architecture:** Irreducible browser I/O (WebGL renderer, `requestPointerLock`, event listeners) is isolated into thin shells. Every piece of real logic — the cm/360→degrees-per-count mapping, DPR normalization, the accel decision, look accumulation + pitch clamp, target bearing/angular-radius — is extracted into **pure functions unit-tested in Node**. Three.js math classes (`PerspectiveCamera`, `Vector3`) run headless in Node with no GL context, so the camera rotation and target geometry are unit-tested too; `Arena` takes an injected renderer + input source so its orchestration is testable without WebGL. Only the GL canvas, the Pointer Lock API, and DOM event wiring are verified live in Chromium (Task 9).
+**Architecture:** Irreducible browser I/O (WebGL renderer, `requestPointerLock`, event listeners) is isolated into thin shells. Every piece of real logic - the cm/360→degrees-per-count mapping, DPR normalization, the accel decision, look accumulation + pitch clamp, target bearing/angular-radius - is extracted into **pure functions unit-tested in Node**. Three.js math classes (`PerspectiveCamera`, `Vector3`) run headless in Node with no GL context, so the camera rotation and target geometry are unit-tested too; `Arena` takes an injected renderer + input source so its orchestration is testable without WebGL. Only the GL canvas, the Pointer Lock API, and DOM event wiring are verified live in Chromium (Task 9).
 
 **Tech Stack:** TypeScript (strict) · Vite · Three.js `^0.184` · Vitest (`environment: 'node'`). New runtime dependency: `three`.
 
@@ -17,10 +17,10 @@
 - **Commits:** conventional-commit subject (`feat(engine): …`, `feat(input): …`, `chore: …`), and every commit ends with the trailer:
   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
   (shown explicitly in each commit step via a second `-m`).
-- **Imports:** `verbatimModuleSyntax` is on — use `import type { … }` for type-only imports and plain `import { … }` for values (including Three.js classes). No `any` in `src/engine` or `src/input` (the dev harness in `src/dev/` may use a single typed global).
+- **Imports:** `verbatimModuleSyntax` is on - use `import type { … }` for type-only imports and plain `import { … }` for values (including Three.js classes). No `any` in `src/engine` or `src/input` (the dev harness in `src/dev/` may use a single typed global).
 - **Logical view frame (the contract for `onAim` and `TargetHandle.bearing()`):** `yaw 0 = forward (−Z)`, `+yaw = right (+X)`; `pitch 0 = level`, `+pitch = up (+Y)`. Mouse-right (`+dx`) → `+yaw`; mouse-down (`+dy`) → `−pitch`. Internally the camera uses Euler order `YXZ` with `rotation.y = −yawRad`, `rotation.x = +pitchRad`.
 - **File-tree adherence:** this phase creates exactly the `input/` and `engine/` files named in the master plan, plus one **temporary dev harness** (`src/dev/arena-harness.ts`) and a small hash hook in `main.ts` so the arena is runnable now. The harness is a dev artifact; Phase 5's shell replaces this routing.
-- **Test env stays `node`** — every new unit test is pure (no jsdom). Browser glue is covered by Task 9.
+- **Test env stays `node`** - every new unit test is pure (no jsdom). Browser glue is covered by Task 9.
 
 ---
 
@@ -37,7 +37,7 @@ npm install three@^0.184.0
 npm install -D @types/three@^0.184.1
 ```
 
-Expected `package.json` result (versions may resolve slightly higher — accept whatever npm pins):
+Expected `package.json` result (versions may resolve slightly higher - accept whatever npm pins):
 ```jsonc
 {
   // …existing…
@@ -54,7 +54,7 @@ Expected `package.json` result (versions may resolve slightly higher — accept 
 }
 ```
 
-- [ ] **Step 2: Write the failing test** (proves Three.js math runs headless in Node — the foundation for unit-testing the engine)
+- [ ] **Step 2: Write the failing test** (proves Three.js math runs headless in Node - the foundation for unit-testing the engine)
 
 `tests/engine/three-smoke.test.ts`:
 ```ts
@@ -94,7 +94,7 @@ git commit -m "chore: add three.js (runtime) + @types/three" \
 
 ### Task 2: DPI + DPR helpers (`src/input/dpi.ts`)
 
-> Pure. `parseDpi`/`isValidDpi` validate the user-entered DPI (no browser API exposes it — spec §6.1). `normalizeByDpr` makes Chrome's device-px `movementX` and Firefox's CSS-px `movementX` agree (spec §6.4). NB: `devicePixelRatio` ≠ mouse DPI; they are unrelated and this file owns both purely to keep the "count normalization" helpers together (per the master plan's `dpi.ts` responsibility).
+> Pure. `parseDpi`/`isValidDpi` validate the user-entered DPI (no browser API exposes it - spec §6.1). `normalizeByDpr` makes Chrome's device-px `movementX` and Firefox's CSS-px `movementX` agree (spec §6.4). NB: `devicePixelRatio` ≠ mouse DPI; they are unrelated and this file owns both purely to keep the "count normalization" helpers together (per the master plan's `dpi.ts` responsibility).
 
 **Files:**
 - Create: `src/input/dpi.ts`
@@ -141,7 +141,7 @@ describe('DPR normalization', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/input/dpi.test.ts`
-Expected: FAIL — `Cannot find module '../../src/input/dpi'`.
+Expected: FAIL - `Cannot find module '../../src/input/dpi'`.
 
 - [ ] **Step 3: Implement `src/input/dpi.ts`**
 
@@ -245,7 +245,7 @@ describe('AccelMeter', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/input/accel-check.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/input/accel-check.ts`**
 
@@ -260,7 +260,7 @@ export function accumulateMagnitude(samples: readonly AimSample[]): number {
 }
 
 export interface AccelVerdict {
-  /** True when OS pointer acceleration appears to be ON — measurement must be blocked. */
+  /** True when OS pointer acceleration appears to be ON - measurement must be blocked. */
   accelerated: boolean;
   /** Relative difference |fast − slow| / slow. */
   ratio: number;
@@ -307,7 +307,7 @@ git commit -m "feat(input): acceleration-gate decision + swipe accumulator" \
 
 ### Task 4: Pointer-lock capture (`src/input/pointer-lock.ts`)
 
-> The pure part — `flattenCoalesced` — turns a batch of coalesced pointer events into DPR-normalized `AimSample`s (spec §6.4–6.5: accumulate `getCoalescedEvents()` so no counts are lost at 1000 Hz). It is unit-tested. The `createPointerLock` shell does the real browser work — `requestPointerLock({ unadjustedMovement: true })` with a graceful fallback (spec §6.2), event wiring, and raw-vs-OS-adjusted detection. The shell has **no top-level DOM access** (so the module imports cleanly in Node) and is verified live in Task 9.
+> The pure part - `flattenCoalesced` - turns a batch of coalesced pointer events into DPR-normalized `AimSample`s (spec §6.4–6.5: accumulate `getCoalescedEvents()` so no counts are lost at 1000 Hz). It is unit-tested. The `createPointerLock` shell does the real browser work - `requestPointerLock({ unadjustedMovement: true })` with a graceful fallback (spec §6.2), event wiring, and raw-vs-OS-adjusted detection. The shell has **no top-level DOM access** (so the module imports cleanly in Node) and is verified live in Task 9.
 
 **Files:**
 - Create: `src/input/pointer-lock.ts`
@@ -344,7 +344,7 @@ describe('flattenCoalesced', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/input/pointer-lock.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/input/pointer-lock.ts`**
 
@@ -492,9 +492,9 @@ git commit -m "feat(input): pointer-lock raw capture + coalesced-event flattenin
 
 ---
 
-### Task 5: Camera rig — cm/360 → view rotation (`src/engine/camera-rig.ts`)
+### Task 5: Camera rig - cm/360 → view rotation (`src/engine/camera-rig.ts`)
 
-> The heart of measurement validity. `degreesPerCount(cm360, dpi) = 914.4 / (cm360·dpi)` is the rotation the scene turns per one normalized mouse count, so a full 360° turn equals exactly `cm360` of physical travel — **independent of any internal yaw constant** (the spec's `Y_app`/`sens` split is internal bookkeeping; this is the observable). `applyLook` integrates samples with the logical frame + pitch clamp. `CameraRig` maps that onto a real `PerspectiveCamera` (unit-tested in Node — no GL needed).
+> The heart of measurement validity. `degreesPerCount(cm360, dpi) = 914.4 / (cm360·dpi)` is the rotation the scene turns per one normalized mouse count, so a full 360° turn equals exactly `cm360` of physical travel - **independent of any internal yaw constant** (the spec's `Y_app`/`sens` split is internal bookkeeping; this is the observable). `applyLook` integrates samples with the logical frame + pitch clamp. `CameraRig` maps that onto a real `PerspectiveCamera` (unit-tested in Node - no GL needed).
 
 **Files:**
 - Create: `src/engine/camera-rig.ts`
@@ -588,7 +588,7 @@ describe('CameraRig camera mapping', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/engine/camera-rig.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/engine/camera-rig.ts`**
 
@@ -604,7 +604,7 @@ export const PITCH_LIMIT: Degrees = 89;
  * View rotation (degrees) per one normalized mouse count, so that a full 360°
  * turn equals `cm360` of physical mouse travel at `dpi`.
  *   deg/count = 914.4 / (cm360 · dpi)
- * Independent of any internal yaw constant — this is the measured observable.
+ * Independent of any internal yaw constant - this is the measured observable.
  */
 export function degreesPerCount(cm360: Cm360, dpi: Dpi): Degrees {
   return TURN_CM / (cm360 * dpi);
@@ -678,7 +678,7 @@ Expected: PASS (all groups).
 
 ```bash
 git add src/engine/camera-rig.ts tests/engine/camera-rig.test.ts
-git commit -m "feat(engine): camera rig — cm/360→deg/count, look integration, clamp" \
+git commit -m "feat(engine): camera rig - cm/360→deg/count, look integration, clamp" \
   -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
@@ -762,7 +762,7 @@ describe('placeStatic', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/engine/targets.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/engine/targets.ts`**
 
@@ -868,15 +868,15 @@ Expected: PASS (all groups).
 
 ```bash
 git add src/engine/targets.ts tests/engine/targets.test.ts
-git commit -m "feat(engine): target geometry — bearing/angular-radius + static placement" \
+git commit -m "feat(engine): target geometry - bearing/angular-radius + static placement" \
   -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 7: Arena (`src/engine/arena.ts`) — `ArenaScene` over an injected renderer + input
+### Task 7: Arena (`src/engine/arena.ts`) - `ArenaScene` over an injected renderer + input
 
-> Implements the `ArenaScene` contract. The renderer and input source are **injected interfaces** (`RendererLike`, `InputSource`) that `THREE.WebGLRenderer` and the pointer-lock controller satisfy structurally — so the arena's orchestration (per-sample → rig → `onAim`; spawn/clear; sensitivity; render delegation) is unit-tested in Node with a spy renderer and a fake input, while the real GL canvas is wired in Task 8. Input is applied **per sample** (not per frame) so no counts are lost at high refresh (spec §6.5); rendering is decoupled in the RAF loop.
+> Implements the `ArenaScene` contract. The renderer and input source are **injected interfaces** (`RendererLike`, `InputSource`) that `THREE.WebGLRenderer` and the pointer-lock controller satisfy structurally - so the arena's orchestration (per-sample → rig → `onAim`; spawn/clear; sensitivity; render delegation) is unit-tested in Node with a spy renderer and a fake input, while the real GL canvas is wired in Task 8. Input is applied **per sample** (not per frame) so no counts are lost at high refresh (spec §6.5); rendering is decoupled in the RAF loop.
 
 **Files:**
 - Create: `src/engine/arena.ts`
@@ -980,7 +980,7 @@ describe('Arena (headless)', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/engine/arena.test.ts`
-Expected: FAIL — module not found.
+Expected: FAIL - module not found.
 
 - [ ] **Step 3: Implement `src/engine/arena.ts`**
 
@@ -997,14 +997,14 @@ import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, TargetHandle, TargetSp
 import { CameraRig } from './camera-rig';
 import { Target, placeStatic } from './targets';
 
-/** Minimal renderer surface the arena needs — satisfied by THREE.WebGLRenderer. */
+/** Minimal renderer surface the arena needs - satisfied by THREE.WebGLRenderer. */
 export interface RendererLike {
   render(scene: Scene, camera: PerspectiveCamera): void;
   setSize(width: number, height: number): void;
   dispose(): void;
 }
 
-/** A source of pointer deltas — satisfied by the pointer-lock controller. */
+/** A source of pointer deltas - satisfied by the pointer-lock controller. */
 export interface InputSource {
   onSample(cb: (sample: AimSample) => void): () => void;
 }
@@ -1232,7 +1232,7 @@ export function mountArenaHarness(root: HTMLElement): void {
     hud.textContent =
       `campeón · input + engine harness\n` +
       `cm/360 ${CM360}   dpi ${DPI}   deg/count ${dpc.toFixed(4)}\n` +
-      `lock ${pointer.isLocked() ? 'on' : 'off'}   mode ${pointer.mode() ?? '—'}\n` +
+      `lock ${pointer.isLocked() ? 'on' : 'off'}   mode ${pointer.mode() ?? '-'}\n` +
       `view  yaw ${view[0].toFixed(1)}°  pitch ${view[1].toFixed(1)}°\n` +
       `accel slow ${slow.toFixed(0)} / fast ${fast.toFixed(0)}` +
       (verdict ? `  → ${verdict.accelerated ? 'BLOCK (accel on)' : 'OK (accel off)'}` : '') +
@@ -1298,7 +1298,7 @@ function renderPlaceholder(root: HTMLDivElement): void {
       <p style="font-family:var(--font-display);font-style:italic;color:var(--slate-2)">aim sensitivity tool</p>
       <h1 style="font-family:var(--font-display);font-size:5rem;line-height:.9">campe<span style="color:var(--ink)">ó</span>n</h1>
       <p style="font-family:var(--font-mono);color:var(--slate-2);margin-top:1rem">
-        dev: <a href="#arena" style="color:var(--gold)">#arena</a> — input + engine harness
+        dev: <a href="#arena" style="color:var(--gold)">#arena</a> - input + engine harness
       </p>
     </main>`;
 }
@@ -1371,7 +1371,7 @@ Run: `npm run dev` (background; note the URL, default `http://localhost:5173`).
   return { dpc, before, after, deltaYaw: after - before };
 }
 ```
-- Expected: `dpc ≈ 0.03362`, `deltaYaw ≈ 90` (within ±0.5°) — proving counts→degrees→view matches `914.4/(cm360·dpi)` through the live render path.
+- Expected: `dpc ≈ 0.03362`, `deltaYaw ≈ 90` (within ±0.5°) - proving counts→degrees→view matches `914.4/(cm360·dpi)` through the live render path.
 - Also evaluate `() => !!document.querySelector('canvas').getContext('webgl2') || !!document.querySelector('canvas').getContext('webgl')` → expect `true`.
 
 - [ ] **Step 6: Clean up**

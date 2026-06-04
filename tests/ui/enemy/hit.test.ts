@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { classifyHit, GRAZE_FACTOR } from '../../../src/ui/enemy/hit';
 import { separation } from '../../../src/engine/targets';
 
-describe('classifyHit — cosmetic shot classification', () => {
+describe('classifyHit - cosmetic shot classification', () => {
   const bearing: [number, number] = [10, 3];
   const radius = 1.5;
 
@@ -28,7 +28,7 @@ describe('classifyHit — cosmetic shot classification', () => {
     expect(classifyHit(v, bearing, radius)).toBe('miss');
   });
 
-  it('depends only on angular distance — symmetric, never on a stored score', () => {
+  it('depends only on angular distance - symmetric, never on a stored score', () => {
     expect(classifyHit([10, 4], bearing, radius)).toBe(classifyHit([10, 2], bearing, radius));
   });
 });

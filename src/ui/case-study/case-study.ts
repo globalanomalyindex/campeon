@@ -85,7 +85,7 @@ function buildFigure(): HTMLElement {
   fig.appendChild(svg);
   const cap = document.createElement('figcaption');
   cap.textContent =
-    'four instruments, each z-scored across the sweep, converging on one peak. the gold band is the 90% ci — it widens with measurement noise and facet disagreement.';
+    'four instruments, each z-scored across the sweep, converging on one peak. the gold band is the 90% ci - it widens with measurement noise and facet disagreement.';
   fig.appendChild(cap);
   return fig;
 }
@@ -114,7 +114,7 @@ function buildRefsAndCredit(): DocumentFragment {
 export function caseStudy(host: HTMLElement, ctx: AppContext): Screen {
   // Reveal-on-scroll is an enhancement: only hide-then-animate when an observer can
   // actually drive it (IntersectionObserver present + motion allowed). Otherwise content
-  // shows immediately and createReveal's reduced path reveals on observe — never trapped hidden.
+  // shows immediately and createReveal's reduced path reveals on observe - never trapped hidden.
   const animate = typeof IntersectionObserver !== 'undefined' && !prefersReduced();
   const reveal = createReveal({ reduced: !animate });
   return {

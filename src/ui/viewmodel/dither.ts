@@ -1,12 +1,12 @@
 /**
- * Ordered (Bayer) dithering + posterization for an RGBA buffer, in place — the CPU/canvas twin of the
+ * Ordered (Bayer) dithering + posterization for an RGBA buffer, in place - the CPU/canvas twin of the
  * arena's GLSL PSX pass (`engine/psx-pass.ts`). The Desert Eagle viewmodel is a 2D overlay drawn ABOVE
  * the WebGL canvas, so the post-processing shader can't reach it; baking the same dither + palette into
  * its keyed sheet once at load makes the gun sit in the same low-fi world as the dithered arena.
  *
  * Same 4×4 Bayer matrix and "dither-before-quantize" order as the shader, so the banding matches:
  *   c += bayer(x,y)/levels ; c = floor(c·levels + 0.5)/levels
- * Alpha is preserved untouched (keeps the magenta-keyed transparency intact). Pure — no DOM, no canvas.
+ * Alpha is preserved untouched (keeps the magenta-keyed transparency intact). Pure - no DOM, no canvas.
  */
 
 /** 4×4 Bayer threshold matrix (values 0..15), identical to the order used in the PSX fragment shader. */

@@ -18,7 +18,7 @@ function rms(xs: readonly number[]): number {
 /**
  * Continuous lag (in samples) of the peak aim↔target cross-correlation along an axis; >0 = aim
  * trails. Zero-mean covariance (not a raw dot product) so a constant offset cannot tip the peak,
- * then parabolic sub-sample refinement of that peak — a smooth target's latency lives between
+ * then parabolic sub-sample refinement of that peak - a smooth target's latency lives between
  * frames, so quantizing it to whole frames would inject a parity artifact into the residual.
  */
 function bestLag(aim: readonly number[], target: readonly number[], maxLag: number): number {
@@ -77,21 +77,21 @@ const median = (xs: readonly number[]): number => {
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
 /**
- * Pure tracking analysis over a recorded trial — the dragonfly + falcon faculty.
+ * Pure tracking analysis over a recorded trial - the dragonfly + falcon faculty.
  *
  * A constant-velocity Kalman filter smooths the TARGET's state; its velocity estimate drives `slip`
- * — the relative angular velocity the player failed to null, the falcon VOR/OKR gaze-stabilization
+ * - the relative angular velocity the player failed to null, the falcon VOR/OKR gaze-stabilization
  * analog. The player's tracking quality is then measured against the target directly:
- *   • latencySec — the player's OWN reaction latency L, recovered as the aim↔target cross-correlation
+ *   • latencySec - the player's OWN reaction latency L, recovered as the aim↔target cross-correlation
  *     lag in seconds. This is the dragonfly forward model's latency-calibrated lead horizon, measured
  *     per player rather than assumed (the old code hard-coded 150 ms for everyone).
- *   • predErr — the LAG-COMPENSATED predictive residual: aim(t) against the target position the
+ *   • predErr - the LAG-COMPENSATED predictive residual: aim(t) against the target position the
  *     player is actually tracking, L away. Removing pure latency isolates the sensitivity-dependent
- *     error (tremor + gain over/undershoot) — exactly what the cm/360 sweep is meant to move.
- *   • jitter — high-frequency aim-speed residual (tremor above FC_HZ, amplified by high sensitivity).
+ *     error (tremor + gain over/undershoot) - exactly what the cm/360 sweep is meant to move.
+ *   • jitter - high-frequency aim-speed residual (tremor above FC_HZ, amplified by high sensitivity).
  *
  * NOTE the Kalman *innovation* (ν = z − Hx̂⁻) is the filter's one-step prediction error about the
- * TARGET — a function of the target's motion and the filter, NOT of the player — so it is deliberately
+ * TARGET - a function of the target's motion and the filter, NOT of the player - so it is deliberately
  * not the score. The player-dependent quantity is the lag-compensated residual above.
  */
 export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
@@ -174,7 +174,7 @@ export const track = {
     // Centre the weaving prey on where the player is currently looking → it starts on-screen and the
     // ±12°/±5° weave keeps it there. The view drifts between trials, so the old absolute origin
     // (yaw:0,pitch:0) could spawn the prey off-screen and the early frames would record the player
-    // HUNTING for it, not tracking it — corrupting the dragonfly/falcon reading.
+    // HUNTING for it, not tracking it - corrupting the dragonfly/falcon reading.
     const [vYaw, vPitch] = scene.view();
     const handle = scene.spawnTarget({
       kind: 'moving',

@@ -46,7 +46,7 @@ export interface BoConfig {
   /** Dense 1-D acquisition grid resolution (default 96). */
   gridSize?: number;
   /** Budget for `isDone` only (default 20). Inert when driven by the session controller, which
-   *  owns stopping — see SearchEngine.isDone. */
+   *  owns stopping - see SearchEngine.isDone. */
   maxTrials?: number;
 }
 
@@ -92,7 +92,7 @@ export function makeBo(config: BoConfig): SearchEngine {
     isDone(history: Observation[]): boolean {
       return history.length >= maxTrials;
     },
-    /** The GP posterior-mean argmax over the grid — the surrogate's own best-guess optimum,
+    /** The GP posterior-mean argmax over the grid - the surrogate's own best-guess optimum,
      *  used by the controller to cross-check (and widen the CI against) the parabola peak. */
     posteriorPeak(history: Observation[], bounds: [Cm360, Cm360]): Cm360 {
       const loX = Math.log(bounds[0]);

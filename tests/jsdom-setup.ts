@@ -5,7 +5,7 @@
  * localStorage that jsdom places on the window object.
  *
  * This setup restores window.localStorage from jsdom's own window when the
- * built-in getter returns undefined — so tests that exercise the default
+ * built-in getter returns undefined - so tests that exercise the default
  * window.localStorage backend work correctly.
  */
 if (typeof window !== 'undefined') {

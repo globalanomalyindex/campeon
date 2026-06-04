@@ -12,14 +12,14 @@ import { CameraRig } from './camera-rig';
 import { Target, MovingTarget, placeStatic, type Placement } from './targets';
 import type { PostProcessor } from './psx-pass';
 
-/** Minimal renderer surface the arena needs — satisfied by THREE.WebGLRenderer. */
+/** Minimal renderer surface the arena needs - satisfied by THREE.WebGLRenderer. */
 export interface RendererLike {
   render(scene: Scene, camera: PerspectiveCamera): void;
   setSize(width: number, height: number): void;
   dispose(): void;
 }
 
-/** A source of pointer deltas — satisfied by the pointer-lock controller. */
+/** A source of pointer deltas - satisfied by the pointer-lock controller. */
 export interface InputSource {
   onSample(cb: (sample: AimSample) => void): () => void;
   /** Optional fire (primary-button) events. Absent in headless tests that don't fire. */
@@ -35,7 +35,7 @@ export interface InputSource {
 export interface EnemyLayer {
   /** Add the layer's container to the arena scene (called once on attach). */
   attach(scene: Scene): void;
-  /** A target appeared at `object`'s position with angular radius `radiusDeg` — start its spawn animation. */
+  /** A target appeared at `object`'s position with angular radius `radiusDeg` - start its spawn animation. */
   spawn(id: string, object: Object3D, radiusDeg: Degrees, nowMs: Ms): void;
   /** Per-frame: follow target positions, advance animations, retire finished ones. */
   update(nowMs: Ms): void;
@@ -117,7 +117,7 @@ export class Arena implements ArenaScene {
   }
 
   private handleFire(): void {
-    // Classify against the LIVE target first — before an instrument's fire handler clears/advances it —
+    // Classify against the LIVE target first - before an instrument's fire handler clears/advances it -
     // so the pop reads the target you actually shot. Cosmetic only: reads view+bearings, writes nothing.
     this.enemies?.fire(this.nowMs, this.rig.view(), [...this.targets.values()]);
     for (const cb of this.fireCbs) cb(this.nowMs);
@@ -129,7 +129,7 @@ export class Arena implements ArenaScene {
 
   /**
    * Attach a cosmetic enemy-billboard layer (its sheet textures load async, so it arrives after
-   * construction). The layer hides each target's sphere but never touches its transform — bearing()
+   * construction). The layer hides each target's sphere but never touches its transform - bearing()
    * and radiusDeg() are unchanged, so the cm/360 measurement is unaffected.
    */
   attachEnemies(layer: EnemyLayer): void {

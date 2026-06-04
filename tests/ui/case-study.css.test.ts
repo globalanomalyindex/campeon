@@ -23,7 +23,7 @@ describe('case-study.css', () => {
   it('stays inside the campeón palette tokens (no raw cobalt from the sibling project)', () => {
     expect(css).not.toMatch(/#1D3FD9/i);
   });
-  it('reveal is progressively enhanced — the hidden state is scoped to a JS-set active flag', () => {
+  it('reveal is progressively enhanced - the hidden state is scoped to a JS-set active flag', () => {
     // opacity:0 must be gated by `.case[data-reveal-active]`, never global, so content is
     // never trapped invisible when JS/IntersectionObserver are absent or fail to fire.
     expect(css).toMatch(/\.case\[data-reveal-active\][^{]*\[data-reveal\][^{]*\{[^}]*opacity:\s*0/);

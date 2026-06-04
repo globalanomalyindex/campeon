@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SHEET, ANIMATIONS, frameIndex, isComplete, cellRect, frameRect, type AnimName } from '../../../src/ui/viewmodel/atlas';
 
-describe('viewmodel atlas — sheet geometry', () => {
+describe('viewmodel atlas - sheet geometry', () => {
   it('describes the measured 8×7 deagle grid', () => {
     expect(SHEET.cols.length).toBe(9); // 9 boundaries → 8 columns
     expect(SHEET.rows.length).toBe(7); // 7 animation rows
@@ -24,7 +24,7 @@ describe('viewmodel atlas — sheet geometry', () => {
   });
 });
 
-describe('viewmodel atlas — animation timing', () => {
+describe('viewmodel atlas - animation timing', () => {
   it('starts every animation on its first frame at t=0', () => {
     for (const name of Object.keys(ANIMATIONS) as AnimName[]) {
       const a = ANIMATIONS[name];

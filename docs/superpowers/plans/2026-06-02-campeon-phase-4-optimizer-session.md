@@ -1,8 +1,8 @@
-# campeón Phase 4 — Optimizer + Session Implementation Plan
+# campeón Phase 4 - Optimizer + Session Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the search-and-report engine — a Gaussian-process Bayesian optimizer over `ln(cm/360)`, a bandit fallback, and a session controller that runs ~15–30 interleaved instrument trials, blends their scores into one objective, and emits a `Report` (optimal cm/360 + 90% CI + curve) that converges on synthetic players.
+**Goal:** Build the search-and-report engine - a Gaussian-process Bayesian optimizer over `ln(cm/360)`, a bandit fallback, and a session controller that runs ~15–30 interleaved instrument trials, blends their scores into one objective, and emits a `Report` (optimal cm/360 + 90% CI + curve) that converges on synthetic players.
 
 **Architecture:** A pure, unit-tested `optimizer/` layer beside the existing `scoring/` and `stats/`. Five focused files: `gp.ts` (exact Matérn-5/2 GP, dependency-free), `bayesopt.ts` (EI/UCB acquisition + the BO `SearchEngine`), `bandit.ts` (UCB1 fallback `SearchEngine`), `objective.ts` (per-instrument z-score blend → `Observation[]`), `session-controller.ts` (cold-start → suggest → run → score → fit → `Report`). The controller depends only on the `SearchEngine`, `Instrument`, and `ArenaScene` interfaces, so it is tested by injecting synthetic instruments + a `FakeScene`. The final report reuses Phase-1 `stats/psychometric` (peak fit) and `stats/bootstrap` (CI).
 
@@ -12,16 +12,16 @@
 
 ## Conventions (apply to EVERY task)
 
-- **Tests:** always `import { describe, it, expect } from 'vitest';` — never rely on globals.
-- **Type imports:** `verbatimModuleSyntax` is on — import types with `import type { … }` (or inline `import { value, type Type } from …`). A plain `import` of a type-only symbol will fail the build.
-- **No `any`** in the core. `noUncheckedIndexedAccess` is **off**, so `arr[i]` is the element type — do not add redundant `!` on plain indexing (match `stats/psychometric.ts` style).
+- **Tests:** always `import { describe, it, expect } from 'vitest';` - never rely on globals.
+- **Type imports:** `verbatimModuleSyntax` is on - import types with `import type { … }` (or inline `import { value, type Type } from …`). A plain `import` of a type-only symbol will fail the build.
+- **No `any`** in the core. `noUncheckedIndexedAccess` is **off**, so `arr[i]` is the element type - do not add redundant `!` on plain indexing (match `stats/psychometric.ts` style).
 - **Type-check before every commit:** `npx tsc --noEmit` must pass (zero errors).
 - **Full suite green before every commit:** `npm test` must pass.
 - **Commit message:** one feature per commit, and the body MUST end with this trailer verbatim:
   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
   Form used throughout: `git commit -m "<subject>" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"`
 - **Test dirs:** create `tests/optimizer/` (the first `Write` to a path there creates it).
-- **No `types.ts` changes this phase** — `Observation`, `SearchEngine`, `Report` already exist and are sufficient. All other types (`GpParams`, `BoConfig`, `SessionConfig`, …) are module-local.
+- **No `types.ts` changes this phase** - `Observation`, `SearchEngine`, `Report` already exist and are sufficient. All other types (`GpParams`, `BoConfig`, `SessionConfig`, …) are module-local.
 
 ---
 
@@ -43,11 +43,11 @@ tests/optimizer/
 └─ session-controller.test.ts
 ```
 
-**Layering note:** `objective.ts` imports `mean`/`sampleStd` from `../scoring/stats` (leaf-pure, already shared by the instruments) — intentional DRY reuse, not a layering inversion.
+**Layering note:** `objective.ts` imports `mean`/`sampleStd` from `../scoring/stats` (leaf-pure, already shared by the instruments) - intentional DRY reuse, not a layering inversion.
 
 ---
 
-### Task 1: `optimizer/gp.ts` — exact Gaussian process (Matérn-5/2)
+### Task 1: `optimizer/gp.ts` - exact Gaussian process (Matérn-5/2)
 
 **Files:**
 - Create: `src/optimizer/gp.ts`
@@ -115,7 +115,7 @@ describe('GP regression', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/optimizer/gp.test.ts`
-Expected: FAIL — `Cannot find module '../../src/optimizer/gp'`.
+Expected: FAIL - `Cannot find module '../../src/optimizer/gp'`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -253,7 +253,7 @@ git commit -m "feat(optimizer): exact Matérn-5/2 Gaussian process (Cholesky, de
 
 ---
 
-### Task 2: `optimizer/bayesopt.ts` — acquisition functions
+### Task 2: `optimizer/bayesopt.ts` - acquisition functions
 
 **Files:**
 - Create: `src/optimizer/bayesopt.ts`
@@ -310,7 +310,7 @@ describe('ucb', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/optimizer/bayesopt.test.ts`
-Expected: FAIL — `Cannot find module '../../src/optimizer/bayesopt'`.
+Expected: FAIL - `Cannot find module '../../src/optimizer/bayesopt'`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -370,7 +370,7 @@ git commit -m "feat(optimizer): EI/UCB acquisition + normal pdf/cdf (A&S erf)" -
 
 ---
 
-### Task 3: `optimizer/bayesopt.ts` — the BO `SearchEngine`
+### Task 3: `optimizer/bayesopt.ts` - the BO `SearchEngine`
 
 **Files:**
 - Modify: `src/optimizer/bayesopt.ts` (append `BoConfig` + `makeBo`)
@@ -426,7 +426,7 @@ describe('makeBo', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/optimizer/bayesopt.test.ts`
-Expected: FAIL — `makeBo` is not exported.
+Expected: FAIL - `makeBo` is not exported.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -508,7 +508,7 @@ git commit -m "feat(optimizer): GP Bayesian-opt SearchEngine over ln(cm/360)" -m
 
 ---
 
-### Task 4: `optimizer/bandit.ts` — UCB1 fallback `SearchEngine`
+### Task 4: `optimizer/bandit.ts` - UCB1 fallback `SearchEngine`
 
 **Files:**
 - Create: `src/optimizer/bandit.ts`
@@ -572,7 +572,7 @@ describe('makeUcb1Bandit', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/optimizer/bandit.test.ts`
-Expected: FAIL — `Cannot find module '../../src/optimizer/bandit'`.
+Expected: FAIL - `Cannot find module '../../src/optimizer/bandit'`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -656,7 +656,7 @@ git commit -m "feat(optimizer): UCB1 bandit fallback over discretized cm/360 arm
 
 ---
 
-### Task 5: `optimizer/objective.ts` — blended objective (per-instrument z-score)
+### Task 5: `optimizer/objective.ts` - blended objective (per-instrument z-score)
 
 **Files:**
 - Create: `src/optimizer/objective.ts`
@@ -693,7 +693,7 @@ describe('trialsToObservations', () => {
     expect(fitPeak(obs).optimalCm360).toBeCloseTo(35, 0);
   });
 
-  it('drops instruments with no spread (≤1 trial or all-equal) — no NaN', () => {
+  it('drops instruments with no spread (≤1 trial or all-equal) - no NaN', () => {
     const trials = [trial('flick', 30, 5), trial('track', 25, 9), trial('track', 40, 9)];
     const obs = trialsToObservations(trials, prof({ flick: 1, track: 1 }));
     expect(obs).toEqual([]);
@@ -726,7 +726,7 @@ describe('trialsToObservations', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/optimizer/objective.test.ts`
-Expected: FAIL — `Cannot find module '../../src/optimizer/objective'`.
+Expected: FAIL - `Cannot find module '../../src/optimizer/objective'`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -778,12 +778,12 @@ Expected: PASS (4 tests).
 ```bash
 npx tsc --noEmit
 git add src/optimizer/objective.ts tests/optimizer/objective.test.ts
-git commit -m "feat(optimizer): blended objective — per-instrument z-score across the sweep" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(optimizer): blended objective - per-instrument z-score across the sweep" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 6: `optimizer/session-controller.ts` — `finalizeReport`
+### Task 6: `optimizer/session-controller.ts` - `finalizeReport`
 
 **Files:**
 - Create: `src/optimizer/session-controller.ts`
@@ -850,7 +850,7 @@ describe('finalizeReport', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/optimizer/session-controller.test.ts`
-Expected: FAIL — `Cannot find module '../../src/optimizer/session-controller'`.
+Expected: FAIL - `Cannot find module '../../src/optimizer/session-controller'`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -875,7 +875,7 @@ export interface FinalizeOptions {
 /**
  * Observations → Report. Fits the peaked psychometric curve, bootstraps the 90% CI, clamps to
  * bounds. If the curve is not concave (flat/ambiguous data), honestly reports the best-observed
- * cm/360 with the FULL bounds as the CI — a wide CI is the honesty signal, never hidden. If a GP
+ * cm/360 with the FULL bounds as the CI - a wide CI is the honesty signal, never hidden. If a GP
  * peak is supplied and disagrees with the curve peak, the CI is widened to span both.
  */
 export function finalizeReport(
@@ -927,12 +927,12 @@ Expected: PASS (4 tests).
 ```bash
 npx tsc --noEmit
 git add src/optimizer/session-controller.ts tests/optimizer/session-controller.test.ts
-git commit -m "feat(optimizer): finalizeReport — psychometric peak + bootstrap CI + honest fallback" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(optimizer): finalizeReport - psychometric peak + bootstrap CI + honest fallback" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 7: `optimizer/session-controller.ts` — `runSession` (the full loop)
+### Task 7: `optimizer/session-controller.ts` - `runSession` (the full loop)
 
 **Files:**
 - Modify: `src/optimizer/session-controller.ts` (update imports; append `SessionConfig`, `SessionOutcome`, `runSession`)
@@ -978,7 +978,7 @@ function instruments(map: Partial<Record<InstrumentId, Instrument>>): Record<Ins
   };
 }
 
-describe('runSession — convergence on synthetic players', () => {
+describe('runSession - convergence on synthetic players', () => {
   it('finds a single instrument latent optimum, with a sub-bounds CI containing the estimate', async () => {
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei', maxTrials: 22 });
     const { report, trials } = await runSession({
@@ -1044,7 +1044,7 @@ describe('runSession — convergence on synthetic players', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/optimizer/session-controller.test.ts`
-Expected: FAIL — `runSession` is not exported.
+Expected: FAIL - `runSession` is not exported.
 
 - [ ] **Step 3: Update the imports**
 
@@ -1093,7 +1093,7 @@ export interface SessionConfig {
   maxTrials: number;
   rng: () => number;
   /** Log-spaced design-of-experiments seeds run before the engine is consulted
-   *  (default max(4, 2×schedule.length) — each scheduled instrument needs ≥2 trials
+   *  (default max(4, 2×schedule.length) - each scheduled instrument needs ≥2 trials
    *  before its z-score has any spread). */
   coldStart?: number;
   /** Earliest trial index at which CI early-stop is allowed (default 8). */
@@ -1159,7 +1159,7 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
 Run: `npx vitest run tests/optimizer/session-controller.test.ts`
 Expected: PASS (7 tests total in the file).
 
-If a convergence bracket fails, do NOT merely widen it — the seeded run is deterministic, so a miss signals a real issue in the objective/GP/loop wiring. Investigate first; only adjust the bracket if the estimate is genuinely correct and the bracket was set too tight.
+If a convergence bracket fails, do NOT merely widen it - the seeded run is deterministic, so a miss signals a real issue in the objective/GP/loop wiring. Investigate first; only adjust the bracket if the estimate is genuinely correct and the bracket was set too tight.
 
 - [ ] **Step 6: Full suite, type-check, and commit**
 
@@ -1167,7 +1167,7 @@ If a convergence bracket fails, do NOT merely widen it — the seeded run is det
 npm test
 npx tsc --noEmit
 git add src/optimizer/session-controller.ts tests/optimizer/session-controller.test.ts
-git commit -m "feat(optimizer): runSession — cold-start → BO loop → blended objective → Report" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(optimizer): runSession - cold-start → BO loop → blended objective → Report" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -1177,7 +1177,7 @@ git commit -m "feat(optimizer): runSession — cold-start → BO loop → blende
 **Files:**
 - Modify: `src/dev/arena-harness.ts`
 
-This proves the full pipeline runs end-to-end through the REAL WebGL arena + REAL instruments + RAF loop in a browser (mirroring Phase 3's `runInstrument` proof). A short auto-fire pulse drives the fire-gated instruments (flick/calibrate/strike) to completion without a human — the recorded misses are genuine (no fabricated measurements), so the resulting `Report` is a real (if low-skill) pipeline output.
+This proves the full pipeline runs end-to-end through the REAL WebGL arena + REAL instruments + RAF loop in a browser (mirroring Phase 3's `runInstrument` proof). A short auto-fire pulse drives the fire-gated instruments (flick/calibrate/strike) to completion without a human - the recorded misses are genuine (no fabricated measurements), so the resulting `Report` is a real (if low-skill) pipeline output.
 
 - [ ] **Step 1: Extend the `ArenaDebug` interface and imports**
 
@@ -1254,10 +1254,10 @@ const report = await window.__arenaDebug.runSession();
 report;
 ```
 
-Expected (the proof — takes ~20–30s as 8 real trials run):
+Expected (the proof - takes ~20–30s as 8 real trials run):
 - Resolves to a `Report` object with:
   - `optimalCm360` finite and within `[18, 50]`,
-  - `ci90` a `[lo, hi]` pair within `[18, 50]` (likely wide — the auto-fire "player" is unskilled, which is honest),
+  - `ci90` a `[lo, hi]` pair within `[18, 50]` (likely wide - the auto-fire "player" is unskilled, which is honest),
   - `curve` a non-empty array of `{ x, mean }`.
 - No exceptions in the console; targets visibly spawn/clear across the run.
 
@@ -1273,13 +1273,13 @@ git commit -m "feat(dev): run a full optimizer session in the arena harness (run
 
 ---
 
-## Self-Review (against the spec, run after writing — fixes applied inline)
+## Self-Review (against the spec, run after writing - fixes applied inline)
 
 **1. Spec coverage (§5 The engine):**
 - §5.2 GP surrogate, Matérn-5/2, noisy nugget → `gp.ts` (Task 1) ✓
 - §5.2 EI `(μ−f⁺−ξ)Φ(Z)+σφ(Z)`, UCB `μ+κσ`, dense 1-D grid, posterior-mean `f⁺` → `bayesopt.ts` (Tasks 2–3) ✓
 - §5.2 cold start 3–5 log-spaced trials → controller `coldStart` (Task 7) ✓ (moved from engine to controller, justified)
-- §5.2 fallback UCB1/Thompson bandit over discretized arms → `bandit.ts` (Task 4); UCB1 implemented, Thompson intentionally omitted (one fallback algorithm suffices — YAGNI; noted here, not silently dropped) ✓
+- §5.2 fallback UCB1/Thompson bandit over discretized arms → `bandit.ts` (Task 4); UCB1 implemented, Thompson intentionally omitted (one fallback algorithm suffices - YAGNI; noted here, not silently dropped) ✓
 - §5.3 peaked curve fit + parametric bootstrap CI + "wide CI is the honesty signal" → `finalizeReport` reuses `stats/psychometric` + `stats/bootstrap`, flat-data fallback = full-bounds CI (Task 6) ✓
 - §5.3 "If GP-peak and curve-peak disagree, widen the CI" → `finalizeReport` `gpPeakCm360` widen (Task 6) ✓
 - §5.4 ~15–30 trials, interleave sensitivities, broad-optimum expectation → `runSession` loop + `maxTrials` + BO interleaving (Task 7) ✓
@@ -1290,17 +1290,17 @@ git commit -m "feat(dev): run a full optimizer session in the arena harness (run
 **2. Placeholder scan:** No TBD/TODO/"handle edge cases"/"similar to". Every code step is complete. ✓
 
 **3. Type consistency:**
-- `GpParams { signalVar, lengthScale, noiseVar }` — identical in `gp.ts`, `bayesopt.ts` (`BoConfig.gp`), tests, harness ✓
-- `SearchEngine.suggest(history, bounds) → Cm360`, `isDone(history) → boolean` — `makeBo` and `makeUcb1Bandit` both conform; bandit omits the unused `bounds` param (assignable) ✓
-- `trialsToObservations(trials, profile) → Observation[]` — same call in `runSession` and tests ✓
-- `finalizeReport(obs, bounds, rng, opts?) → Report` — same in Task 6/7 and tests ✓
-- `Report { optimalCm360, ci90:[lo,hi], curve:{x,mean}[] }` — matches `types.ts` exactly ✓
+- `GpParams { signalVar, lengthScale, noiseVar }` - identical in `gp.ts`, `bayesopt.ts` (`BoConfig.gp`), tests, harness ✓
+- `SearchEngine.suggest(history, bounds) → Cm360`, `isDone(history) → boolean` - `makeBo` and `makeUcb1Bandit` both conform; bandit omits the unused `bounds` param (assignable) ✓
+- `trialsToObservations(trials, profile) → Observation[]` - same call in `runSession` and tests ✓
+- `finalizeReport(obs, bounds, rng, opts?) → Report` - same in Task 6/7 and tests ✓
+- `Report { optimalCm360, ci90:[lo,hi], curve:{x,mean}[] }` - matches `types.ts` exactly ✓
 - `clamp` defined once (Task 6), reused by `runSession` (Task 7, same file) ✓
-- `Instrument.run(ctx, scene)` — synthetic test instruments implement `run(ctx)` (fewer params, assignable); real path passes `arena` ✓
+- `Instrument.run(ctx, scene)` - synthetic test instruments implement `run(ctx)` (fewer params, assignable); real path passes `arena` ✓
 
 **4. Forward notes for Phase 5 (Shell + flow + state):**
 - The shell wires `setup` (DPI + goal slider → `Profile.speedAccuracy` + `instrumentWeights`) → `runSession(config)` with the real `INSTRUMENTS`, real `Arena` scene, and a live `onFrame`-driven convergence plot reading `report.curve` (x = ln cm/360 → `Math.exp` for display).
-- `runSession` currently `await`s instruments back-to-back; Phase 5 may want per-trial progress callbacks (`onTrial(result)`) for the live HUD — add an optional `onTrial?` to `SessionConfig` rather than changing the return shape.
+- `runSession` currently `await`s instruments back-to-back; Phase 5 may want per-trial progress callbacks (`onTrial(result)`) for the live HUD - add an optional `onTrial?` to `SessionConfig` rather than changing the return shape.
 - `Result` (in `types.ts`) needs the per-game table + breakdown `{ biasZeroCm360, precisionFloorDeg, ttkMs, hitRate }`. Source estimators from `trials`: `biasZeroCm360` = calibrate `gain` crossing 1 (interpolate the gain-vs-ln(cm360) trials); `precisionFloorDeg` = min calibrate `sigmaR`; `ttkMs`/`hitRate` = strike `raw` at the reported optimum. Build a `optimizer/breakdown.ts` (pure) in Phase 5.
 - The GP/curve disagreement widen is plumbed but unused by `runSession` (no `gpPeakCm360` passed). Phase 5 (or a Task-7 follow-up) can compute the GP grid-argmax over the final objective and pass it for a more honest CI; kept optional to keep the core loop decoupled from the GP.
 - Tunables that may want per-profile adaptation later: GP `{signalVar, lengthScale, noiseVar}`, `coldStart`, `ciStopWidth`, `maxTrials`, bandit `arms`. All are config, no magic constants buried in logic.

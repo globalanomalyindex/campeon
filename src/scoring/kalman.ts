@@ -1,6 +1,6 @@
 /** Constant-velocity Kalman filter parameters. */
 export interface KalmanCVParams {
-  /** Process-noise spectral density (deg²/s³) — how much the model lets velocity drift. */
+  /** Process-noise spectral density (deg²/s³) - how much the model lets velocity drift. */
   q: number;
   /** Measurement-noise variance (deg²). */
   r: number;
@@ -9,9 +9,9 @@ export interface KalmanCVParams {
 export interface KalmanCVInit {
   pos?: number;
   vel?: number;
-  /** Initial position variance. Default 1e3 — a diffuse prior for an unknown initial state. */
+  /** Initial position variance. Default 1e3 - a diffuse prior for an unknown initial state. */
   posVar?: number;
-  /** Initial velocity variance. Default 1e3 — a diffuse prior for an unknown initial velocity. */
+  /** Initial velocity variance. Default 1e3 - a diffuse prior for an unknown initial velocity. */
   velVar?: number;
 }
 
@@ -20,7 +20,7 @@ export interface KalmanCVInit {
  *   F(dt) = [[1, dt], [0, 1]], H = [1, 0]
  *   Q = q · [[dt³/3, dt²/2], [dt²/2, dt]]  (continuous white-noise-acceleration model)
  * Covariance P stored as the four scalars p00 p01 p10 p11.
- * `update(z)` returns the innovation ν = z − pos⁻ — the filter's one-step prediction residual for the
+ * `update(z)` returns the innovation ν = z − pos⁻ - the filter's one-step prediction residual for the
  * tracked signal. NB: when this filter tracks the *target* (as in the track instrument), ν is a
  * property of the target's motion and the model, NOT of the player, so it is not the player's
  * tracking score; the player-dependent metric is the lag-compensated residual in track.ts.

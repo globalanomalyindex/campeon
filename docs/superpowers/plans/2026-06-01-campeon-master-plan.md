@@ -1,8 +1,8 @@
-# campeón — Master Implementation Plan (Index)
+# campeón - Master Implementation Plan (Index)
 
 > **For agentic workers:** This is the architecture + contract index. Each **phase** has its own detailed task plan (`2026-06-01-campeon-phase-N-*.md`) using checkbox (`- [ ]`) steps. REQUIRED SUB-SKILL to execute any phase: `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans`.
 
-**Goal:** Build `campeón`, a client-side web app that finds an FPS player's optimal mouse sensitivity (in cm/360) via four bio-inspired aim instruments, a Fitts/Kalman scorer, a Bayesian-optimization search, and a psychometric report — translated to native per-game sensitivities.
+**Goal:** Build `campeón`, a client-side web app that finds an FPS player's optimal mouse sensitivity (in cm/360) via four bio-inspired aim instruments, a Fitts/Kalman scorer, a Bayesian-optimization search, and a psychometric report - translated to native per-game sensitivities.
 
 **Architecture:** A pure, unit-tested core (`convert`, `scoring`, `optimizer`, `stats`) that knows nothing about the DOM or Three.js, wrapped by an `engine` (Three.js arena + raw input) and a `ui` shell. Everything optimizes one scalar, `cm/360`; the per-game yaw table only converts at the input/output edges. State is local (`localStorage`) behind a `Storage` interface.
 
@@ -14,7 +14,7 @@
 
 ## Quality bar (this is a design-engineer portfolio piece)
 
-Every phase is held to both axes — engineering *and* design:
+Every phase is held to both axes - engineering *and* design:
 - Pure-core modules are TDD'd against published formulas; tests are meaningful, not coverage theater.
 - `strict` TS, no `any` in core, typed boundaries, no dead code, legible commit history (one feature/fix per commit).
 - Arena holds 60fps+; input handled per-frame with no lost counts; shell transitions are smooth.
@@ -36,7 +36,7 @@ campeon/
 │  └─ fonts/                       # Gefalent OTF/TTF (Regular, Italic)
 ├─ src/
 │  ├─ main.ts                      # app entry; mounts shell, routes screens
-│  ├─ types.ts                     # SHARED CONTRACTS (see below) — single source of truth
+│  ├─ types.ts                     # SHARED CONTRACTS (see below) - single source of truth
 │  ├─ convert/                     # PURE · cm/360 math + per-game yaw
 │  │  ├─ cm360.ts                  # cmPer360, sensFor, crossGame
 │  │  ├─ yaw-table.ts              # GAME_YAW: verified yaw constants + caveats
@@ -188,7 +188,7 @@ Each phase is an independent, working, testable increment. Detailed task plans a
 
 | # | Phase | Builds | Deliverable (working + testable) | Depends on |
 |---|---|---|---|---|
-| **1** | **Foundations** | scaffold, brand tokens + Gefalent, `convert/`, `stats/` | Vite app boots with brand tokens; `convert` + `stats` pass full unit tests against published formulas | — |
+| **1** | **Foundations** | scaffold, brand tokens + Gefalent, `convert/`, `stats/` | Vite app boots with brand tokens; `convert` + `stats` pass full unit tests against published formulas | - |
 | **2** | **Input fidelity + engine** *(highest risk)* | `input/`, `engine/` | A pointer-locked Three.js arena you can mouse-look in at a set cm/360; accel-check gate works; raw vs os-adjusted detected; DPR-normalized | 1 |
 | **3** | **Instruments + scoring** | `scoring/`, `instruments/` | Each of the 4 instruments runs a trial in the arena and returns a scored `TrialResult`; scorers unit-tested | 1, 2 |
 | **4** | **Optimizer + session** | `optimizer/` | A full ~15–30-trial session: suggest cm/360 → run instrument → score → fit → `Report` with CI; converges on synthetic players in tests | 1, 3 |
@@ -196,21 +196,21 @@ Each phase is an independent, working, testable increment. Detailed task plans a
 | **6** | **Polish** | motion, `case-study/`, QA | 60fps pass, micro-interactions, the science page with citations, a11y + reduced-motion, error/empty states | 5 |
 
 **Deferred tracks (post-core, separate plans):**
-- **Falcon motion** — wing flap + parallax sky occluded by the wing silhouette (reduced-motion aware).
-- **PSX arena skin** — low-res abyss → 2D-sprite run-and-gun (chrome Desert Eagle, ULTRAKILL), driven by supplied sprites.
+- **Falcon motion** - wing flap + parallax sky occluded by the wing silhouette (reduced-motion aware).
+- **PSX arena skin** - low-res abyss → 2D-sprite run-and-gun (chrome Desert Eagle, ULTRAKILL), driven by supplied sprites.
 
 ---
 
 ## Execution model
 
 - Build on a feature branch (not `main`); each phase may use a git worktree (`superpowers:using-git-worktrees`) when run by parallel agents.
-- Per-phase: dispatch via `superpowers:subagent-driven-development` — fresh subagent per task, two-stage review between tasks, TDD throughout.
+- Per-phase: dispatch via `superpowers:subagent-driven-development` - fresh subagent per task, two-stage review between tasks, TDD throughout.
 - After each phase: verify the deliverable runs, commit, then write the next phase's detailed plan.
 
 ---
 
 ## Self-review (index level)
 
-- **Spec coverage:** every spec section maps to a phase — instruments §4→P3, engine §5→P4, input §6→P2, conversion §7→P1, architecture §8→all, flow §9→P5, visual identity §10→P5/P6, phasing §11→this roadmap, success criteria §12→P6 + per-phase tests. No section uncovered.
+- **Spec coverage:** every spec section maps to a phase - instruments §4→P3, engine §5→P4, input §6→P2, conversion §7→P1, architecture §8→all, flow §9→P5, visual identity §10→P5/P6, phasing §11→this roadmap, success criteria §12→P6 + per-phase tests. No section uncovered.
 - **Contract consistency:** all phase plans import names from `src/types.ts`; this index is the single source for type/signature names.
 - Detailed per-phase plans follow; each is self-reviewed against the spec when written.

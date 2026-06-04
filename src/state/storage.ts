@@ -1,6 +1,6 @@
 import type { Result, Session, Storage } from '../types';
 
-/** Minimal key/value surface — satisfied by window.localStorage and by test fakes. */
+/** Minimal key/value surface - satisfied by window.localStorage and by test fakes. */
 export interface KvBackend {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;

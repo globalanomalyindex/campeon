@@ -43,8 +43,8 @@ function fallbackReport(obs: readonly Observation[], lo: Cm360, hi: Cm360): Repo
 
 /**
  * Observations → Report. Fits the parabolic performance curve, bootstraps the 90% CI, clamps to
- * bounds. When no peak can be located — too few points (<3), a non-concave fit, or a singular
- * /degenerate design — it honestly reports the best-observed cm/360 with the FULL bounds as the CI;
+ * bounds. When no peak can be located - too few points (<3), a non-concave fit, or a singular
+ * /degenerate design - it honestly reports the best-observed cm/360 with the FULL bounds as the CI;
  * a wide CI is the honesty signal, never hidden. Unexpected errors are re-thrown, not masked. If a
  * GP peak is supplied and disagrees with the curve peak, the CI is widened to span both (spec §5.3).
  */
@@ -63,7 +63,7 @@ export function finalizeReport(
     fit = fitPeak([...obs]);
   } catch (err) {
     // Expected: "not concave" (no interior peak) or "singular matrix" (degenerate design) → the
-    // data cannot locate a peak, so report honestly. Anything else is a real bug — re-throw it.
+    // data cannot locate a peak, so report honestly. Anything else is a real bug - re-throw it.
     if (!(err instanceof Error) || !/not concave|singular/.test(err.message)) throw err;
     return fallbackReport(obs, lo, hi);
   }
@@ -96,13 +96,13 @@ export interface SessionConfig {
   /** Cycled one-per-trial; e.g. ['track','flick','calibrate','strike']. */
   schedule: InstrumentId[];
   maxTrials: number;
-  /** Shared RNG stream — consumed by the instruments AND the early-stop/final bootstraps, so
+  /** Shared RNG stream - consumed by the instruments AND the early-stop/final bootstraps, so
    *  changing `ciStopWidth` or `bootstrapIters` perturbs the (still deterministic) noise sequence
    *  later trials see. Fine for an offline session; just don't expect identical early trials when
    *  only the stop criterion differs. */
   rng: () => number;
   /** Log-spaced design-of-experiments seeds run before the engine is consulted
-   *  (default max(4, 2×schedule.length) — each scheduled instrument needs ≥2 trials
+   *  (default max(4, 2×schedule.length) - each scheduled instrument needs ≥2 trials
    *  before its z-score has any spread). */
   coldStart?: number;
   /** Earliest trial index at which CI early-stop is allowed (default 8). */
@@ -111,9 +111,9 @@ export interface SessionConfig {
   ciStopWidth?: Cm360;
   /** Bootstrap resamples for early-stop checks and the final report (default 400). */
   bootstrapIters?: number;
-  /** Fired before each trial's instrument runs — for a live "now: +flick" HUD. */
+  /** Fired before each trial's instrument runs - for a live "now: +flick" HUD. */
   onTrialStart?: (id: InstrumentId, index: number, cm360: Cm360) => void;
-  /** Fired after each trial with the trial, all trials so far, and a cheap interim Report — for the
+  /** Fired after each trial with the trial, all trials so far, and a cheap interim Report - for the
    *  live convergence view. The interim bootstrap uses its OWN seeded RNG, so setting this never
    *  perturbs the (deterministic) instrument-noise stream. */
   onTrial?: (trial: TrialResult, trials: readonly TrialResult[], interim: Report) => void;
@@ -160,7 +160,7 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
       const interim = finalizeReport(
         trialsToObservations(trials, profile),
         bounds,
-        mulberry32(0x5eed ^ trials.length), // own stream — does NOT touch the instrument RNG
+        mulberry32(0x5eed ^ trials.length), // own stream - does NOT touch the instrument RNG
         { bootstrapIters: config.interimBootstrapIters ?? 120 },
       );
       config.onTrial(result, trials, interim);

@@ -3,7 +3,7 @@ import type { Cm360, Degrees, Ms, TrialResult } from '../types';
 export interface Breakdown {
   /** cm/360 where the calibrate gain crosses 1 (the bias-zero sensitivity, spec §4.3). */
   biasZeroCm360: Cm360;
-  /** Minimum calibrate σ_R observed — the precision floor (skill/hardware), not a recommendation. */
+  /** Minimum calibrate σ_R observed - the precision floor (skill/hardware), not a recommendation. */
   precisionFloorDeg: Degrees;
   /** Strike time-to-kill at the optimum. */
   ttkMs: Ms;

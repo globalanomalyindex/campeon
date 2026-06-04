@@ -92,7 +92,7 @@ describe('track.run', () => {
     expect(r.at).toBeGreaterThan(0);
   });
 
-  it('spawns the prey around the current view — not the world origin — so it is on-screen when the view has drifted', () => {
+  it('spawns the prey around the current view - not the world origin - so it is on-screen when the view has drifted', () => {
     const scene = new FakeScene();
     scene.view_ = [50, 12]; // the view drifts between trials; the prior trial left it here
     void track.run(ctx(), scene);

@@ -4,7 +4,7 @@ import { Arena, type EnemyLayer, type InputSource, type RendererLike } from '../
 import type { AimSample, TargetHandle } from '../../src/types';
 import { mulberry32 } from '../../src/stats/bootstrap';
 
-/** Records every cosmetic call the arena drives — proves the hooks fire without touching scoring. */
+/** Records every cosmetic call the arena drives - proves the hooks fire without touching scoring. */
 class FakeEnemyLayer implements EnemyLayer {
   attached = 0;
   spawned: string[] = [];
@@ -77,7 +77,7 @@ describe('Arena ↔ cosmetic EnemyLayer wiring', () => {
     const h = harness(true);
     const handle = h.arena.spawnTarget(SPEC);
     expect(h.layer.spawned).toEqual([handle.id]);
-    // The sphere is hidden — the skin owns the visuals now.
+    // The sphere is hidden - the skin owns the visuals now.
     const mesh = (handle as unknown as { mesh: Object3D }).mesh;
     expect(mesh.visible).toBe(false);
   });

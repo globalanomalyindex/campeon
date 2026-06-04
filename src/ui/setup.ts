@@ -24,8 +24,8 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
           <label class="field">current in-game sensitivity
             <input class="mono" type="number" min="0.01" step="0.01" data-field="sens" value="${d.currentSens}">
           </label>
-          <p class="setup__readout">you sit at <span class="mono" data-readout="cm360">—</span> cm/360 today</p>
-          <label class="field">goal — precision ↔ speed
+          <p class="setup__readout">you sit at <span class="mono" data-readout="cm360">-</span> cm/360 today</p>
+          <label class="field">goal - precision ↔ speed
             <input type="range" min="0" max="1" step="0.01" data-field="goal" value="${d.profile.speedAccuracy}">
             <span class="setup__goalhint mono" data-readout="goal"></span>
           </label>
@@ -43,7 +43,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
       const refresh = (): void => {
         const dpi = Number(dpiEl.value), sens = Number(sensEl.value);
         const yaw = yawFor(gameEl.value as GameId);
-        cmOut.textContent = dpi > 0 && sens > 0 ? cmPer360(dpi, sens, yaw).toFixed(1) : '—';
+        cmOut.textContent = dpi > 0 && sens > 0 ? cmPer360(dpi, sens, yaw).toFixed(1) : '-';
         const g = Number(goalEl.value);
         goalOut.textContent = g >= 0.66 ? 'speed-first' : g <= 0.34 ? 'precision-first' : 'balanced';
       };

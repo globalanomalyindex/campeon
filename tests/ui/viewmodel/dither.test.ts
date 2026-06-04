@@ -20,7 +20,7 @@ function flat(w: number, h: number, value: number, alpha = 255): Uint8ClampedArr
   return d;
 }
 
-describe('orderedDither — Bayer dither + posterize', () => {
+describe('orderedDither - Bayer dither + posterize', () => {
   it('snaps every channel to one of the levels+1 quantization values', () => {
     const allowed = new Set(quantLevels(6)); // {0,43,85,128,170,213,255}
     // a ramp of inputs across the full range, on a 4×4 tile so all Bayer cells are exercised
@@ -59,7 +59,7 @@ describe('orderedDither — Bayer dither + posterize', () => {
     for (let i = 7; i < d.length; i += 4) expect(d[i]).toBe(0);
   });
 
-  it('is deterministic — same buffer in, same buffer out', () => {
+  it('is deterministic - same buffer in, same buffer out', () => {
     const a = orderedDither(flat(8, 8, 99), 8, 8);
     const b = orderedDither(flat(8, 8, 99), 8, 8);
     expect(Array.from(a)).toEqual(Array.from(b));
