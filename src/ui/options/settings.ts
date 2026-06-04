@@ -28,3 +28,9 @@ export function effectiveYaw(id: GameId, overrides: YawOverrides): number {
 export function effectiveYawTable(overrides: YawOverrides): YawEntry[] {
   return GAME_YAW.map((e) => ({ ...e, yaw: effectiveYaw(e.id, overrides) }));
 }
+
+/** Center the optimizer's search window on a seed cm/360 (the comfortable turn), clamped to sane bounds. */
+export function boundsFromSeed(seed: Cm360, factor = 1.7): [Cm360, Cm360] {
+  if (!Number.isFinite(seed) || seed <= 0) return [...DEFAULT_BOUNDS];
+  return normalizeBounds(seed / factor, seed * factor);
+}

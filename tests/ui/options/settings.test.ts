@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeBounds, effectiveYaw, effectiveYawTable, DEFAULT_BOUNDS } from '../../../src/ui/options/settings';
+import { normalizeBounds, effectiveYaw, effectiveYawTable, DEFAULT_BOUNDS, boundsFromSeed } from '../../../src/ui/options/settings';
 
 describe('options settings helpers', () => {
   it('normalizeBounds orders, clamps to [5,150], guarantees a >=5 span, and never inverts', () => {
@@ -26,5 +26,26 @@ describe('options settings helpers', () => {
     const t = effectiveYawTable({ valorant: 0.08 });
     expect(t.find((e) => e.id === 'valorant')!.yaw).toBeCloseTo(0.08, 6);
     expect(t.find((e) => e.id === 'cs2')!.yaw).toBeCloseTo(0.022, 6);
+  });
+});
+
+describe('boundsFromSeed', () => {
+  it('centers a window on the seed within sane bounds', () => {
+    const [lo, hi] = boundsFromSeed(30); // 30/1.7=17.6 .. 30*1.7=51
+    expect(lo).toBeCloseTo(17.65, 1);
+    expect(hi).toBeCloseTo(51, 1);
+    expect(lo).toBeGreaterThanOrEqual(5);
+    expect(hi).toBeLessThanOrEqual(150);
+  });
+
+  it('clamps a tiny seed to the minimum span', () => {
+    const [lo, hi] = boundsFromSeed(3);
+    expect(lo).toBe(5);
+    expect(hi - lo).toBeGreaterThanOrEqual(5);
+  });
+
+  it('falls back to the default window for a bad seed', () => {
+    expect(boundsFromSeed(NaN)).toEqual(DEFAULT_BOUNDS);
+    expect(boundsFromSeed(0)).toEqual(DEFAULT_BOUNDS);
   });
 });
