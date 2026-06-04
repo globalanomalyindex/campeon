@@ -207,6 +207,17 @@ export class Arena implements ArenaScene {
     this.moving.clear();
   }
 
+  /** Remove a single target by id (range free-play retires killed targets one at a time). Safe no-op
+   *  if the id is unknown. The cosmetic merc death persists in the enemy layer's fade-out set. */
+  removeTarget(id: string): void {
+    const target = this.targets.get(id);
+    if (!target) return;
+    this.scene.remove(target.mesh);
+    if (target instanceof MovingTarget) this.moving.delete(target);
+    target.dispose();
+    this.targets.delete(id);
+  }
+
   onAim(cb: AimCallback): () => void {
     this.aimCbs.add(cb);
     return () => {
