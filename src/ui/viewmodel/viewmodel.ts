@@ -3,6 +3,7 @@ import { ViewmodelController } from './controller';
 import { keyMagenta, despillMagenta } from './key';
 import { orderedDither } from './dither';
 import { kick, restSway, stepSway, type SwayState } from './sway';
+import { punch, restRecoil, stepRecoil, type RecoilState } from './recoil';
 
 const SHEET_URL = '/sprites/deagle.png';
 
@@ -15,6 +16,8 @@ export interface Viewmodel {
   tick(nowMs: number): void;
   /** Nudge the weapon-sway spring by a camera look delta (degrees). Cosmetic; no-op under reduced motion. */
   look(dYawDeg: number, dPitchDeg: number): void;
+  /** Fire the gun: play the muzzle animation + a recoil punch. Cosmetic; no-op recoil under reduced motion. */
+  fire(): void;
   dispose(): void;
 }
 
@@ -33,6 +36,7 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
   const reduced = opts.reducedMotion ?? false;
   const ctrl = new ViewmodelController(opts.initial ?? 'smoking', 0);
   let sway: SwayState = restSway(); // weapon-sway offset (normalized); stepped each tick, kicked on look
+  let recoil: RecoilState = restRecoil(); // fire-driven snap, summed with sway in draw
   let lastMs = 0;
 
   // Load the sheet and key its magenta background to transparency, once, into an offscreen source.
@@ -77,16 +81,19 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
   resize();
   window.addEventListener('resize', resize);
 
+  const BACK_SCALE_K = 0.12; // how much a backward lunge enlarges the gun
+  const RECOIL_ROLL_K = 0.5; // muzzle-rise tilt (rad) per unit recoil
   const draw = (nowMs: number): void => {
     const { rect } = ctrl.frameAt(nowMs);
     ctx.clearRect(0, 0, el.width, el.height);
-    // Anchor lower-right (CS:Source), offset by the sway spring for a parallax / weight feel.
-    const destH = el.height * 0.66;
+    // Anchor lower-right (CS:Source); offset by sway (parallax) + recoil (fire punch). Both cosmetic.
+    const lunge = 1 + recoil.back * BACK_SCALE_K; // brief scale-up on fire (muzzle lunges at the viewer)
+    const destH = el.height * 0.66 * lunge;
     const destW = destH * (rect.sw / rect.sh);
     const cx = el.width * 0.72 + sway.x * el.width; // horizontal centre (right of screen centre) + sway
     const dx = cx - destW / 2;
-    const dy = el.height - destH + sway.y * el.height;
-    const roll = sway.x * 0.6; // subtle barrel tilt (rad) — sells the depth
+    const dy = el.height - destH + sway.y * el.height - recoil.y * el.height; // recoil kicks the gun up
+    const roll = sway.x * 0.6 + recoil.y * RECOIL_ROLL_K; // barrel tilt: sway + a touch of muzzle rise
     ctx.save();
     ctx.translate(cx, dy + destH); // pivot at the grip (bottom of the gun)
     ctx.rotate(roll);
@@ -108,10 +115,16 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
       const dt = lastMs === 0 ? 1 / 60 : Math.min(0.05, (nowMs - lastMs) / 1000);
       lastMs = nowMs;
       sway = stepSway(sway, dt);
+      recoil = stepRecoil(recoil, dt);
       draw(nowMs);
     },
     look(dYawDeg, dPitchDeg) {
       if (!reduced) sway = kick(sway, dYawDeg, dPitchDeg);
+    },
+    fire() {
+      ctrl.play('fire', performance.now(), 'idleReady');
+      if (!reduced) recoil = punch(recoil);
+      if (reduced) draw(0); // static fire frame, no animated recoil
     },
     dispose() {
       window.removeEventListener('resize', resize);
