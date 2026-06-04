@@ -91,4 +91,16 @@ describe('track.run', () => {
     expect(Number.isFinite(r.score)).toBe(true);
     expect(r.at).toBeGreaterThan(0);
   });
+
+  it('spawns the prey around the current view — not the world origin — so it is on-screen when the view has drifted', () => {
+    const scene = new FakeScene();
+    scene.view_ = [50, 12]; // the view drifts between trials; the prior trial left it here
+    void track.run(ctx(), scene);
+    const moving = scene.spawned.find((s) => s.kind === 'moving');
+    expect(moving).toBeDefined();
+    // The base placement must track the current view (the ±12°/±5° weave then keeps it on-screen).
+    // The old code hard-coded yaw:0,pitch:0, so the prey could start far off-screen → garbage tracking.
+    expect(moving!.yaw).toBeCloseTo(50);
+    expect(moving!.pitch).toBeCloseTo(12);
+  });
 });

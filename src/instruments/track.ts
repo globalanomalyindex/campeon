@@ -171,10 +171,15 @@ export const track = {
   run(ctx: TrialContext, scene: ArenaScene): Promise<TrialResult> {
     scene.setSensitivity(ctx.cm360, ctx.dpi);
     const seed = Math.floor(ctx.rng() * 1e9);
+    // Centre the weaving prey on where the player is currently looking → it starts on-screen and the
+    // ±12°/±5° weave keeps it there. The view drifts between trials, so the old absolute origin
+    // (yaw:0,pitch:0) could spawn the prey off-screen and the early frames would record the player
+    // HUNTING for it, not tracking it — corrupting the dragonfly/falcon reading.
+    const [vYaw, vPitch] = scene.view();
     const handle = scene.spawnTarget({
       kind: 'moving',
-      yaw: 0,
-      pitch: 0,
+      yaw: vYaw,
+      pitch: Math.max(-80, Math.min(80, vPitch)),
       distance: 20,
       worldRadius: 0.6,
       motion: { yawAmp: 12, pitchAmp: 5, baseFreq: 0.5, seed },
