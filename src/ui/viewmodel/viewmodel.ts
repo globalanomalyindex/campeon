@@ -1,6 +1,6 @@
 import { SHEET, type AnimName } from './atlas';
 import { ViewmodelController } from './controller';
-import { keyMagenta } from './key';
+import { keyMagenta, despillMagenta } from './key';
 import { orderedDither } from './dither';
 import { kick, restSway, stepSway, type SwayState } from './sway';
 
@@ -46,8 +46,18 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
   if (!octx) throw new Error('viewmodel: 2D context unavailable');
   octx.drawImage(img, 0, 0);
   const data = octx.getImageData(0, 0, SHEET.w, SHEET.h);
-  keyMagenta(data.data);
+  // Gun-scoped chroma cleanup: the Deagle palette has no true magenta (chrome / gold / smoke / gunmetal),
+  // so we can key more generously than the shared default — a tighter green gate (gMax 175) takes the
+  // bright anti-aliased pink boundary fully transparent. (The enemy sheets keep the conservative default
+  // key since their Deadpool palette may include legit pink/red.) Then despill twice: once now to
+  // neutralize the deeper magenta cast the key can't safely reach (in full colour → best luminance), and
+  // once AFTER the dither to mop up the faint cast the 6-level posterizer re-creates on near-white
+  // highlights (it rounds R/B up to 255 while G drops a level, manufacturing pink from neutral). The
+  // pair drives residual magenta to zero without touching the warm gold glint.
+  keyMagenta(data.data, { gMax: 175 });
+  despillMagenta(data.data);
   orderedDither(data.data, SHEET.w, SHEET.h); // bake the PS1 dither+posterize so the gun matches the arena
+  despillMagenta(data.data);
   octx.putImageData(data, 0, 0);
 
   const el = document.createElement('canvas');
