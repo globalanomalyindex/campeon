@@ -21,7 +21,7 @@ export interface AppContext {
   route: Route;
   storage: Storage;
   draft: SessionDraft;
-  lastResult?: { sessionId: string; result: Result; tuned?: boolean };
+  lastResult?: { sessionId: string; result: Result };
 }
 
 export type ScreenFactory = (host: HTMLElement, ctx: AppContext) => Screen;

@@ -43,6 +43,8 @@ export interface EnemyLayer {
   fire(nowMs: Ms, view: [Degrees, Degrees], targets: ReadonlyArray<TargetHandle>): void;
   /** Remove all live sprites (per trial). */
   clear(): void;
+  /** Retire a single live sprite by id (range free-play removes targets one at a time; no-op if absent). */
+  remove?(id: string): void;
   dispose(): void;
 }
 
@@ -208,7 +210,9 @@ export class Arena implements ArenaScene {
   }
 
   /** Remove a single target by id (range free-play retires killed targets one at a time). Safe no-op
-   *  if the id is unknown. The cosmetic merc death persists in the enemy layer's fade-out set. */
+   *  if the id is unknown. A clean-hit merc death already lives on in the layer's fade-out set; the
+   *  `enemies.remove` call also retires a still-live sprite (e.g. under reduced motion, where `fire()`
+   *  never moved it to fade-outs) so none are left frozen on screen. */
   removeTarget(id: string): void {
     const target = this.targets.get(id);
     if (!target) return;
@@ -216,6 +220,7 @@ export class Arena implements ArenaScene {
     if (target instanceof MovingTarget) this.moving.delete(target);
     target.dispose();
     this.targets.delete(id);
+    this.enemies?.remove?.(id);
   }
 
   onAim(cb: AimCallback): () => void {

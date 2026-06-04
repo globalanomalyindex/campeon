@@ -189,6 +189,11 @@ export async function createEnemyLayer(
       onShot?.(best); // 'miss' → the HUD flashes a miss tick; 'graze'/'kill' → the merc itself reacts
     },
 
+    remove(id: string): void {
+      const rec = enemies.get(id);
+      if (rec) retire(id, rec); // a still-live record (e.g. reduced motion, where fire() never fades it out)
+    },
+
     clear(): void {
       for (const [id, rec] of enemies) retire(id, rec);
       enemies.clear();

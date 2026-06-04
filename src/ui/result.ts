@@ -10,7 +10,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
   return {
     mount() {
       if (!r) { ctx.navigate('hero'); return; }
-      const tuned = ctx.lastResult?.tuned ?? false;
+      const tuned = r.tuned ?? false;
       const root = document.createElement('section');
       root.className = 'screen screen--shell result fade-in';
       const rows = GAME_YAW.map((g) => {

@@ -24,4 +24,17 @@ describe('Arena.removeTarget', () => {
     expect(() => arena.tick(16)).not.toThrow();
     arena.dispose();
   });
+
+  it('notifies the enemy layer to retire the matching sprite (no orphaned mercs under reduced motion)', () => {
+    const arena = makeArena();
+    const removed: string[] = [];
+    arena.attachEnemies({
+      attach() {}, spawn() {}, update() {}, fire() {}, clear() {}, dispose() {},
+      remove(id: string) { removed.push(id); },
+    });
+    const t = arena.spawnTarget({ kind: 'static', yaw: 0, pitch: 0, distance: 20 });
+    arena.removeTarget(t.id);
+    expect(removed).toEqual([t.id]);
+    arena.dispose();
+  });
 });

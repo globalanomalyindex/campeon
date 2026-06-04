@@ -13,5 +13,6 @@ export function adoptResult(measured: Result, adoptedCm360: Cm360, dpi: Dpi): Re
     ...measured,
     optimalCm360: adoptedCm360,
     perGameSens: perGameSens(adoptedCm360, dpi),
+    tuned: true,
   };
 }

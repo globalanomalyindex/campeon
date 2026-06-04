@@ -100,6 +100,9 @@ export interface Result {
   ci90: [Cm360, Cm360];
   perGameSens: Partial<Record<GameId, number>>;
   breakdown: { biasZeroCm360: Cm360; precisionFloorDeg: Degrees; ttkMs: Ms; hitRate: number };
+  /** Set when the number was hand-picked in the range, not measured. The result screen drops the 90% CI
+   *  (a hand-picked value has no measured CI) and the exported JSON is self-describing (honesty). */
+  tuned?: boolean;
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────

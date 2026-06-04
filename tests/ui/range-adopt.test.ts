@@ -17,6 +17,10 @@ describe('adoptResult', () => {
     expect(tuned.perGameSens).toEqual(perGameSens(42, 800));
     expect(tuned.perGameSens).not.toEqual(measured.perGameSens);
   });
+  it('flags the result tuned (so the screen drops the CI and the export is self-describing)', () => {
+    expect(adoptResult(measured, 42, 800).tuned).toBe(true);
+    expect(measured.tuned).toBeUndefined(); // the measured result is never retroactively flagged
+  });
   it('keeps the measured breakdown (characterizes the measured run, not the hand-picked value)', () => {
     const tuned = adoptResult(measured, 42, 800);
     expect(tuned.breakdown).toEqual(measured.breakdown);

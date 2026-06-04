@@ -69,12 +69,12 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
       root.querySelector('[data-range="exit"]')!.addEventListener('click', () => ctx.navigate('result'));
       root.querySelector('[data-range="reset"]')!.addEventListener('click', () => {
         applyCm(measuredCm360);
-        ctx.lastResult = { sessionId, result: measured, tuned: false };
+        ctx.lastResult = { sessionId, result: measured };
         ctx.storage.saveResult(sessionId, measured);
       });
       root.querySelector('[data-range="adopt"]')!.addEventListener('click', () => {
-        const tunedResult = adoptResult(measured, current, dpi);
-        ctx.lastResult = { sessionId, result: tunedResult, tuned: true };
+        const tunedResult = adoptResult(measured, current, dpi); // carries tuned: true
+        ctx.lastResult = { sessionId, result: tunedResult };
         ctx.storage.saveResult(sessionId, tunedResult);
         ctx.navigate('result');
       });

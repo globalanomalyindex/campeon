@@ -75,7 +75,7 @@ describe('result screen', () => {
   it('drops the CI and labels "tuned by feel" when the result is adopted', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
-    ctx.lastResult = { sessionId: 's1', result: RESULT, tuned: true };
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, tuned: true } };
     resultScreen(host, ctx).mount();
     expect(host.querySelector('[data-result="ci"]')).toBeNull();
     expect(host.textContent).toContain('tuned by feel');
