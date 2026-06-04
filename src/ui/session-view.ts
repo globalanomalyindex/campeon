@@ -1,16 +1,10 @@
-import { WebGLRenderer } from 'three';
-import { Arena, type InputSource } from '../engine/arena';
-import { createPsxPass } from '../engine/psx-pass';
-import { createPointerLock } from '../input/pointer-lock';
 import { makeEvolution } from '../optimizer/evolution';
 import { runSession } from '../optimizer/session-controller';
 import { buildResult } from '../optimizer/result';
 import { INSTRUMENTS } from '../instruments/registry';
 import { mulberry32 } from '../stats/rng';
 import { plotGeometry, renderConvergencePlot, type PlotMark } from './convergence-plot';
-import { createViewmodel, type Viewmodel } from './viewmodel/viewmodel';
-import { createEnemyLayer, type EnemyLayerHandle } from './enemy/enemy-layer';
-import { createShotFeedback } from './feedback';
+import { createArenaStage } from './arena-stage';
 import type { AppContext, Screen } from './shell';
 import type { InstrumentId, Report, TrialResult } from '../types';
 
@@ -40,12 +34,8 @@ export function searchLabel(index: number, cm360: number, coldStart: number): st
 }
 
 export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
-  let raf = 0;
   let alive = true;
   let cleanup: (() => void) | null = null;
-  let viewmodel: Viewmodel | null = null;
-  let enemies: EnemyLayerHandle | null = null;
-  let offFire: (() => void) | null = null;
 
   return {
     mount() {
@@ -59,7 +49,6 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         <figure class="session__plot"><svg data-plot aria-label="convergence on your optimal cm/360"></svg>
           <figcaption class="mono" data-hud="estimate"></figcaption></figure>`;
       host.appendChild(root);
-      const feedback = createShotFeedback(root); // brief "miss" tick when a shot lands in no hitbox
 
       const canvas = root.querySelector('canvas') as HTMLCanvasElement;
       const svg = root.querySelector('[data-plot]') as unknown as SVGElement;
@@ -67,52 +56,8 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       const hudProgress = root.querySelector('[data-hud="progress"]')!;
       const hudEstimate = root.querySelector('[data-hud="estimate"]')!;
 
-      const renderer = new WebGLRenderer({ canvas, antialias: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      const size = (): [number, number] => [window.innerWidth, window.innerHeight];
-      const psx = createPsxPass(renderer, size); // PS1 abyss: low-res + dither + posterize + scanlines
-      const pointer = createPointerLock(canvas);
-      const input: InputSource = {
-        onSample: (cb) => pointer.onSample(cb),
-        onFire: (cb) => pointer.onFire(cb),
-      };
-      const arena = new Arena({ renderer, input, size, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, rng: mulberry32(7), postProcessor: psx });
-
-      // PSX Desert Eagle viewmodel — cosmetic overlay (loads async; never touches the pointer stream
-      // or the cm/360 math). Smoking idle pre-lock → flick+draw on start → fire on each shot.
       const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      void createViewmodel({ reducedMotion: reduced }).then((vm) => {
-        if (!alive) { vm.dispose(); return; }
-        viewmodel = vm;
-        root.appendChild(vm.el);
-      });
-      offFire = pointer.onFire(() => viewmodel?.play('fire', 'idleReady'));
-
-      // Merc-prey enemy billboards — cosmetic skin over the targets (loads async; the arena hides each
-      // gold sphere but keeps its transform, so bearing/radius — and the cm/360 — are untouched).
-      void createEnemyLayer({ reducedMotion: reduced, onShot: (r) => { if (r === 'miss') feedback.miss(); } }).then((layer) => {
-        if (!alive) { layer.dispose(); return; }
-        enemies = layer;
-        arena.attachEnemies(layer); // arena.dispose() will dispose it
-      });
-
-      // Weapon sway: feed camera look deltas to the viewmodel for the parallax / depth feel.
-      let prevView: [number, number] | null = null;
-      arena.onAim((_s, view) => {
-        if (prevView) viewmodel?.look(view[0] - prevView[0], view[1] - prevView[1]);
-        prevView = view;
-      });
-
-      const onResize = (): void => arena.resize();
-      window.addEventListener('resize', onResize);
-      let last = 0;
-      const loop = (ts: number): void => {
-        const dt = last === 0 ? 16 : ts - last; last = ts;
-        arena.tick(dt); arena.render();
-        viewmodel?.tick(ts);
-        raf = window.requestAnimationFrame(loop);
-      };
-      raf = window.requestAnimationFrame(loop);
+      const stage = createArenaStage(root, { canvas, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, reducedMotion: reduced });
 
       const drawPlot = (report: Report, trials: readonly TrialResult[]): void => {
         const g = plotGeometry({
@@ -125,17 +70,17 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       };
 
       const start = (): void => {
-        viewmodel?.play('flickDraw', 'idleReady'); // flick the cigarette, draw the deagle (the reveal)
+        stage.playViewmodel('flickDraw', 'idleReady'); // flick the cigarette, draw the deagle (the reveal)
         const engine = makeEvolution({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 }, sigma0: 0.3, maxTrials: MAX_TRIALS });
         void runSession({
           dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
-          engine, instruments: INSTRUMENTS, scene: arena, schedule: SCHEDULE,
+          engine, instruments: INSTRUMENTS, scene: stage.arena, schedule: SCHEDULE,
           maxTrials: MAX_TRIALS, coldStart: COLD_START, rng: mulberry32(2026), minTrials: 12, ciStopWidth: 6, bootstrapIters: 300,
           onTrialStart: (id, i, cm360) => {
             hudInstruction.textContent = instructionFor(id);
             hudProgress.textContent = searchLabel(i, cm360, COLD_START);
-            enemies?.setEnvironment(id); // skin this trial's targets with the environment's prey
-            arena.clearTargets();
+            stage.setEnemyEnvironment(id); // skin this trial's targets with the environment's prey
+            stage.arena.clearTargets();
           },
           onTrial: (_t, trials, interim) => drawPlot(interim, trials),
         }).then(({ report, trials }) => {
@@ -149,17 +94,11 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         });
       };
 
-      canvas.addEventListener('click', () => void pointer.request().then(start).catch(start), { once: true });
+      canvas.addEventListener('click', () => void stage.requestLock().then(start).catch(start), { once: true });
 
       cleanup = () => {
         alive = false;
-        window.cancelAnimationFrame(raf);
-        window.removeEventListener('resize', onResize);
-        offFire?.();
-        feedback.dispose();
-        viewmodel?.dispose();
-        pointer.dispose();
-        arena.dispose();
+        stage.dispose();
       };
     },
     unmount() { cleanup?.(); host.replaceChildren(); },
