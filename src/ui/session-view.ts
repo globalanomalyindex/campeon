@@ -9,6 +9,7 @@ import { INSTRUMENTS } from '../instruments/registry';
 import { mulberry32 } from '../stats/rng';
 import { plotGeometry, renderConvergencePlot, type PlotMark } from './convergence-plot';
 import { createViewmodel, type Viewmodel } from './viewmodel/viewmodel';
+import { createEnemyLayer, type EnemyLayerHandle } from './enemy/enemy-layer';
 import type { AppContext, Screen } from './shell';
 import type { InstrumentId, Report, TrialResult } from '../types';
 
@@ -42,6 +43,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
   let alive = true;
   let cleanup: (() => void) | null = null;
   let viewmodel: Viewmodel | null = null;
+  let enemies: EnemyLayerHandle | null = null;
   let offFire: (() => void) | null = null;
 
   return {
@@ -84,6 +86,14 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       });
       offFire = pointer.onFire(() => viewmodel?.play('fire', 'idleReady'));
 
+      // Merc-prey enemy billboards — cosmetic skin over the targets (loads async; the arena hides each
+      // gold sphere but keeps its transform, so bearing/radius — and the cm/360 — are untouched).
+      void createEnemyLayer({ reducedMotion: reduced }).then((layer) => {
+        if (!alive) { layer.dispose(); return; }
+        enemies = layer;
+        arena.attachEnemies(layer); // arena.dispose() will dispose it
+      });
+
       const onResize = (): void => arena.resize();
       window.addEventListener('resize', onResize);
       let last = 0;
@@ -115,6 +125,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           onTrialStart: (id, i, cm360) => {
             hudInstruction.textContent = instructionFor(id);
             hudProgress.textContent = searchLabel(i, cm360, COLD_START);
+            enemies?.setEnvironment(id); // skin this trial's targets with the environment's prey
             arena.clearTargets();
           },
           onTrial: (_t, trials, interim) => drawPlot(interim, trials),

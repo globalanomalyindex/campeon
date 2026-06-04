@@ -1,0 +1,171 @@
+import {
+  CanvasTexture,
+  Group,
+  NearestFilter,
+  type Object3D,
+  type Scene,
+  Sprite,
+  SpriteMaterial,
+  SRGBColorSpace,
+  type Texture,
+} from 'three';
+import type { EnemyLayer } from '../../engine/arena';
+import type { Degrees, InstrumentId, Ms, TargetHandle } from '../../types';
+import { SHEET } from './atlas';
+import { EnemyController } from './controller';
+import { classifyHit } from './hit';
+import { keyMagenta } from '../viewmodel/key';
+
+const SHEETS: Record<InstrumentId, string> = {
+  track: '/sprites/track.png',
+  flick: '/sprites/flick.png',
+  calibrate: '/sprites/calibrate.png',
+  strike: '/sprites/strike.png',
+};
+
+/** World height (metres) of a merc billboard. The true target sphere (≈1.2m) lives at its weak-spot. */
+const ENEMY_HEIGHT = 2.4;
+/** Cell aspect (w/h) from the uniform grid — keeps the billboard from stretching. */
+const ASPECT = SHEET.w / SHEET.cols / (SHEET.h / SHEET.rows);
+/** Vertical pivot: the gold weak-spot sits ~2/3 up the cell, so anchor it to the true target centre. */
+const WEAKSPOT_V = 0.66;
+
+interface EnemyRecord {
+  sprite: Sprite;
+  tex: Texture;
+  mat: SpriteMaterial;
+  ctrl: EnemyController;
+  object: Object3D;
+}
+
+export interface EnemyLayerHandle extends EnemyLayer {
+  /** Choose which environment sheet subsequent spawns use (the active instrument's prey). */
+  setEnvironment(id: InstrumentId): void;
+}
+
+/**
+ * COSMETIC enemy billboard layer — the over-the-top "merc-prey" that skins each arena target. It is a
+ * pure decoration over the true target: the arena keeps every target's gold sphere as the owner of
+ * `bearing()` / `radiusDeg()` (the angular truth the instruments score against) and merely hides it,
+ * pinning a camera-facing `THREE.Sprite` at the same world position. Hits drive only animation via the
+ * read-only `classifyHit`; nothing here ever writes a sample or a score, so the cm/360 stays exact.
+ *
+ * Runtime-only (image decode + canvas chroma-key + WebGL sprites). The frame / state / hit logic it
+ * depends on is unit-tested in atlas.ts / controller.ts / hit.ts.
+ *
+ * Loads + keys all four environment sheets up front, then resolves; the arena attaches it once ready.
+ */
+export async function createEnemyLayer(opts: { reducedMotion?: boolean } = {}): Promise<EnemyLayerHandle> {
+  const reduced = opts.reducedMotion ?? false;
+
+  // Load + magenta-key each sheet once into its own base texture (NearestFilter → crisp PSX pixels).
+  const bases = new Map<InstrumentId, Texture>();
+  await Promise.all(
+    (Object.keys(SHEETS) as InstrumentId[]).map(async (id) => {
+      const img = new Image();
+      img.src = SHEETS[id];
+      await img.decode();
+      const off = document.createElement('canvas');
+      off.width = SHEET.w;
+      off.height = SHEET.h;
+      const octx = off.getContext('2d');
+      if (!octx) throw new Error('enemy-layer: 2D context unavailable');
+      octx.drawImage(img, 0, 0);
+      const data = octx.getImageData(0, 0, SHEET.w, SHEET.h);
+      keyMagenta(data.data);
+      octx.putImageData(data, 0, 0);
+      const tex = new CanvasTexture(off);
+      tex.colorSpace = SRGBColorSpace;
+      tex.magFilter = NearestFilter;
+      tex.minFilter = NearestFilter;
+      tex.generateMipmaps = false;
+      tex.needsUpdate = true;
+      bases.set(id, tex);
+    }),
+  );
+
+  const group = new Group();
+  group.name = 'enemy-layer';
+  const enemies = new Map<string, EnemyRecord>();
+  let activeEnv: InstrumentId = 'flick';
+  let scene: Scene | null = null;
+
+  const applyUV = (rec: EnemyRecord, nowMs: Ms): void => {
+    const frame = reduced ? rec.ctrl.staticFrame() : rec.ctrl.frameAt(nowMs);
+    rec.tex.offset.set(frame.uv.offsetX, frame.uv.offsetY);
+    rec.tex.repeat.set(frame.uv.repeatX, frame.uv.repeatY);
+  };
+
+  const retire = (id: string, rec: EnemyRecord): void => {
+    group.remove(rec.sprite);
+    rec.mat.dispose();
+    rec.tex.dispose();
+    enemies.delete(id);
+  };
+
+  return {
+    setEnvironment(id: InstrumentId): void {
+      activeEnv = id;
+    },
+
+    attach(s: Scene): void {
+      scene = s;
+      s.add(group);
+    },
+
+    spawn(id: string, object: Object3D, nowMs: Ms): void {
+      const base = bases.get(activeEnv);
+      if (!base) return;
+      const tex = base.clone();
+      tex.needsUpdate = true;
+      const mat = new SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.5, depthWrite: false });
+      const sprite = new Sprite(mat);
+      sprite.center.set(0.5, WEAKSPOT_V);
+      sprite.scale.set(ENEMY_HEIGHT * ASPECT, ENEMY_HEIGHT, 1);
+      sprite.position.copy(object.position);
+      // Reduced motion: a static cocky idle, no spawn burst, no follow-up.
+      const ctrl = new EnemyController(reduced ? 'idle' : 'spawn', nowMs, reduced ? null : 'idle');
+      const rec: EnemyRecord = { sprite, tex, mat, ctrl, object };
+      applyUV(rec, nowMs);
+      group.add(sprite);
+      enemies.set(id, rec);
+    },
+
+    update(nowMs: Ms): void {
+      for (const [id, rec] of enemies) {
+        rec.sprite.position.copy(rec.object.position); // follow the (possibly weaving) target
+        if (!reduced && rec.ctrl.isFinished(nowMs)) {
+          retire(id, rec);
+          continue;
+        }
+        applyUV(rec, nowMs);
+      }
+    },
+
+    fire(nowMs: Ms, view: [Degrees, Degrees], targets: ReadonlyArray<TargetHandle>): void {
+      if (reduced) return; // no hit reactions under reduced motion
+      for (const t of targets) {
+        const rec = enemies.get(t.id);
+        if (!rec) continue;
+        const s = rec.ctrl.current();
+        if (s === 'death' || s === 'escape') continue; // already retiring
+        const cls = classifyHit(view, t.bearing(), t.radiusDeg());
+        if (cls === 'kill') rec.ctrl.play('death', nowMs, null);
+        else if (cls === 'graze') rec.ctrl.play('flinch', nowMs, 'idle');
+      }
+    },
+
+    clear(): void {
+      for (const [id, rec] of enemies) retire(id, rec);
+      enemies.clear();
+    },
+
+    dispose(): void {
+      for (const [id, rec] of enemies) retire(id, rec);
+      enemies.clear();
+      if (scene) scene.remove(group);
+      for (const tex of bases.values()) tex.dispose();
+      bases.clear();
+    },
+  };
+}

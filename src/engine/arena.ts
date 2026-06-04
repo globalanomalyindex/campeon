@@ -3,6 +3,7 @@ import {
   DirectionalLight,
   GridHelper,
   HemisphereLight,
+  type Object3D,
   PerspectiveCamera,
   Scene,
 } from 'three';
@@ -23,6 +24,26 @@ export interface InputSource {
   onSample(cb: (sample: AimSample) => void): () => void;
   /** Optional fire (primary-button) events. Absent in headless tests that don't fire. */
   onFire?(cb: () => void): () => void;
+}
+
+/**
+ * A cosmetic billboard skin for targets (e.g. the merc-prey sprites). PURELY decorative: the arena
+ * drives its lifecycle but it never feeds back into samples or scores. The arena keeps each target's
+ * sphere as the owner of bearing()/radiusDeg() and only hides it; the layer pins a sprite at the same
+ * position. Injected post-construction via `attachEnemies` because its sheet textures load async.
+ */
+export interface EnemyLayer {
+  /** Add the layer's container to the arena scene (called once on attach). */
+  attach(scene: Scene): void;
+  /** A target appeared at `object`'s position — start its spawn animation. */
+  spawn(id: string, object: Object3D, nowMs: Ms): void;
+  /** Per-frame: follow target positions, advance animations, retire finished ones. */
+  update(nowMs: Ms): void;
+  /** A shot was fired from `view`; classify against live `targets` to play death/flinch (cosmetic). */
+  fire(nowMs: Ms, view: [Degrees, Degrees], targets: ReadonlyArray<TargetHandle>): void;
+  /** Remove all live sprites (per trial). */
+  clear(): void;
+  dispose(): void;
 }
 
 export interface ArenaOptions {
@@ -59,6 +80,7 @@ export class Arena implements ArenaScene {
   private disposed = false;
   private nowMs: Ms = 0;
   private readonly post: PostProcessor | undefined;
+  private enemies: EnemyLayer | undefined;
 
   constructor(opts: ArenaOptions) {
     this.renderer = opts.renderer;
@@ -94,10 +116,22 @@ export class Arena implements ArenaScene {
 
   private handleFire(): void {
     for (const cb of this.fireCbs) cb(this.nowMs);
+    // Cosmetic only: the skin reacts to the shot (pop/flinch). Reads view+bearings, writes nothing.
+    this.enemies?.fire(this.nowMs, this.rig.view(), [...this.targets.values()]);
   }
 
   setSensitivity(cm360: Cm360, dpi: Dpi): void {
     this.rig.setSensitivity(cm360, dpi);
+  }
+
+  /**
+   * Attach a cosmetic enemy-billboard layer (its sheet textures load async, so it arrives after
+   * construction). The layer hides each target's sphere but never touches its transform — bearing()
+   * and radiusDeg() are unchanged, so the cm/360 measurement is unaffected.
+   */
+  attachEnemies(layer: EnemyLayer): void {
+    this.enemies = layer;
+    layer.attach(this.scene);
   }
 
   /** Current arena clock (ms since construction). */
@@ -114,6 +148,7 @@ export class Arena implements ArenaScene {
     if (this.disposed) return;
     this.nowMs += dtMs;
     for (const t of this.moving) t.update(this.nowMs);
+    this.enemies?.update(this.nowMs); // follow target positions + advance sprite animations (cosmetic)
     for (const cb of this.frameCbs) cb(dtMs, this.nowMs);
   }
 
@@ -146,20 +181,23 @@ export class Arena implements ArenaScene {
           ...(spec.worldRadius !== undefined ? { worldRadius: spec.worldRadius } : {}),
         });
 
-    if (spec.kind === 'moving') {
-      const target = new MovingTarget(id, placement, spec.motion ?? {}, this.nowMs);
-      this.moving.add(target);
-      this.targets.set(id, target);
-      this.scene.add(target.mesh);
-      return target;
-    }
-    const target = new Target(id, placement);
+    const target: Target | MovingTarget =
+      spec.kind === 'moving'
+        ? new MovingTarget(id, placement, spec.motion ?? {}, this.nowMs)
+        : new Target(id, placement);
+    if (target instanceof MovingTarget) this.moving.add(target);
     this.targets.set(id, target);
     this.scene.add(target.mesh);
+    if (this.enemies) {
+      // The merc skin replaces the gold sphere visually; the sphere's transform still owns bearing/radius.
+      target.mesh.visible = false;
+      this.enemies.spawn(id, target.mesh, this.nowMs);
+    }
     return target;
   }
 
   clearTargets(): void {
+    this.enemies?.clear();
     for (const target of this.targets.values()) {
       this.scene.remove(target.mesh);
       target.dispose();
@@ -198,6 +236,7 @@ export class Arena implements ArenaScene {
     this.clearTargets();
     this.frameCbs.clear();
     this.fireCbs.clear();
+    this.enemies?.dispose();
     for (const d of this.envDisposables) d.dispose();
     this.post?.dispose();
     this.renderer.dispose();

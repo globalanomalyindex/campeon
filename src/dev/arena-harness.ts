@@ -4,6 +4,7 @@ import { createPsxPass } from '../engine/psx-pass';
 import type { InputSource } from '../engine/arena';
 import { degreesPerCount } from '../engine/camera-rig';
 import { createPointerLock } from '../input/pointer-lock';
+import { createEnemyLayer, type EnemyLayerHandle } from '../ui/enemy/enemy-layer';
 import { AccelMeter, accelVerdict } from '../input/accel-check';
 import { mulberry32 } from '../stats/bootstrap';
 import type { AimSample, PointerLockMode, InstrumentId, TrialResult, Report } from '../types';
@@ -83,9 +84,23 @@ export function mountArenaHarness(root: HTMLElement): void {
   };
 
   const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7), postProcessor: createPsxPass(renderer, size) });
-  arena.spawnTarget({ kind: 'static' });
-  arena.spawnTarget({ kind: 'static' });
-  arena.spawnTarget({ kind: 'static' });
+
+  let enemyLayer: EnemyLayerHandle | null = null;
+  const ENV_KEYS: Record<string, InstrumentId> = { q: 'track', w: 'flick', e: 'calibrate', r: 'strike' };
+  const spawnTrio = (): void => {
+    arena.clearTargets();
+    arena.spawnTarget({ kind: 'static' });
+    arena.spawnTarget({ kind: 'static' });
+    arena.spawnTarget({ kind: 'moving', motion: { yawAmp: 14, baseFreq: 0.45 } });
+  };
+  spawnTrio(); // gold spheres until the merc skin finishes loading
+  // Cosmetic merc-prey skin: attach then respawn so targets are skinned. [q/w/e/r] swap environment.
+  void createEnemyLayer({}).then((layer) => {
+    enemyLayer = layer;
+    arena.attachEnemies(layer);
+    layer.setEnvironment('flick');
+    spawnTrio();
+  });
 
   let view: [number, number] = [0, 0];
   arena.onAim((_s, v) => {
@@ -128,6 +143,13 @@ export function mountArenaHarness(root: HTMLElement): void {
       meter = null;
     }
     refreshHud();
+  });
+  window.addEventListener('keydown', (e) => {
+    const env = ENV_KEYS[e.key];
+    if (env && enemyLayer) {
+      enemyLayer.setEnvironment(env);
+      spawnTrio();
+    }
   });
   window.addEventListener('resize', () => arena.resize());
 
