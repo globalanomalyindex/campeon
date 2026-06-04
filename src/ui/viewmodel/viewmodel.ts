@@ -5,7 +5,7 @@ import { orderedDither } from './dither';
 import { kick, restSway, stepSway, type SwayState } from './sway';
 import { punch, restRecoil, stepRecoil, type RecoilState } from './recoil';
 
-const SHEET_URL = '/sprites/deagle.png';
+const SHEET_URL = `${import.meta.env.BASE_URL}sprites/deagle.png`; // base-aware (root in dev, /campeon/ on Pages)
 
 export interface Viewmodel {
   /** The transparent full-screen overlay canvas — append it over the arena (pointer-events: none). */

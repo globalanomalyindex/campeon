@@ -16,11 +16,13 @@ import { EnemyController } from './controller';
 import { classifyHit, type HitClass } from './hit';
 import { keyMagenta } from '../viewmodel/key';
 
+// Base-aware (root in dev, /campeon/ on GitHub Pages) — these are runtime string URLs Vite won't rewrite.
+const B = import.meta.env.BASE_URL;
 const SHEETS: Record<InstrumentId, string> = {
-  track: '/sprites/track.png',
-  flick: '/sprites/flick.png',
-  calibrate: '/sprites/calibrate.png',
-  strike: '/sprites/strike.png',
+  track: `${B}sprites/track.png`,
+  flick: `${B}sprites/flick.png`,
+  calibrate: `${B}sprites/calibrate.png`,
+  strike: `${B}sprites/strike.png`,
 };
 
 /** Merc billboard height = K × the hitbox diameter, so the visible merc ≈ the hittable disc. */
