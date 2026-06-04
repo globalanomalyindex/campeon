@@ -1,6 +1,7 @@
 import { SHEET, type AnimName } from './atlas';
 import { ViewmodelController } from './controller';
 import { keyMagenta } from './key';
+import { orderedDither } from './dither';
 
 const SHEET_URL = '/sprites/deagle.png';
 
@@ -16,7 +17,8 @@ export interface Viewmodel {
 
 /**
  * Thin canvas shell for the Desert Eagle viewmodel — a cosmetic overlay above the WebGL arena. Loads
- * the sprite sheet, knocks out its magenta key to alpha once, and blits the controller's current frame
+ * the sprite sheet, knocks out its magenta key to alpha and bakes in the same ordered-dither + posterize
+ * as the arena's PSX pass (the GLSL shader can't reach a 2D overlay), then blits the controller's frame
  * crisply (no smoothing → PSX pixels), anchored lower-right (CS:Source style). Purely decorative: it
  * never touches the pointer stream or the cm/360 math, and is `pointer-events: none` so clicks pass
  * through to the arena. Under reduced motion it shows a single static frame.
@@ -40,6 +42,7 @@ export async function createViewmodel(opts: { reducedMotion?: boolean; initial?:
   octx.drawImage(img, 0, 0);
   const data = octx.getImageData(0, 0, SHEET.w, SHEET.h);
   keyMagenta(data.data);
+  orderedDither(data.data, SHEET.w, SHEET.h); // bake the PS1 dither+posterize so the gun matches the arena
   octx.putImageData(data, 0, 0);
 
   const el = document.createElement('canvas');
