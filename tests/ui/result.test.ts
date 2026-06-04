@@ -54,4 +54,30 @@ describe('result screen', () => {
     (host.querySelector('[data-action="again"]') as HTMLButtonElement).click();
     expect(ctx.nav).toContain('hero');
   });
+
+  it('renders a "step into the range" CTA that navigates to range', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    resultScreen(host, ctx).mount();
+    const btn = host.querySelector('[data-action="range"]') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    btn.click();
+    expect(ctx.nav).toContain('range');
+  });
+
+  it('shows the measured 90% CI when not tuned', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount();
+    expect(host.querySelector('[data-result="ci"]')!.textContent).toContain('29.1');
+    expect(host.textContent).not.toContain('tuned by feel');
+  });
+
+  it('drops the CI and labels "tuned by feel" when the result is adopted', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: RESULT, tuned: true };
+    resultScreen(host, ctx).mount();
+    expect(host.querySelector('[data-result="ci"]')).toBeNull();
+    expect(host.textContent).toContain('tuned by feel');
+  });
 });

@@ -10,6 +10,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
   return {
     mount() {
       if (!r) { ctx.navigate('hero'); return; }
+      const tuned = ctx.lastResult?.tuned ?? false;
       const root = document.createElement('section');
       root.className = 'screen screen--shell result fade-in';
       const rows = GAME_YAW.map((g) => {
@@ -22,7 +23,9 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
         <div class="wrap stack result__inner">
           <p class="result__lead">your sweet spot</p>
           <h1 class="display result__number"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
-          <p class="result__ci mono">90% CI <span data-result="ci">${fmt(r.ci90[0])}–${fmt(r.ci90[1])}</span> cm/360</p>
+          ${tuned
+            ? `<p class="result__ci result__ci--tuned mono">tuned by feel — not a measured optimum</p>`
+            : `<p class="result__ci mono">90% CI <span data-result="ci">${fmt(r.ci90[0])}–${fmt(r.ci90[1])}</span> cm/360</p>`}
           <p class="result__credit">your most-evolved sensitivity — the target-acquisition “brain” that won across four predator environments: dragonfly · falcon · spider · raptor · archerfish · mantis shrimp</p>
           <div class="result__breakdown">
             <div><span class="result__bk-label">bias-zero <em>archerfish</em></span><span class="mono" data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
@@ -34,10 +37,12 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
           <p class="result__saved mono">saved locally</p>
           <div class="result__actions">
             <button class="action action--ghost" data-action="export">export json</button>
+            <button class="action action--ghost" data-action="range">step into the range</button>
             <button class="action action--primary" data-action="again">run again</button>
           </div>
         </div>`;
       root.querySelector('[data-action="again"]')!.addEventListener('click', () => ctx.navigate('hero'));
+      root.querySelector('[data-action="range"]')!.addEventListener('click', () => ctx.navigate('range'));
       root.querySelector('[data-action="export"]')!.addEventListener('click', () => {
         const sessions = ctx.storage.loadSessions();
         const results = ctx.lastResult ? { [ctx.lastResult.sessionId]: ctx.lastResult.result } : {};

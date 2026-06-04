@@ -12,6 +12,7 @@ import { sessionView } from './ui/session-view';
 import { result } from './ui/result';
 import { caseStudy } from './ui/case-study/case-study';
 import { options } from './ui/options/options';
+import { range } from './ui/range';
 
 const appEl = document.querySelector<HTMLDivElement>('#app');
 if (!appEl) throw new Error('#app element missing');
@@ -25,7 +26,7 @@ async function boot(): Promise<void> {
   }
   const screens: Record<Route, ScreenFactory> = {
     hero, setup, gate, session: sessionView, result,
-    'case-study': caseStudy, options,
+    'case-study': caseStudy, options, range,
   };
   createShell(app, { storage: createStorage(), screens }).start();
 }

@@ -1,6 +1,6 @@
 import type { Cm360, Dpi, GameId, Profile, Result, Session, Storage } from '../types';
 
-export type Route = 'hero' | 'setup' | 'gate' | 'session' | 'result' | 'case-study' | 'options';
+export type Route = 'hero' | 'setup' | 'gate' | 'session' | 'result' | 'case-study' | 'options' | 'range';
 
 export interface Screen {
   mount(): void;
@@ -21,7 +21,7 @@ export interface AppContext {
   route: Route;
   storage: Storage;
   draft: SessionDraft;
-  lastResult?: { sessionId: string; result: Result };
+  lastResult?: { sessionId: string; result: Result; tuned?: boolean };
 }
 
 export type ScreenFactory = (host: HTMLElement, ctx: AppContext) => Screen;
@@ -34,6 +34,7 @@ export interface ShellDeps {
 const ROUTE_HASH: Record<Route, string> = {
   hero: '#/', setup: '#/setup', gate: '#/gate', session: '#/session',
   result: '#/result', 'case-study': '#/case-study', options: '#/options',
+  range: '#/range',
 };
 const HASH_ROUTE = new Map<string, Route>(Object.entries(ROUTE_HASH).map(([r, h]) => [h, r as Route]));
 
@@ -50,6 +51,7 @@ function defaultDraft(): SessionDraft {
 /** Screens that require prerequisites; otherwise redirect. */
 const GUARDS: Partial<Record<Route, (ctx: AppContext) => Route | null>> = {
   result: (ctx) => (ctx.lastResult ? null : 'hero'),
+  range: (ctx) => (ctx.lastResult ? null : 'hero'),
 };
 
 export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void; context: AppContext } {
