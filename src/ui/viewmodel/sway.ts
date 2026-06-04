@@ -24,13 +24,16 @@ export interface SwayParams {
   impulseGain: number;
   /** Hard clamp on |offset| so a fast whip can't fling the gun off-anchor. */
   maxOffset: number;
+  /** Look deltas below this (deg) are ignored — idle micro-jitter must not move the gun. */
+  deadzone: number;
 }
 
 export const DEFAULT_SWAY: SwayParams = {
-  stiffness: 80,
-  damping: 13, // < 2·√80 ≈ 17.9 → lively, slightly under-damped
-  impulseGain: 0.010,
-  maxOffset: 0.1,
+  stiffness: 90,
+  damping: 20, // ≥ 2·√90 ≈ 18.97 → over-damped: returns without wandering/oscillating
+  impulseGain: 0.005, // gentle — only deliberate flicks visibly sway
+  maxOffset: 0.06,
+  deadzone: 0.08, // hold still through sub-0.08° micro-corrections
 };
 
 export const restSway = (): SwayState => ({ x: 0, y: 0, vx: 0, vy: 0 });
@@ -39,7 +42,9 @@ const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.m
 
 /** Inject a look impulse: the gun lags, so velocity kicks opposite the camera's yaw/pitch delta. */
 export function kick(s: SwayState, dYawDeg: number, dPitchDeg: number, p: SwayParams = DEFAULT_SWAY): SwayState {
-  return { x: s.x, y: s.y, vx: s.vx - dYawDeg * p.impulseGain, vy: s.vy - dPitchDeg * p.impulseGain };
+  const dy = Math.abs(dYawDeg) < p.deadzone ? 0 : dYawDeg; // idle micro-jitter → no sway
+  const dp = Math.abs(dPitchDeg) < p.deadzone ? 0 : dPitchDeg;
+  return { x: s.x, y: s.y, vx: s.vx - dy * p.impulseGain, vy: s.vy - dp * p.impulseGain };
 }
 
 /** Advance the damped spring by `dtSec` toward rest (semi-implicit Euler — stable at frame dt). */

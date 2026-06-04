@@ -23,12 +23,14 @@ const SHEETS: Record<InstrumentId, string> = {
   strike: '/sprites/strike.png',
 };
 
-/** World height (metres) of a merc billboard. The true target sphere (≈1.2m) lives at its weak-spot. */
-const ENEMY_HEIGHT = 2.4;
+/** Merc billboard height = K × the hitbox diameter, so the visible merc ≈ the hittable disc. */
+const ENEMY_SIZE_K = 1.7;
+/** Floor on billboard height (metres) so tiny-width targets stay visible. */
+const MIN_ENEMY_HEIGHT = 0.6;
 /** Cell aspect (w/h) from the uniform grid — keeps the billboard from stretching. */
 const ASPECT = SHEET.w / SHEET.cols / (SHEET.h / SHEET.rows);
-/** Vertical pivot: the gold weak-spot sits ~2/3 up the cell, so anchor it to the true target centre. */
-const WEAKSPOT_V = 0.66;
+/** Vertical pivot: the gold weak-spot sits ~0.7 up the cell — anchor it to the true hitbox centre. */
+const WEAKSPOT_V = 0.7;
 
 interface EnemyRecord {
   sprite: Sprite;
@@ -120,7 +122,7 @@ export async function createEnemyLayer(
       s.add(group);
     },
 
-    spawn(id: string, object: Object3D, nowMs: Ms): void {
+    spawn(id: string, object: Object3D, radiusDeg: number, nowMs: Ms): void {
       const base = bases.get(activeEnv);
       if (!base) return;
       const tex = base.clone();
@@ -128,7 +130,12 @@ export async function createEnemyLayer(
       const mat = new SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.5, depthWrite: false });
       const sprite = new Sprite(mat);
       sprite.center.set(0.5, WEAKSPOT_V);
-      sprite.scale.set(ENEMY_HEIGHT * ASPECT, ENEMY_HEIGHT, 1);
+      // Size to the hitbox: world height = K × the hitbox diameter (worldRadius = dist·tan(radiusDeg)),
+      // so aiming at the merc lands in the hitbox and a small-width flick target gets a small merc.
+      const dist = object.position.length() || 20;
+      const worldRadius = dist * Math.tan((radiusDeg * Math.PI) / 180);
+      const h = Math.max(MIN_ENEMY_HEIGHT, ENEMY_SIZE_K * 2 * worldRadius);
+      sprite.scale.set(h * ASPECT, h, 1);
       sprite.position.copy(object.position);
       // Reduced motion: a static cocky idle, no spawn burst, no follow-up.
       const ctrl = new EnemyController(reduced ? 'idle' : 'spawn', nowMs, reduced ? null : 'idle');

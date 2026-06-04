@@ -17,6 +17,11 @@ describe('weapon sway spring', () => {
     expect(speed(s)).toBeGreaterThan(0);
   });
 
+  it('ignores look deltas inside the deadzone (idle micro-jitter holds still)', () => {
+    const s = kick(restSway(), 0.05, -0.05); // both below the 0.08° deadzone
+    expect(s).toEqual(restSway());
+  });
+
   it('settles back toward rest after a kick (damped, finite, bounded)', () => {
     let s = kick(restSway(), 12, -6);
     let peak = 0;

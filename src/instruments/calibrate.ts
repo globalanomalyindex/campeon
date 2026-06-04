@@ -51,8 +51,9 @@ export const calibrate = {
 
     const present = (now: Ms): void => {
       presentAim = scene.view();
-      const yaw = (ctx.rng() * 2 - 1) * 18;
-      const pitch = (ctx.rng() * 2 - 1) * 9;
+      // Spawn around the current view → always on-screen (the reach is the offset, not an absolute bearing).
+      const yaw = presentAim[0] + (ctx.rng() * 2 - 1) * 18;
+      const pitch = Math.max(-80, Math.min(80, presentAim[1] + (ctx.rng() * 2 - 1) * 9));
       handle = scene.spawnTarget({ kind: 'static', yaw, pitch, distance: 20, worldRadius: 0.6 });
       presentedAt = now;
     };

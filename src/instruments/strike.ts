@@ -50,8 +50,11 @@ export const strike = {
     let frames: Frame[] = [];
 
     const present = (now: Ms): void => {
-      const yaw = (ctx.rng() * 2 - 1) * 20;
-      const pitch = (ctx.rng() * 2 - 1) * 10;
+      // Spawn around where the player is currently looking → always on-screen (the view drifts between
+      // trials; an absolute-origin spawn could land off-screen and waste the player's time hunting it).
+      const [vYaw, vPitch] = scene.view();
+      const yaw = vYaw + (ctx.rng() * 2 - 1) * 20;
+      const pitch = Math.max(-80, Math.min(80, vPitch + (ctx.rng() * 2 - 1) * 10));
       handle = scene.spawnTarget({ kind: 'static', yaw, pitch, distance: 20, worldRadius: 0.7 });
       presentedAt = now;
       frames = [];

@@ -35,8 +35,8 @@ export interface InputSource {
 export interface EnemyLayer {
   /** Add the layer's container to the arena scene (called once on attach). */
   attach(scene: Scene): void;
-  /** A target appeared at `object`'s position — start its spawn animation. */
-  spawn(id: string, object: Object3D, nowMs: Ms): void;
+  /** A target appeared at `object`'s position with angular radius `radiusDeg` — start its spawn animation. */
+  spawn(id: string, object: Object3D, radiusDeg: Degrees, nowMs: Ms): void;
   /** Per-frame: follow target positions, advance animations, retire finished ones. */
   update(nowMs: Ms): void;
   /** A shot was fired from `view`; classify against live `targets` to play death/flinch (cosmetic). */
@@ -192,7 +192,7 @@ export class Arena implements ArenaScene {
     if (this.enemies) {
       // The merc skin replaces the gold sphere visually; the sphere's transform still owns bearing/radius.
       target.mesh.visible = false;
-      this.enemies.spawn(id, target.mesh, this.nowMs);
+      this.enemies.spawn(id, target.mesh, target.radiusDeg(), this.nowMs);
     }
     return target;
   }

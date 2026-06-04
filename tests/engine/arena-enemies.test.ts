@@ -15,7 +15,7 @@ class FakeEnemyLayer implements EnemyLayer {
   attach(_scene: Scene): void {
     this.attached += 1;
   }
-  spawn(id: string, _object: Object3D, _nowMs: number): void {
+  spawn(id: string, _object: Object3D, _radiusDeg: number, _nowMs: number): void {
     this.spawned.push(id);
   }
   update(_nowMs: number): void {
