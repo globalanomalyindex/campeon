@@ -110,6 +110,9 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
       const startFreePlay = (): void => {
         if (!alive) return;
         state = initRange(SLOTS);
+        // arena.handleFire runs the cosmetic enemy.fire() (which migrates a killed merc into its
+        // persistent fade-out set) BEFORE these onFire callbacks, so removeTarget() here only drops the
+        // already-invisible sphere — the death animation plays out independently. Relies on that order.
         offFire = stage.arena.onFire((now) => {
           if (!state) return;
           const view = stage.arena.view();

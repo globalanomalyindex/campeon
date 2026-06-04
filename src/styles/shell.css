@@ -264,4 +264,38 @@
 .result__games { width: 100%; border-collapse: collapse; margin-top: var(--space-3); }
 .result__games th, .result__games td { padding: .4rem .6rem; text-align: left; border-bottom: 1px solid var(--parchment); }
 .result__games [data-current="true"] { color: var(--ink); background: color-mix(in srgb, var(--gold) 22%, transparent); }
-.result__actions { display: flex; gap: var(--space-4); justify-content: center; margin-top: var(--space-5); }
+.result__actions { display: flex; gap: var(--space-4); justify-content: center; margin-top: var(--space-5); flex-wrap: wrap; }
+.result__ci--tuned { color: var(--slate); font-style: italic; }
+
+/* ─── Range (free-play) ────────────────────────────────────────────────────── */
+/* HUD: live cm/360 + delta, top-left, never eats clicks (the nudge keys work while locked). */
+.range__hud {
+  position: fixed; left: var(--space-4); top: var(--space-4);
+  display: flex; flex-direction: column; gap: 2px;
+  color: var(--bone);
+  background: rgba(13, 13, 13, .75);
+  padding: .5rem .8rem;
+  border: 1px solid var(--slate-2);
+  z-index: 10;
+  pointer-events: none;
+}
+.range__hud .display { font-family: var(--font-display); font-size: 2.4rem; line-height: 1; color: var(--gold); }
+.range__hud .display small { font-size: .9rem; color: var(--slate-2); font-family: var(--font-mono); }
+.range__delta { font-size: .75rem; color: var(--slate-2); font-family: var(--font-mono); }
+
+/* Control bar: bottom-centre, clickable (use after Esc releases the pointer lock). */
+.range__bar {
+  position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%);
+  display: flex; gap: var(--space-4); align-items: center;
+  background: rgba(13, 13, 13, .82);
+  border: 1px solid var(--slate-2);
+  padding: .5rem var(--space-4);
+  z-index: 11;
+  pointer-events: auto;
+}
+
+.range__hint {
+  position: fixed; left: 50%; bottom: calc(var(--space-4) + 3.4rem); transform: translateX(-50%);
+  font-size: .7rem; color: var(--slate-2);
+  z-index: 10; pointer-events: none; white-space: nowrap;
+}
