@@ -3,6 +3,7 @@ import './styles/base.css';
 import './styles/shell.css';
 import './styles/case-study.css';
 import './styles/options.css';
+import './styles/calibrate.css';
 import { createShell, type Route, type ScreenFactory } from './ui/shell';
 import { createStorage } from './state/storage';
 import { hero } from './ui/hero';

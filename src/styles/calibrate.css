@@ -1,0 +1,14 @@
+.calibrate__stage { position: relative; width: 100%; background: #000;
+  border: 1px solid var(--line, #26262e); border-radius: 14px; overflow: hidden; }
+.calibrate__canvas { display: block; width: 100%; height: 360px; cursor: crosshair; }
+.calibrate__hint { position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; text-align: center; pointer-events: none; }
+.calibrate__hint span { background: rgba(0,0,0,.6); padding: 11px 18px; border-radius: 10px; }
+.calibrate__readouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.calibrate__ro { border: 1px solid var(--line, #26262e); border-radius: 12px; padding: 12px 14px; }
+.calibrate__ro .k { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; opacity: .65; }
+.calibrate__ro .v { font-size: 22px; margin-top: 5px; }
+.calibrate__progress { height: 8px; border: 1px solid var(--line, #26262e); border-radius: 999px;
+  overflow: hidden; margin: 10px 0; }
+.calibrate__progress > div { height: 100%; width: 0; background: var(--accent, #ff3b30); }
+.calibrate__good { color: #39d98a; } .calibrate__warn { color: #ffb020; }
