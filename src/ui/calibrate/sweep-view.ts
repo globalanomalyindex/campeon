@@ -12,7 +12,7 @@ type Phase = 'idle-slow' | 'running-slow' | 'idle-fast' | 'running-fast';
 
 export function createSweepView(
   host: HTMLElement,
-  opts: { padWidthCm: number; onResult: (r: SweepResult) => void; onInvalid: () => void },
+  opts: { padWidthCm: number; onResult: (r: SweepResult) => void; onInvalid: () => void; onLockFailed: () => void },
 ): SweepView {
   host.innerHTML = `
     <section class="screen screen--arena fade-in">
@@ -65,7 +65,7 @@ export function createSweepView(
   }
 
   const onLock = (): void => { $('hint').style.display = pointer.isLocked() ? 'none' : 'flex'; };
-  const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onInvalid()); };
+  const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onLockFailed()); };
   document.addEventListener('pointerlockchange', onLock);
   canvas.addEventListener('click', onCanvasClick);
 

@@ -50,7 +50,8 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     if (state.step === 'sweep') {
       view = createSweepView(host, { padWidthCm: state.padWidthCm,
         onResult: (r) => dispatch({ type: 'sweep-done', dpi: r.dpi, accelerated: r.accelerated }),
-        onInvalid: () => dispatch({ type: 'sweep-done', dpi: NaN, accelerated: true }) });
+        onInvalid: () => dispatch({ type: 'sweep-done', dpi: NaN, accelerated: true }),
+        onLockFailed: () => dispatch({ type: 'start-manual' }) });
       return;
     }
     if (state.step === 'turn' && state.dpi !== null) {
