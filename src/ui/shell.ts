@@ -57,11 +57,28 @@ const GUARDS: Partial<Record<Route, (ctx: AppContext) => Route | null>> = {
 export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void; context: AppContext } {
   let current: Screen | null = null;
 
+  // Old-school film cut between screens: a quick cream flash on every route change.
+  const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let flashEl: HTMLElement | null = null;
+  function flashCut(): void {
+    if (reduceMotion || typeof document === 'undefined') return;
+    if (!flashEl) {
+      flashEl = document.createElement('div');
+      flashEl.className = 'route-flash';
+      flashEl.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(flashEl);
+    }
+    flashEl.classList.remove('is-on');
+    void flashEl.offsetWidth; // reflow so the animation restarts on rapid navigation
+    flashEl.classList.add('is-on');
+  }
+
   const context: AppContext = {
     route: 'hero',
     storage: deps.storage ?? inMemoryStorage(),
     draft: defaultDraft(),
     navigate(route: Route) {
+      flashCut();
       location.hash = ROUTE_HASH[route];
       render(route);
     },
@@ -87,7 +104,7 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     // echo is deduped here so a screen never mounts twice. Genuine nav (back/forward) still routes.
     window.addEventListener('hashchange', () => {
       const next = routeFromHash();
-      if (next !== context.route) render(next);
+      if (next !== context.route) { flashCut(); render(next); }
     });
     render(routeFromHash());
   }

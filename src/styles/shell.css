@@ -21,6 +21,12 @@
 .fade-in { animation: fade-in var(--dur-med) var(--ease-out); }
 @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+/* film-cut flash between screens (set by the shell router on every navigation) */
+.route-flash { position: fixed; inset: 0; z-index: 9999; background: var(--cinema-cream, #efe7d6); opacity: 0; pointer-events: none; }
+.route-flash.is-on { animation: route-cut 280ms var(--ease-out); }
+@keyframes route-cut { 0% { opacity: .85; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .route-flash { display: none; } }
+
 /* ─── Hero: spaghetti-western title sequence → menu ─────────────────────────── */
 .hero {
   position: fixed; inset: 0; z-index: 0;
@@ -54,35 +60,41 @@
   transition: opacity 380ms var(--ease-out);
 }
 .intro.is-gone { opacity: 0; pointer-events: none; }
-.intro__stack { display: grid; gap: var(--space-4); text-align: center; max-width: min(90vw, 56ch); padding: 0 var(--space-4); }
+/* lines overlap in a single centered cell so one fades out while the next fades in (one at a time) */
+.intro__stack { display: grid; place-items: center; text-align: center; padding: 0 var(--space-4); }
+.intro__line, .intro__title { grid-area: 1 / 1; }
 .intro__line {
-  font-family: var(--font-cinema); color: var(--cinema-cream);
+  font-family: var(--font-cinema); color: var(--cinema-cream); max-width: min(90vw, 52ch);
   font-size: clamp(1.4rem, 3.4vw, 2.7rem); line-height: 1.22; letter-spacing: .01em;
-  opacity: 0; transform: translateY(14px); filter: blur(6px);
-  transition: opacity 760ms var(--ease-out), transform 760ms var(--ease-out), filter 760ms var(--ease-out);
+  opacity: 0; filter: blur(3px);
+  transition: opacity 1400ms var(--ease-out), filter 1400ms var(--ease-out);
 }
-.intro__line.is-on { opacity: 1; transform: none; filter: blur(0); }
+.intro__line.is-on { opacity: 1; filter: blur(0); }
 .intro__title {
-  font-family: var(--font-cinema); color: var(--blood);
-  font-size: clamp(3rem, 12vw, 8rem); line-height: 1; letter-spacing: -.01em; margin-top: var(--space-3);
-  opacity: 0; transform: scale(.96); filter: blur(8px);
-  transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out), filter 700ms var(--ease-out), text-shadow 700ms var(--ease-out);
+  font-family: var(--font-cinema); line-height: 1; letter-spacing: -.01em;
+  font-size: clamp(3rem, 12vw, 8rem);
+  opacity: 0; transform: scale(.97); filter: blur(8px);
+  transition: opacity 1400ms var(--ease-out), transform 1400ms var(--ease-out), filter 1400ms var(--ease-out);
 }
-.intro__title.is-on { opacity: 1; transform: none; filter: blur(0); text-shadow: 0 0 30px color-mix(in oklab, var(--blood) 55%, transparent); }
+.intro__title.is-on { opacity: 1; transform: none; filter: blur(0); }
+.intro__el { color: var(--cinema-cream); }
+.intro__champ { color: var(--blood); transition: filter 700ms var(--ease-out); }
+/* glow via filter (drop-shadow), not text-shadow, to stay on the compositor-safe property set */
+.intro__title.is-on .intro__champ { filter: drop-shadow(0 0 16px color-mix(in oklab, var(--blood) 60%, transparent)); }
 .intro__skip {
   position: absolute; bottom: var(--space-4); right: var(--space-4); z-index: 4;
   background: none; border: 0; cursor: pointer;
   color: color-mix(in oklab, var(--cinema-cream) 55%, transparent);
   font-family: var(--font-mono); font-size: .78rem; letter-spacing: .14em; text-transform: uppercase;
-  transition: color 140ms ease;
+  transition: color 140ms var(--ease-out);
 }
 .intro__skip:hover { color: var(--cinema-cream); }
 
 /* the menu (the resolved end state) */
 .hero__menu {
-  position: relative; z-index: 3;
-  display: grid; place-items: center; gap: var(--space-2); text-align: center;
-  padding: var(--space-5) var(--space-4);
+  position: relative; z-index: 3; justify-self: start;
+  display: grid; justify-items: start; gap: var(--space-2); text-align: left;
+  padding: var(--space-5) clamp(1.5rem, 9vw, 9rem);
 }
 .hero__mark {
   font-family: var(--font-cinema); font-size: clamp(3.5rem, 13vw, 9rem); line-height: .95;
@@ -109,16 +121,17 @@
 
 .hero__tagline { color: color-mix(in oklab, var(--cinema-cream) 68%, transparent); font-size: 1rem; letter-spacing: .02em; max-width: 44ch; }
 .hero__byline { font-family: var(--font-cinema); font-style: italic; color: var(--gold); font-size: 1.05rem; }
-.hero__nav { display: flex; gap: var(--space-4); justify-content: center; margin-top: var(--space-3); }
+.hero__nav { display: flex; gap: var(--space-4); justify-content: flex-start; margin-top: var(--space-3); }
 .hero__nav .action--ghost { color: color-mix(in oklab, var(--cinema-cream) 58%, transparent); }
 .hero__nav .action--ghost:hover { color: var(--cinema-cream); }
 
 @media (prefers-reduced-motion: reduce) {
-  .reel { animation: none; }
+  .reel { display: none; }
   .flash { display: none; }
   .intro__line, .intro__title { transition: opacity 300ms ease; transform: none; filter: none; }
-  .intro__title.is-on { text-shadow: none; }
+  .intro__title.is-on .intro__champ { filter: none; }
   .hero__mark { will-change: auto; }
+  .hero__tagline, .hero__menu > .action, .hero__byline, .hero__nav { transform: none; transition: opacity 220ms ease; }
 }
 
 /* ─── Setup screen ─────────────────────────────────────────────────────────── */
