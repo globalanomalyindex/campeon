@@ -1,6 +1,7 @@
-// Effective DPI measured from a horizontal sweep across a known pad width. The pointer-lock
-// samples are already DPR-normalized counts, so this is true mouse DPI (and catches a mouse
-// whose labeled DPI is wrong). Net horizontal travel is the pad width, so we sum signed dx.
+// Effective DPI measured from a horizontal sweep across a known reference width (a wallet card).
+// The pointer-lock samples are already DPR-normalized counts, so this is true mouse DPI (and
+// catches a mouse whose labeled DPI is wrong). Net horizontal travel is the reference width, so
+// we sum signed dx.
 import { isValidDpi } from './dpi';
 import type { AimSample, Dpi } from '../types';
 
