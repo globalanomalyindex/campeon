@@ -7,6 +7,7 @@
 import { createPointerLock } from '../../input/pointer-lock';
 import { accelVerdict, accelTolForWidth } from '../../input/accel-check';
 import { SweepAccumulator, dpiFromSweep, isPlausibleSweepDpi } from '../../input/dpi-sweep';
+import { hex, rgba } from '../../palette';
 
 export interface SweepResult { dpi: number; accelerated: boolean; }
 export interface SweepView { dispose(): void; }
@@ -87,24 +88,24 @@ export function createSweepView(
     const mid = H / 2;
     ctx.clearRect(0, 0, W, H);
     // left-edge start marker (where the card's left end goes)
-    ctx.strokeStyle = 'rgba(255,196,0,.55)'; ctx.lineWidth = 3;
+    ctx.strokeStyle = rgba('gold', 0.55); ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(6, H * 0.18); ctx.lineTo(6, H * 0.82); ctx.stroke();
     // right-edge finish band during a running pass
-    if (running()) { ctx.fillStyle = 'rgba(255,196,0,.08)'; ctx.fillRect(W - W * 0.16, 0, W * 0.16, H); }
+    if (running()) { ctx.fillStyle = rgba('gold', 0.08); ctx.fillRect(W - W * 0.16, 0, W * 0.16, H); }
     // animated direction arrow: rightward while sweeping, leftward to cue "go back" before the fast pass
     const dir = phase === 'idle-fast' ? -1 : 1;
     if (running() || phase === 'idle-fast') drawArrow(ctx, ts, dir, W, mid, ready && running());
     // cardiogram trail
-    ctx.strokeStyle = 'rgba(234,231,220,.12)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba('cream', 0.12); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
     if (trail.length >= 2) {
       const first = trail[0]!;
-      ctx.strokeStyle = '#FFC400'; ctx.lineWidth = 2;
+      ctx.strokeStyle = hex.gold; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(first.x, first.y);
       for (let i = 1; i < trail.length; i++) { const p = trail[i]!; ctx.lineTo(p.x, p.y); }
       ctx.stroke();
       const head = trail[trail.length - 1]!;
-      ctx.fillStyle = '#FFC400'; ctx.beginPath(); ctx.arc(head.x, head.y, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = hex.gold; ctx.beginPath(); ctx.arc(head.x, head.y, 3, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -226,7 +227,7 @@ export function createSweepView(
 function drawArrow(ctx: CanvasRenderingContext2D, ts: number, dir: number, W: number, y: number, done: boolean): void {
   const period = 1400, span = W * 0.5, x0 = W * 0.25;
   const t = (ts % period) / period;
-  ctx.strokeStyle = done ? 'rgba(57,217,138,.9)' : 'rgba(255,196,0,.8)';
+  ctx.strokeStyle = done ? rgba('ok', 0.9) : rgba('gold', 0.8);
   ctx.lineWidth = 3; ctx.lineCap = 'round';
   for (let i = 0; i < 3; i++) {
     const f = (t + i * 0.18) % 1;

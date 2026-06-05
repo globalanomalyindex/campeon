@@ -1,37 +1,37 @@
-.calibrate__stage { position: relative; width: 100%; background: #000;
-  border: 1px solid var(--line, #26262e); border-radius: 14px; overflow: hidden; }
+.calibrate__stage { position: relative; width: 100%; background: var(--cinema-ink);
+  border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .calibrate__canvas { display: block; width: 100%; height: 360px; cursor: crosshair; }
 .calibrate__hint { position: absolute; inset: 0; display: flex; align-items: center;
   justify-content: center; text-align: center; pointer-events: none; }
-.calibrate__hint span { background: rgba(0,0,0,.6); padding: 11px 18px; border-radius: 10px; }
+.calibrate__hint span { background: var(--scrim); padding: 11px 18px; border-radius: 10px; }
 .calibrate__readouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
 .calibrate__ro { border: 1px solid var(--line, #26262e); border-radius: 12px; padding: 12px 14px; }
 .calibrate__ro .k { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; opacity: .65; }
 .calibrate__ro .v { font-size: 22px; margin-top: 5px; }
 .calibrate__progress { height: 8px; border: 1px solid var(--line, #26262e); border-radius: 999px;
   overflow: hidden; margin: 10px 0; }
-.calibrate__progress > div { height: 100%; width: 0; background: var(--accent, #ff3b30); }
-.calibrate__good { color: #39d98a; } .calibrate__warn { color: #ffb020; }
+.calibrate__progress > div { height: 100%; width: 0; background: var(--accent); }
+.calibrate__good { color: var(--ok); } .calibrate__warn { color: var(--warn); }
 
 /* ── guided cues: one step at a time ─────────────────────────────────────── */
 /* persistent 2-segment journey tracker, overlaid top-center across sweep + spin */
 .cal-progress { position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px; z-index: 30;
-  background: rgba(13,13,13,.78); border: 1px solid var(--line, #26262e);
+  background: var(--scrim); border: 1px solid var(--line);
   border-radius: 999px; padding: 6px 14px; font: 600 12px var(--font-mono, ui-monospace, monospace); }
-.cal-progress__seg { display: inline-flex; align-items: center; gap: 6px; color: var(--slate-2, #6c7a85);
+.cal-progress__seg { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted);
   letter-spacing: .04em; }
-.cal-progress__seg[data-state="active"] { color: var(--gold, #ffc400); }
-.cal-progress__seg[data-state="done"] { color: #39d98a; }
+.cal-progress__seg[data-state="active"] { color: var(--gold); }
+.cal-progress__seg[data-state="done"] { color: var(--ok); }
 .cal-progress__num { display: inline-grid; place-items: center; width: 18px; height: 18px;
   border-radius: 999px; border: 1px solid currentColor; font-size: 11px; }
-.cal-progress__arrow { color: var(--slate-2, #6c7a85); }
+.cal-progress__arrow { color: var(--text-muted); }
 
 /* step / pass pill */
 .cal-step { display: inline-block; align-self: flex-start; padding: 4px 11px; border-radius: 999px;
   border: 1px solid var(--gold, #ffc400); color: var(--gold, #ffc400);
   font: 600 11px var(--font-mono, ui-monospace, monospace); letter-spacing: .06em; text-transform: uppercase; }
-.cal-step--done { border-color: #39d98a; color: #39d98a; }
+.cal-step--done { border-color: var(--ok); color: var(--ok); }
 
 /* pulsing "click here" ring used inside the canvas hint overlay */
 .cal-pulse { position: relative; width: 64px; height: 64px; border-radius: 999px;
@@ -55,8 +55,8 @@
 /* pace meter: a bar that turns green when the user's speed is in the right range */
 .cal-pace { height: 10px; border: 1px solid var(--line, #26262e); border-radius: 999px; overflow: hidden;
   margin: 10px 0; position: relative; }
-.cal-pace__fill { height: 100%; width: 0; transition: width 90ms linear, background 140ms; background: #ffb020; }
-.cal-pace__fill[data-ok="true"] { background: #39d98a; }
+.cal-pace__fill { height: 100%; width: 0; transition: width 90ms linear, background 140ms; background: var(--warn); }
+.cal-pace__fill[data-ok="true"] { background: var(--ok); }
 .cal-pace__label { font-size: 11px; opacity: .7; margin-top: -2px; }
 
 /* intro preview list */

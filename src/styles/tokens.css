@@ -1,14 +1,4 @@
 @font-face {
-  font-family: 'Gefalent';
-  src: url('./fonts/Gefalent-Regular.otf') format('opentype');
-  font-weight: 400; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gefalent';
-  src: url('./fonts/Gefalent-Italic.otf') format('opentype');
-  font-weight: 400; font-style: italic; font-display: swap;
-}
-@font-face {
   font-family: 'Bartine Disco';
   src: url('./fonts/BartineDisco-Regular.otf') format('opentype');
   font-weight: 400; font-style: normal; font-display: swap;
@@ -19,23 +9,50 @@
   font-weight: 400; font-style: italic; font-display: swap;
 }
 :root {
-  /* palette (sampled from the hero) */
-  --bone: #EAE7DC;
-  --slate: #4A5A66;
-  --slate-2: #6C7A85;
-  --gold: #FFC400;
-  --ink: #0D0D0D;
-  --parchment: #EFDEA5;
-  /* organism accents (track=slate, flick=gold from the core palette; +2 harmonized hues) */
-  --c-track: #4A5A66;     /* falcon/dragonfly - slate */
-  --c-flick: #FFC400;     /* spider/raptor - gold */
-  --c-calibrate: #7FA6B6; /* archerfish - water blue (cool, harmonized with slate) */
-  --c-strike: #E8702A;    /* mantis shrimp - strike ember (warm, harmonized with gold) */
-  /* spaghetti-western title sequence (the hero intro) */
-  --font-cinema: 'Bartine Disco', 'Gefalent', serif;
-  --cinema-ink: #0c0b09;   /* warm near-black title screen (never pure #000) */
-  --cinema-cream: #efe7d6; /* aged-cream cinematic text */
-  --blood: #c4251f;        /* spaghetti-western title red (deeper than the in-arena marker red) */
+  /* ── the one cinematic world: a warm spaghetti-western film stock ──────────────
+     Every screen lives here. Surfaces are warm near-black; ink is aged cream; the
+     two accents are a western blood-red (identity) and brass gold (value/action). */
+  --cinema-ink: #0c0b09;     /* warm near-black film stock (never pure #000) */
+  --cinema-cream: #efe7d6;   /* aged-cream cinematic ink */
+  --blood: #c4251f;          /* western title red - identity accent */
+  --gold: #FFC400;           /* brass gold - value + primary action (matches the arena/calibrate canvases) */
+
+  /* surfaces: lifted panels are cream mixed into the film stock, so they never go cold */
+  --surface:        var(--cinema-ink);
+  --surface-raised: color-mix(in oklab, var(--cinema-cream) 7%, var(--cinema-ink));   /* inputs, panels */
+  --surface-sunk:   color-mix(in oklab, #050403 55%, var(--cinema-ink));              /* insets, figures, arena chrome */
+  --scrim:          color-mix(in oklab, var(--cinema-ink) 86%, transparent);          /* translucent HUD/overlay backing */
+
+  /* ink (text) on the film stock */
+  --text:        var(--cinema-cream);
+  --text-muted:  color-mix(in oklab, var(--cinema-cream) 64%, transparent);
+  --text-faint:  color-mix(in oklab, var(--cinema-cream) 42%, transparent);
+
+  /* hairlines + the calibrate/accent hooks (calibrate.css reads var(--line)/var(--accent) with fallbacks) */
+  --line:        color-mix(in oklab, var(--cinema-cream) 16%, transparent);
+  --line-strong: color-mix(in oklab, var(--cinema-cream) 30%, transparent);
+  --accent:      var(--blood);
+  --ok:   #6fc28a;   /* warmed status green (pace meter good) */
+  --warn: #e0a23a;   /* warmed status amber (pace meter warn) */
+
+  /* legacy aliases - kept so existing rules resolve into the cinematic world.
+     bone = the page, ink = darkest surface, slate/slate-2 = muted cream + hairline. */
+  --bone: var(--surface);
+  --ink: var(--cinema-ink);
+  --parchment: var(--line);
+  --slate:   var(--text-muted);
+  --slate-2: var(--text-faint);
+  --cinema-cream-fixed: #efe7d6;
+
+  /* organism accents (instrument identities in the arena + case study) */
+  --c-track: #7c93a3;     /* dragonfly/falcon - cool steel (kept cool: it is a per-organism signal, not chrome) */
+  --c-flick: var(--gold); /* spider/raptor - gold */
+  --c-calibrate: #7FA6B6; /* archerfish - water blue */
+  --c-strike: #E8702A;    /* mantis shrimp - strike ember */
+
+  /* the title-sequence font, app-wide */
+  --font-cinema: 'Bartine Disco', serif;
+
   /* type */
   --font-display: 'Bartine Disco', system-ui, sans-serif;
   --font-body: system-ui, -apple-system, sans-serif;

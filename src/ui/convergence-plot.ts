@@ -89,7 +89,7 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
   }
   if (g.curvePath) {
     svg.appendChild(el('path', {
-      d: g.curvePath, fill: 'none', stroke: 'var(--bone)', 'stroke-width': '2',
+      d: g.curvePath, fill: 'none', stroke: 'var(--cinema-cream)', 'stroke-width': '2',
       'stroke-opacity': '0.7', 'data-curve': '',
     }));
   }
@@ -111,7 +111,7 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
   for (const t of g.xTicks) {
     const label = el('text', {
       x: t.px.toFixed(2), y: String(g.size.height - 8), 'text-anchor': 'middle',
-      fill: 'var(--slate-2)', 'font-size': '10', 'font-family': 'var(--font-mono)',
+      fill: 'var(--text-muted)', 'font-size': '10', 'font-family': 'var(--font-mono)',
     });
     label.textContent = String(t.cm360);
     svg.appendChild(label);
@@ -122,7 +122,7 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
     const lab = el('text', {
       x: '10', y: yc.toFixed(1), 'text-anchor': 'middle',
       transform: `rotate(-90 10 ${yc.toFixed(1)})`,
-      fill: 'var(--slate-2)', 'font-size': '10', 'font-family': 'var(--font-mono)', 'data-ylabel': '',
+      fill: 'var(--text-muted)', 'font-size': '10', 'font-family': 'var(--font-mono)', 'data-ylabel': '',
     });
     lab.textContent = yLabel;
     svg.appendChild(lab);

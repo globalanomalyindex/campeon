@@ -1,22 +1,25 @@
-// The hero is a spaghetti-western title sequence that resolves into the menu. A Darwin epigraph fades
-// in and out one line at a time (auto-paced, click to advance / skip line by line), "el campeón"
-// lands ("el" in cream, "campeón" in red), a screen flash cuts to the "campeón" mark with a vertical
-// film-reel weave that settles, and a second click-flash brings up the (left-aligned) menu + byline.
-// Reduced-motion and returning-this-session visitors go straight to the menu.
+// The hero is a spaghetti-western title sequence that resolves into the menu. A definition of
+// evolution fades in and out one line at a time (auto-paced, click to advance / skip line by line),
+// "el campeón" lands ("el" in cream, "campeón" in red), a screen flash cuts to the "campeón" mark
+// with a vertical film-reel weave that settles, and a second click-flash brings up the (left-aligned)
+// menu + byline. Reduced-motion and returning-this-session visitors go straight to the menu.
 import type { AppContext, Screen } from './shell';
 
-// PLACEHOLDER copy: the canonical Darwin adaptation epigraph (commonly attributed). Swap this array
-// for the exact quote from the Figma once it is available - the choreography is content-agnostic.
+// The epigraph: a one-sentence definition of evolution dealt out as four title cards, resolving into
+// "el campeón" (the one that cannot be beaten). It mirrors the engine - one trait (cm/360) perfected
+// across generations of trials. The choreography is content-agnostic; line count drives the pacing.
 const LINES = [
-  'it is not the strongest that survives,',
-  'nor the most intelligent,',
-  'but the one most responsive to change.',
-  'charles darwin',
+  'evolution is defined as',
+  'the slow perfecting of one trait,',
+  'across a thousand generations,',
+  'until it cannot be beaten.',
 ];
 
-const LINE_IN = 1400;   // ms fade-in (matches the CSS transition)
+const LINE_IN = 1400;   // ms fade-in (matches the .is-on CSS transition)
 const LINE_HOLD = 950;  // ms a line holds at full opacity
-const FADE_OUT = 1150;  // ms a line takes to clear before the next fades in
+// the gap before the next beat begins. MUST be >= the CSS fade-OUT (1000ms) so the outgoing line is
+// fully gone before the next fades in - nothing ever overlaps. The 100ms surplus is a clean breath.
+const FADE_OUT = 1100;
 const TITLE_HOLD = 1700; // ms "el campeón" holds before the flash cut to the hero
 
 const prefersReduced = (): boolean =>

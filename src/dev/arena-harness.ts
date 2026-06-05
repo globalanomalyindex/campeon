@@ -42,7 +42,7 @@ export function mountArenaHarness(root: HTMLElement): void {
   const cross = document.createElement('div');
   cross.style.cssText =
     'position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;' +
-    'border-radius:50%;background:#FFC400;box-shadow:0 0 0 1px #0D0D0D;pointer-events:none;';
+    'border-radius:50%;background:#FFC400;box-shadow:0 0 0 1px #0c0b09;pointer-events:none;';
   root.appendChild(cross);
 
   const hud = document.createElement('pre');

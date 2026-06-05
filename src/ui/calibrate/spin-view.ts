@@ -7,6 +7,7 @@
 // helper. Runtime-verified, not unit-tested.
 import { createPointerLock } from '../../input/pointer-lock';
 import { degPerCountFor, cm360FromTurnCounts } from '../../convert/turn-rate';
+import { hex, rgba } from '../../palette';
 import type { Cm360 } from '../../types';
 
 export interface SpinView { dispose(): void; }
@@ -68,26 +69,26 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
 
     ctx.globalAlpha = repositioning ? 0.4 : 1;
     ctx.lineWidth = 10; ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(234,231,220,0.14)';
+    ctx.strokeStyle = rgba('cream', 0.14);
     ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
     const frac = Math.min(1, deg / 360);
-    ctx.strokeStyle = repositioning ? '#ffb020' : (near ? '#39d98a' : '#FFC400');
+    ctx.strokeStyle = repositioning ? hex.warn : (near ? hex.ok : hex.gold);
     ctx.beginPath(); ctx.arc(cx, cy, rad, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
 
     // home marker + label (glows green once a full turn is reached)
     const glow = near && !repositioning;
-    if (glow) { ctx.shadowColor = '#39d98a'; ctx.shadowBlur = 14; }
-    ctx.fillStyle = glow ? '#39d98a' : '#ff3b30';
+    if (glow) { ctx.shadowColor = hex.ok; ctx.shadowBlur = 14; }
+    ctx.fillStyle = glow ? hex.ok : hex.blood;
     ctx.beginPath(); ctx.arc(cx, cy - rad, 6, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(234,231,220,.7)'; ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = rgba('cream', 0.7); ctx.font = '11px ui-monospace, monospace';
     ctx.textAlign = 'center'; ctx.fillText('home', cx, cy - rad - 12);
 
     // center readout
     ctx.globalAlpha = 1; ctx.textBaseline = 'middle';
-    if (flashing) { ctx.fillStyle = '#ffb020'; ctx.font = '600 16px ui-monospace, monospace'; ctx.fillText('almost - keep turning', cx, cy); }
-    else if (repositioning) { ctx.fillStyle = '#ffb020'; ctx.font = '600 20px ui-monospace, monospace'; ctx.fillText('paused', cx, cy); }
-    else { ctx.fillStyle = 'rgba(234,231,220,.92)'; ctx.font = '600 26px ui-monospace, monospace'; ctx.fillText(Math.round(Math.min(360, deg)) + '°', cx, cy); }
+    if (flashing) { ctx.fillStyle = hex.warn; ctx.font = '600 16px ui-monospace, monospace'; ctx.fillText('almost - keep turning', cx, cy); }
+    else if (repositioning) { ctx.fillStyle = hex.warn; ctx.font = '600 20px ui-monospace, monospace'; ctx.fillText('paused', cx, cy); }
+    else { ctx.fillStyle = rgba('cream', 0.92); ctx.font = '600 26px ui-monospace, monospace'; ctx.fillText(Math.round(Math.min(360, deg)) + '°', cx, cy); }
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 
     // cues
@@ -168,7 +169,7 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
 function drawSideArrow(ctx: CanvasRenderingContext2D, ts: number, cx: number, y: number, half: number): void {
   const t = (Math.sin((ts % 1600) / 1600 * Math.PI * 2) + 1) / 2; // 0..1 ease
   const x = cx - half + t * half * 2;
-  ctx.strokeStyle = 'rgba(255,196,0,.8)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.strokeStyle = rgba('gold', 0.8); ctx.lineWidth = 3; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(cx - half, y); ctx.lineTo(cx + half, y); ctx.stroke();
   // moving chevron showing the drag head
   ctx.beginPath();
@@ -178,7 +179,7 @@ function drawSideArrow(ctx: CanvasRenderingContext2D, ts: number, cx: number, y:
 /** A pulsing green ring at the dial center, inviting the quick-click to finish (only when valid). */
 function drawFinishPulse(ctx: CanvasRenderingContext2D, ts: number, cx: number, cy: number, base: number): void {
   const t = (ts % 1400) / 1400;
-  ctx.strokeStyle = `rgba(57,217,138,${0.7 * (1 - t)})`;
+  ctx.strokeStyle = rgba('ok', 0.7 * (1 - t));
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(cx, cy, base * (0.7 + t * 0.6), 0, Math.PI * 2); ctx.stroke();
 }
