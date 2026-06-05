@@ -1,5 +1,6 @@
 // Guided calibration orchestrator. Pure step machine (calibrate-flow) under a thin shell that
-// mounts the sweep + turn views and writes the session draft. Retires the typed setup + the gate.
+// mounts the sweep + spin views and writes the session draft. The game pick is deferred to the
+// result; the speed/accuracy goal defaults to balanced. Retires the typed setup + the gate.
 import type { AppContext, Screen } from './shell';
 import type { GameId } from '../types';
 import { GAME_YAW, yawFor } from '../convert/yaw-table';
@@ -8,11 +9,11 @@ import { boundsFromSeed } from './options/settings';
 import { CARD_WIDTH_CM } from '../input/dpi-sweep';
 import { calibrateReducer, initialCalState, type CalState } from './calibrate-flow';
 import { createSweepView, type SweepView } from './calibrate/sweep-view';
-import { createTurnView, type TurnView } from './calibrate/turn-view';
+import { createSpinView, type SpinView } from './calibrate/spin-view';
 
 export function setup(host: HTMLElement, ctx: AppContext): Screen {
   let state: CalState = initialCalState();
-  let view: SweepView | TurnView | null = null;
+  let view: SweepView | SpinView | null = null;
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function dispatch(a: Parameters<typeof calibrateReducer>[1]): void {
@@ -26,12 +27,11 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     return GAME_YAW.map((g) => `<option value="${g.id}"${g.id === sel ? ' selected' : ''}>${g.label}</option>`).join('');
   }
 
-  function commitGuided(game: GameId, goal: number): void {
+  function commitGuided(seedCm360: number): void {
     const dpi = state.dpi;
     if (dpi !== null) ctx.draft.dpi = dpi;
-    ctx.draft.currentGame = game;
-    ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: goal };
-    ctx.draft.bounds = boundsFromSeed(state.seedCm360 ?? cmPer360(ctx.draft.dpi, 1, yawFor(game)));
+    ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: 0.5 }; // balanced default; tune later on options
+    ctx.draft.bounds = boundsFromSeed(seedCm360); // the spin always supplies a seed
     ctx.navigate('session');
   }
 
@@ -55,9 +55,9 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
         onLockFailed: () => dispatch({ type: 'start-manual' }) });
       return;
     }
-    if (state.step === 'turn' && state.dpi !== null) {
+    if (state.step === 'spin' && state.dpi !== null) {
       const dpi = state.dpi;
-      view = createTurnView(host, { dpi, onSeed: (cm) => dispatch({ type: 'turn-done', seedCm360: cm }) });
+      view = createSpinView(host, { dpi, onSeed: (cm) => commitGuided(cm) });
       return;
     }
 
@@ -94,15 +94,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
         <button class="action action--primary" data-action="manual-begin">begin</button>
         <button class="action action--ghost" data-action="back">back</button>
       </div>`;
-    // step === 'game'
-    return `
-      <div class="wrap stack setup__inner">
-        <h2 class="display setup__title">+ your game</h2>
-        <p class="setup__lead">your comfortable spin is <span class="mono">${(state.seedCm360 ?? 0).toFixed(1)}</span> cm per full turn. pick your game so we can give you the number to enter.</p>
-        <label class="field">game<select data-field="game">${gameOptions(ctx.draft.currentGame)}</select></label>
-        <label class="field">goal - precision to speed<input type="range" min="0" max="1" step="0.01" data-field="goal" value="${ctx.draft.profile.speedAccuracy}"></label>
-        <button class="action action--primary" data-action="game-begin">play</button>
-      </div>`;
+    return ''; // 'spin' returns early in render(); no other steps reach here
   }
 
   function wire(root: HTMLElement): void {
@@ -114,7 +106,6 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     click('manual', () => dispatch({ type: 'start-manual' }));
     click('back', () => dispatch({ type: 'back-to-intro' }));
     click('manual-begin', () => commitManual(Number(val('dpi')), Number(val('sens')), val('game') as GameId, Number(val('goal'))));
-    click('game-begin', () => commitGuided(val('game') as GameId, Number(val('goal'))));
   }
 
   return {
