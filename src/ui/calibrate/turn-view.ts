@@ -84,12 +84,13 @@ export function createTurnView(
     else if (e.code === 'Enter' && completed) { pointer.exit(); opts.onSeed(cm360); }
   };
   const onLock = (): void => { $('hint').style.display = pointer.isLocked() ? 'none' : 'flex'; };
+  const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => {}); };
   document.addEventListener('keydown', onKey);
   document.addEventListener('pointerlockchange', onLock);
   window.addEventListener('resize', size);
-  canvas.addEventListener('click', () => { if (!pointer.isLocked()) void pointer.request().catch(() => {}); });
+  canvas.addEventListener('click', onCanvasClick);
   rearm(); size();
 
   return { dispose() { off(); document.removeEventListener('keydown', onKey);
-    document.removeEventListener('pointerlockchange', onLock); window.removeEventListener('resize', size); pointer.dispose(); } };
+    document.removeEventListener('pointerlockchange', onLock); window.removeEventListener('resize', size); canvas.removeEventListener('click', onCanvasClick); pointer.dispose(); } };
 }

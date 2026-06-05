@@ -58,15 +58,16 @@ export function createSweepView(
   function finish(fastCounts: number): void {
     const dpi = dpiFromSweep(slowCounts, opts.padWidthCm);
     $('dpi').textContent = isPlausibleSweepDpi(dpi) ? Math.round(dpi).toString() : 'invalid';
-    if (!isPlausibleSweepDpi(dpi)) { opts.onInvalid(); return; }
+    if (!isPlausibleSweepDpi(dpi)) { pointer.exit(); opts.onInvalid(); return; }
     const { accelerated } = accelVerdict(slowCounts, fastCounts);
     pointer.exit();
     opts.onResult({ dpi: Math.round(dpi), accelerated });
   }
 
   const onLock = (): void => { $('hint').style.display = pointer.isLocked() ? 'none' : 'flex'; };
+  const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onInvalid()); };
   document.addEventListener('pointerlockchange', onLock);
-  canvas.addEventListener('click', () => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onInvalid()); });
+  canvas.addEventListener('click', onCanvasClick);
 
-  return { dispose() { off(); offFire(); document.removeEventListener('pointerlockchange', onLock); pointer.dispose(); } };
+  return { dispose() { off(); offFire(); document.removeEventListener('pointerlockchange', onLock); canvas.removeEventListener('click', onCanvasClick); pointer.dispose(); } };
 }
