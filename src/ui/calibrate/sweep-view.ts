@@ -37,20 +37,59 @@ export function createSweepView(
   const canvas = $('canvas') as HTMLCanvasElement;
   const pointer = createPointerLock(canvas);
 
+  const ctx2d = canvas.getContext('2d');
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const COUNTS_PER_PX = 4.5; // visual scale only; true DPI is unknown mid-sweep
+  const WOBBLE_GAIN = 0.5;   // px of vertical deflection per count of dy
+  let W = 0, H = 0;
+  let trail: Array<{ x: number; y: number }> = [];
+
+  function sizeCanvas(): void {
+    const r = canvas.getBoundingClientRect(); W = r.width; H = r.height;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    ctx2d?.setTransform(dpr, 0, 0, dpr, 0, 0); drawTrail();
+  }
+  function clearTrail(): void { trail = []; drawTrail(); }
+  function pushTrail(dy: number): void {
+    const mid = H / 2;
+    const x = Math.min(W - 2, acc.total() / COUNTS_PER_PX);
+    const prevY = trail.length ? trail[trail.length - 1]!.y : mid;
+    const y = Math.max(2, Math.min(H - 2, prevY + dy * WOBBLE_GAIN));
+    trail.push({ x, y });
+    if (trail.length > 2000) trail.shift();
+    drawTrail();
+  }
+  function drawTrail(): void {
+    if (!ctx2d) return;
+    const mid = H / 2;
+    ctx2d.clearRect(0, 0, W, H);
+    ctx2d.strokeStyle = 'rgba(234,231,220,0.12)'; ctx2d.lineWidth = 1;
+    ctx2d.beginPath(); ctx2d.moveTo(0, mid); ctx2d.lineTo(W, mid); ctx2d.stroke();
+    if (trail.length >= 2) {
+      const first = trail[0]!;
+      ctx2d.strokeStyle = '#FFC400'; ctx2d.lineWidth = 2;
+      ctx2d.beginPath(); ctx2d.moveTo(first.x, first.y);
+      for (let i = 1; i < trail.length; i++) { const p = trail[i]!; ctx2d.lineTo(p.x, p.y); }
+      ctx2d.stroke();
+      const head = trail[trail.length - 1]!;
+      ctx2d.fillStyle = '#FFC400'; ctx2d.beginPath(); ctx2d.arc(head.x, head.y, 3, 0, Math.PI * 2); ctx2d.fill();
+    }
+  }
+
   let phase: Phase = 'idle-slow';
   let slowCounts = 0;
   const acc = new SweepAccumulator();
 
   const off = pointer.onSample((s) => { if (phase === 'running-slow' || phase === 'running-fast') {
-    acc.add(s); $('counts').textContent = Math.round(acc.total()).toString();
+    acc.add(s); $('counts').textContent = Math.round(acc.total()).toString(); pushTrail(s.dy);
   } });
 
   const offFire = pointer.onFire(() => {
     if (!pointer.isLocked()) return;
-    if (phase === 'idle-slow') { acc.reset(); phase = 'running-slow'; setLead("slide SLOWLY across to the card's right end, then click"); }
+    if (phase === 'idle-slow') { acc.reset(); clearTrail(); phase = 'running-slow'; setLead("slide SLOWLY across to the card's right end, then click"); }
     else if (phase === 'running-slow') { slowCounts = acc.total(); phase = 'idle-fast'; $('pass').textContent = 'fast';
       setLead("back to the card's left end, click, then slide FAST across"); }
-    else if (phase === 'idle-fast') { acc.reset(); phase = 'running-fast'; setLead("slide FAST across to the card's right end, then click"); }
+    else if (phase === 'idle-fast') { acc.reset(); clearTrail(); phase = 'running-fast'; setLead("slide FAST across to the card's right end, then click"); }
     else if (phase === 'running-fast') { finish(acc.total()); }
   });
 
@@ -69,6 +108,8 @@ export function createSweepView(
   const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onLockFailed()); };
   document.addEventListener('pointerlockchange', onLock);
   canvas.addEventListener('click', onCanvasClick);
+  window.addEventListener('resize', sizeCanvas);
+  sizeCanvas();
 
-  return { dispose() { off(); offFire(); document.removeEventListener('pointerlockchange', onLock); canvas.removeEventListener('click', onCanvasClick); pointer.dispose(); } };
+  return { dispose() { off(); offFire(); document.removeEventListener('pointerlockchange', onLock); window.removeEventListener('resize', sizeCanvas); canvas.removeEventListener('click', onCanvasClick); pointer.dispose(); } };
 }
