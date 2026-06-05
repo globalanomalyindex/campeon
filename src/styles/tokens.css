@@ -8,6 +8,16 @@
   src: url('./fonts/Gefalent-Italic.otf') format('opentype');
   font-weight: 400; font-style: italic; font-display: swap;
 }
+@font-face {
+  font-family: 'Bartine Disco';
+  src: url('./fonts/BartineDisco-Regular.otf') format('opentype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Bartine Disco';
+  src: url('./fonts/BartineDisco-Italic.otf') format('opentype');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
 :root {
   /* palette (sampled from the hero) */
   --bone: #EAE7DC;
@@ -21,6 +31,11 @@
   --c-flick: #FFC400;     /* spider/raptor - gold */
   --c-calibrate: #7FA6B6; /* archerfish - water blue (cool, harmonized with slate) */
   --c-strike: #E8702A;    /* mantis shrimp - strike ember (warm, harmonized with gold) */
+  /* spaghetti-western title sequence (the hero intro) */
+  --font-cinema: 'Bartine Disco', 'Gefalent', serif;
+  --cinema-ink: #0c0b09;   /* warm near-black title screen (never pure #000) */
+  --cinema-cream: #efe7d6; /* aged-cream cinematic text */
+  --blood: #c4251f;        /* spaghetti-western title red (deeper than the in-arena marker red) */
   /* type */
   --font-display: 'Gefalent', system-ui, sans-serif;
   --font-body: system-ui, -apple-system, sans-serif;
