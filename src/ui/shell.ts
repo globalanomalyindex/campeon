@@ -1,6 +1,6 @@
 import type { Cm360, Dpi, GameId, Profile, Result, Session, Storage } from '../types';
 
-export type Route = 'hero' | 'setup' | 'gate' | 'session' | 'result' | 'case-study' | 'options' | 'range';
+export type Route = 'hero' | 'setup' | 'session' | 'result' | 'case-study' | 'options' | 'range';
 
 export interface Screen {
   mount(): void;
@@ -32,7 +32,7 @@ export interface ShellDeps {
 }
 
 const ROUTE_HASH: Record<Route, string> = {
-  hero: '#/', setup: '#/setup', gate: '#/gate', session: '#/session',
+  hero: '#/', setup: '#/setup', session: '#/session',
   result: '#/result', 'case-study': '#/case-study', options: '#/options',
   range: '#/range',
 };
