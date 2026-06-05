@@ -33,6 +33,8 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
             <div><span class="result__bk-label">time-to-kill <em>mantis shrimp</em></span><span class="mono" data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
             <div><span class="result__bk-label">hit rate</span><span class="mono" data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
           </div>
+          <label class="field result__game-pick">your game
+            <select data-action="your-game">${GAME_YAW.map((g) => `<option value="${g.id}"${g.id === ctx.draft.currentGame ? ' selected' : ''}>${g.label}</option>`).join('')}</select></label>
           <table class="result__games"><thead><tr><th>game</th><th>sensitivity</th></tr></thead><tbody>${rows}</tbody></table>
           <p class="result__saved mono">saved locally</p>
           <div class="result__actions">
@@ -47,6 +49,11 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
         const sessions = ctx.storage.loadSessions();
         const results = ctx.lastResult ? { [ctx.lastResult.sessionId]: ctx.lastResult.result } : {};
         triggerDownload('campeon-result.json', toJson(buildExportBundle(sessions, results, 0)));
+      });
+      const sel = root.querySelector('[data-action="your-game"]') as HTMLSelectElement | null;
+      sel?.addEventListener('change', () => {
+        root.querySelectorAll('tr[data-current="true"]').forEach((tr) => tr.removeAttribute('data-current'));
+        root.querySelector(`tr[data-game="${sel.value}"]`)?.setAttribute('data-current', 'true');
       });
       host.appendChild(root);
     },

@@ -47,6 +47,17 @@ describe('result screen', () => {
     expect(host.querySelector('[data-breakdown="precisionFloorDeg"]')!.textContent).toContain('-');
   });
 
+  it('the your-game selector re-highlights the matching row (deferred game pick)', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount();
+    const select = host.querySelector('[data-action="your-game"]') as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    select.value = 'valorant';
+    select.dispatchEvent(new Event('change'));
+    expect(host.querySelector('tr[data-game="valorant"]')!.getAttribute('data-current')).toBe('true');
+    expect(host.querySelectorAll('tr[data-current="true"]').length).toBe(1); // only one row current
+  });
+
   it('+ run again navigates home', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
