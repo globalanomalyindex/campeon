@@ -39,7 +39,7 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
   let paused = false;        // counting suspended (set on mousedown until classified)
   let repositioning = false; // UI: showing the reposition prompt (set by the hold timer)
   let W = 0, H = 0;
-  let downAt = 0, downSwept = 0;
+  let downAt = 0, pressMoved = 0; // pressMoved = travel during the current press (tap-vs-hold)
   let holdTimer: number | null = null;
 
   const progressDeg = (): number => Math.abs(swept) * degPerCount;
@@ -68,22 +68,22 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
   function setLead(t: string): void { $('lead').textContent = t; }
 
   const off = pointer.onSample((s) => {
-    if (!pointer.isLocked() || paused) return;
+    if (!pointer.isLocked()) return;
+    if (paused) { pressMoved += Math.abs(s.dx); return; } // movement during a press: classifies tap vs hold, never counts
     swept += s.dx; draw();
   });
 
   const onDown = (ev: MouseEvent): void => {
     if (!pointer.isLocked() || ev.button !== 0) return;
-    downAt = ev.timeStamp; downSwept = swept; paused = true; // suspend until classified
+    downAt = ev.timeStamp; pressMoved = 0; paused = true; // suspend counting until classified
     holdTimer = window.setTimeout(() => { repositioning = true; setLead('repositioning - reset your mouse, then let go'); draw(); }, TAP_MS);
   };
   const onUp = (ev: MouseEvent): void => {
     if (ev.button !== 0 || downAt === 0) return;
     if (holdTimer !== null) { clearTimeout(holdTimer); holdTimer = null; }
     const dt = ev.timeStamp - downAt;
-    const moved = Math.abs(swept - downSwept);
     downAt = 0;
-    const isTap = dt < TAP_MS && moved < TAP_MOVE_MAX;
+    const isTap = dt < TAP_MS && pressMoved < TAP_MOVE_MAX; // quick AND still = a tap (done); else a reposition
     if (isTap && progressDeg() >= MIN_DONE_DEG) {
       pointer.exit();
       opts.onSeed(cm360FromTurnCounts(Math.abs(swept), opts.dpi));

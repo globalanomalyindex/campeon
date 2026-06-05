@@ -95,24 +95,29 @@ true the loop breaks and the session finalizes from the trials gathered so far. 
 loop, the engine, the cold-start, or the objective changes. Pure-testable (a fake instrument +
 `shouldStop` flipping true mid-run asserts the loop stops and finalizes).
 
-The session screen (`src/ui/session-view.ts`) drives it:
+The session screen (`src/ui/session-view.ts`) drives it in **segments**. Pointer lock has to be
+released for the player to click the panel (the cursor is captured while aiming), so the panel is
+shown only between segments, never mid-run:
 
-- Runs with a generous hard cap (`MAX_TRIALS = 30`) and **no** `ciStopWidth` (so it does not silently
-  auto-stop before the player can decide - the player controls stopping now).
-- Each `onTrial`, updates the live plot (as today) and evaluates **convergence** from the interim
-  report: CI width `<= DIALED_IN_CI` (e.g. 4 cm/360) AND the estimate stable (peak moved
-  `< STABLE_EPS`, e.g. 0.4 cm/360) versus the previous converged check. On first convergence, reveal
-  a non-blocking **"dialed in"** panel: the settled number, the tight CI, and two actions -
-  **"lock it in"** and **"keep refining"**.
-- **lock it in** -> sets the stop flag (so `runSession` breaks at the next iteration boundary) and,
-  on the resolved outcome, builds the result and navigates to `result` (the existing `.then(...)`).
-- **keep refining** -> dismisses the panel; the session keeps running generations; the panel
-  re-reveals if it converges again (tighter).
-- If the hard cap is reached, the session finalizes and navigates to `result` as today (a forced
-  lock-in). The panel copy makes clear it is still refining in the background until you lock in.
+- A segment is one `runSession` call (sharing one persistent evolution `engine` instance and the
+  accumulated `initialTrials`). The first segment runs cold-start + up to ~12 generations with
+  `ciStopWidth = FIRST_STOP_CI` (6 cm/360), so it stops itself when the 90% CI is tight, or at its
+  cap. During the segment the live plot updates every trial (this is the "watch").
+- When a segment ends, the session **releases pointer lock** and reveals the **"dialed in"** panel:
+  the settled number, the 90% CI, and two actions - **"lock it in"** and **"keep refining"**.
+- **lock it in** -> builds the result and navigates to `result` (sets `shouldStop` too, fencing any
+  in-flight work).
+- **keep refining** -> re-requests lock and runs another segment of `REFINE_GENS` (6) more
+  generations from the accumulated trials (no `ciStopWidth`, so it always advances), then shows the
+  panel again with the tightened number.
+- `MAX_TRIALS = 30` is the hard cap across all segments. Once reached, "keep refining" force-finalizes
+  to `result`.
 
-So the player sees the estimate settle and the band tighten, and chooses when it is "genuinely
-perfect" - exactly the requested behavior - with the existing convergence math untouched.
+So the player watches the estimate settle and the band tighten during each segment, then decides at
+the natural unlocked pause when it is "genuinely perfect" - with the existing convergence math
+untouched. (This segment-based approach replaced an earlier idea of mid-run convergence detection: a
+panel cannot be clicked while the pointer is locked for aiming, so the decision must happen at a
+released-lock boundary.)
 
 ## Deferred game pick + default profile
 
