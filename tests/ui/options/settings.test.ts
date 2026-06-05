@@ -31,7 +31,7 @@ describe('options settings helpers', () => {
 
 describe('boundsFromSeed', () => {
   it('centers a window on the seed within sane bounds', () => {
-    const [lo, hi] = boundsFromSeed(30); // 30/1.7=17.6 .. 30*1.7=51
+    const [lo, hi] = boundsFromSeed(30); // 30/1.7 = 17.65 (2 dp) .. 30*1.7 = 51
     expect(lo).toBeCloseTo(17.65, 1);
     expect(hi).toBeCloseTo(51, 1);
     expect(lo).toBeGreaterThanOrEqual(5);

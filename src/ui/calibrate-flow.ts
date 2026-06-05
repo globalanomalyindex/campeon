@@ -32,7 +32,7 @@ export function calibrateReducer(state: CalState, action: CalAction): CalState {
     case 'turn-done':
       return { ...state, seedCm360: action.seedCm360, step: 'game' };
     case 'retry':
-      return { ...state, step: 'sweep' };
+      return { ...state, step: 'sweep', dpi: null };
     case 'back-to-intro':
       return { ...state, step: 'intro' };
   }

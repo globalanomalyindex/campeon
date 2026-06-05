@@ -28,6 +28,12 @@ describe('calibrateReducer', () => {
     expect(s.step).toBe('sweep');
   });
 
+  it('retry clears any stale dpi from the blocked sweep', () => {
+    const s = calibrateReducer({ ...s0, step: 'blocked', dpi: 1600 }, { type: 'retry' });
+    expect(s.step).toBe('sweep');
+    expect(s.dpi).toBeNull();
+  });
+
   it('the turn stores the seed and advances to the game pick', () => {
     const s = calibrateReducer({ ...s0, step: 'turn', dpi: 800 },
       { type: 'turn-done', seedCm360: 28.5 });
