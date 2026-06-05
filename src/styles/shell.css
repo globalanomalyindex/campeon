@@ -249,6 +249,21 @@
   text-overflow: ellipsis;
 }
 
+.session__dialed {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2); text-align: center;
+  background: rgba(13, 13, 13, .82);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  color: var(--bone);
+}
+.session__dialed[hidden] { display: none; }
+.session__dialed-label { letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+.session__dialed-num { font-size: clamp(40px, 9vw, 84px); line-height: 1; margin: 0; }
+.session__dialed-num small { font-size: .3em; opacity: .7; }
+.session__dialed-ci { opacity: .75; }
+.session__dialed-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; justify-content: center; }
+
 /* ─── Result screen ────────────────────────────────────────────────────────── */
 .result__inner { max-width: 40rem; margin-inline: auto; text-align: center; padding: var(--space-6) 0; }
 .result__lead { color: var(--slate-2); text-transform: lowercase; letter-spacing: .04em; }
