@@ -29,8 +29,8 @@ export function createSweepView(
       <div class="wrap stack">
         <span class="cal-step" data-sweep="step">step 1 of 2 - the sweep</span>
         <h2 class="display">+ the sweep</h2>
-        <p class="gate__lead" data-sweep="lead">lay any card flat on your desk, lined up against the left edge of this box.</p>
-        <p class="cal-sub" data-sweep="sub">clicking hides your cursor so we can read raw motion - press Esc anytime to stop.</p>
+        <p class="gate__lead" data-sweep="lead">lay any card flat on your desk, next to your mouse.</p>
+        <p class="cal-sub" data-sweep="sub">click here to begin (it hides the cursor so we can read your mouse's raw motion). press Esc anytime to stop.</p>
         <div class="calibrate__stage">
           <canvas class="calibrate__canvas" data-sweep="canvas"></canvas>
           <div class="calibrate__hint" data-sweep="hint"><span class="cal-pulse"><span class="cal-pulse__dot"></span></span></div>
@@ -133,7 +133,7 @@ export function createSweepView(
     if (idleTimer !== null) { clearTimeout(idleTimer); idleTimer = null; }
     phase = next; updateUi();
   }
-  function nudge(): void { $('lead').textContent = 'keep sliding all the way to the card\'s right edge.'; }
+  function nudge(): void { $('lead').textContent = 'keep going, all the way to your card\'s RIGHT edge.'; }
   // One action at a time on an idle pass: show "position your mouse" first, then swap to "click" once
   // they have had a beat to settle (clicking works the whole time - this only paces the guidance).
   function armIdleHint(): void {
@@ -160,19 +160,19 @@ export function createSweepView(
     $('pass').textContent = fast() ? 'pass 2 of 2 - fast' : 'pass 1 of 2 - slow';
     $('step').textContent = fast() ? 'step 1 of 2 - the sweep (checking acceleration)' : 'step 1 of 2 - the sweep';
     if (!locked) {
-      $('lead').textContent = 'lay any card flat on your desk, lined up against the left edge of this box.';
-      $('sub').textContent = 'clicking hides your cursor so we can read raw motion - press Esc anytime to stop.';
+      $('lead').textContent = 'lay any card flat on your desk, next to your mouse.';
+      $('sub').textContent = 'click here to begin (it hides the cursor so we can read your mouse\'s raw motion). press Esc anytime to stop.';
     } else if (phase === 'idle-slow') {
-      $('lead').textContent = idleClickReady ? 'now click once to start.' : 'rest your mouse at the card\'s LEFT edge.';
+      $('lead').textContent = idleClickReady ? 'lined up? click once to start sliding.' : 'now line your mouse up with the LEFT edge of your card.';
       $('sub').textContent = '';
     } else if (phase === 'running-slow') {
-      $('lead').textContent = ready ? 'click to finish pass 1.' : 'slowly slide right, following the card to its RIGHT edge.';
+      $('lead').textContent = ready ? 'reached the right edge? click to finish pass 1.' : 'slowly slide your mouse across the card to its RIGHT edge.';
       $('sub').textContent = '';
     } else if (phase === 'idle-fast') {
-      $('lead').textContent = idleClickReady ? 'now click to start the quick pass.' : 'move your mouse back to the card\'s LEFT edge.';
-      $('sub').textContent = idleClickReady ? 'this quick pass just checks your mouse is steady.' : '';
+      $('lead').textContent = idleClickReady ? 'click to start a quick second pass.' : 'bring your mouse back to the card\'s LEFT edge.';
+      $('sub').textContent = idleClickReady ? 'this one just checks your mouse moves steadily.' : '';
     } else if (phase === 'running-fast') {
-      $('lead').textContent = ready ? 'click to finish calibration.' : 'now slide FAST to the right edge - one quick motion.';
+      $('lead').textContent = ready ? 'click to finish.' : 'now slide FAST to the card\'s RIGHT edge, one quick motion.';
       $('sub').textContent = '';
     }
     updatePace();

@@ -1,8 +1,8 @@
 // The hero is a spaghetti-western title sequence that resolves into the menu. A definition of
 // evolution fades in and out one line at a time (auto-paced, click to advance / skip line by line),
 // "el campeón" lands ("el" in cream, "campeón" in red), a screen flash cuts to the "campeón" mark
-// with a vertical film-reel weave that settles, and a second click-flash brings up the (left-aligned)
-// menu + byline. Reduced-motion and returning-this-session visitors go straight to the menu.
+// with a vertical film-reel weave that settles, and then a flash brings up the (left-aligned) menu +
+// byline on its own (no final click). Reduced-motion and returning-this-session visitors skip to the menu.
 import type { AppContext, Screen } from './shell';
 
 // The epigraph: a one-sentence definition of evolution dealt out as four title cards, resolving into
@@ -21,6 +21,7 @@ const LINE_HOLD = 950;  // ms a line holds at full opacity
 // fully gone before the next fades in - nothing ever overlaps. The 100ms surplus is a clean breath.
 const FADE_OUT = 1100;
 const TITLE_HOLD = 1700; // ms "el campeón" holds before the flash cut to the hero
+const MARK_HOLD = 1700;  // ms the hero mark holds + weaves, then the menu flashes in on its own (no click)
 
 const prefersReduced = (): boolean =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -127,7 +128,7 @@ export function hero(host: HTMLElement, ctx: AppContext): Screen {
       const showBeat = (b: number): void => {
         if (b < N) { lineEls[b]!.classList.add('is-on'); timer = window.setTimeout(advance, LINE_IN + LINE_HOLD); return; }
         if (b === N) { q('[data-title]').classList.add('is-on'); timer = window.setTimeout(advance, LINE_IN + TITLE_HOLD); return; }
-        if (b === N + 1) { flash(() => { intro.classList.add('is-gone'); menu.classList.add('is-mark'); startWeave(); }); return; }
+        if (b === N + 1) { flash(() => { intro.classList.add('is-gone'); menu.classList.add('is-mark'); startWeave(); }); timer = window.setTimeout(advance, MARK_HOLD); return; }
         flash(() => { menu.classList.add('is-on'); intro.remove(); }); done = true; markSeen();
       };
 
@@ -155,9 +156,10 @@ export function hero(host: HTMLElement, ctx: AppContext): Screen {
         startWeave(); markSeen();
       };
 
-      // The advance-click lives on the root: once the title flash-cuts away, the intro overlay is
-      // pointer-events:none, but the final click-flash to the menu still needs to register. The
-      // `done` guard makes menu-button clicks (which bubble here) a no-op once the menu is live.
+      // The advance-click lives on the root so a click can still skip a beat early even after the title
+      // flash-cuts away (the intro overlay is pointer-events:none by then). The menu reveal is automatic
+      // now; clicking only fast-forwards to it. The `done` guard makes menu-button clicks (which bubble
+      // here) a no-op once the menu is live.
       const onRootClick = (): void => advance();
       const onSkipClick = (e: Event): void => { e.stopPropagation(); skip(); };
       root.addEventListener('click', onRootClick);
