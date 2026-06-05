@@ -13,6 +13,8 @@ export interface ArenaStage {
   readonly arena: Arena;
   /** Request pointer lock (resolves on lock / rejects if denied). Wire to a user click. */
   requestLock(): Promise<unknown>;
+  /** Release pointer lock (hand the cursor back, e.g. to click the dialed-in panel). */
+  exitLock(): void;
   /** Live sensitivity change (range nudge) → arena.setSensitivity at the fixed dpi. */
   setCm360(cm360: number): void;
   /** Skin subsequent target spawns with an environment's prey sheet (null-safe if not yet loaded). */
@@ -86,6 +88,7 @@ export function createArenaStage(
   return {
     arena,
     requestLock: () => pointer.request(),
+    exitLock: () => pointer.exit(),
     setCm360: (next) => arena.setSensitivity(next, dpi),
     setEnemyEnvironment: (id) => enemies?.setEnvironment(id),
     playViewmodel: (name, then = null) => viewmodel?.play(name, then),
