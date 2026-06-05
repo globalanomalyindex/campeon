@@ -1,10 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { dpiFromSweep, SweepAccumulator, isPlausibleSweepDpi } from '../../src/input/dpi-sweep';
+import { dpiFromSweep, SweepAccumulator, isPlausibleSweepDpi, CARD_WIDTH_CM } from '../../src/input/dpi-sweep';
 
 describe('dpi-sweep', () => {
   it('recovers DPI from counts across a known pad width', () => {
     // a 40 cm pad at 800 dpi -> 40/2.54 in * 800 = 12598.4 counts
     expect(dpiFromSweep(12598.4, 40)).toBeCloseTo(800, 1);
+  });
+
+  it('uses the standardized ID-1 card width as the reference anchor', () => {
+    expect(CARD_WIDTH_CM).toBeCloseTo(8.56, 6); // ISO/IEC 7810 ID-1 long edge, 85.60 mm
+  });
+
+  it('recovers DPI from counts swept across a card', () => {
+    // a card (8.56 cm) at 1600 dpi -> 8.56/2.54 in * 1600 = 5391.5 counts
+    const dpi = 1600;
+    const counts = (CARD_WIDTH_CM / 2.54) * dpi;
+    expect(dpiFromSweep(counts, CARD_WIDTH_CM)).toBeCloseTo(dpi, 6);
   });
 
   it('returns NaN for a non-positive pad width', () => {

@@ -4,10 +4,13 @@
 import { isValidDpi } from './dpi';
 import type { AimSample, Dpi } from '../types';
 
-/** Effective DPI from `horizontalCounts` (DPR-normalized) swept across `padWidthCm`. NaN if width <= 0. */
-export function dpiFromSweep(horizontalCounts: number, padWidthCm: number): Dpi {
-  if (!(padWidthCm > 0)) return NaN;
-  return horizontalCounts / (padWidthCm / 2.54); // counts per inch
+/** Standard wallet-card width: ISO/IEC 7810 ID-1 long edge (85.60 mm). Used as the sweep anchor. */
+export const CARD_WIDTH_CM = 8.56;
+
+/** Effective DPI from `horizontalCounts` (DPR-normalized) swept across `referenceWidthCm`. NaN if width <= 0. */
+export function dpiFromSweep(horizontalCounts: number, referenceWidthCm: number): Dpi {
+  if (!(referenceWidthCm > 0)) return NaN;
+  return horizontalCounts / (referenceWidthCm / 2.54); // counts per inch
 }
 
 /** Accumulates one sweep pass: net horizontal counts (signed dx sum, reported as magnitude). */
