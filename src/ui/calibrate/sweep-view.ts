@@ -1,6 +1,7 @@
 // src/ui/calibrate/sweep-view.ts
-// Thin shell: the locked mousepad sweep. Slow pass measures DPI; fast pass cross-checks for
-// acceleration. Marking uses onFire (a locked primary-button press), so no cursor is needed.
+// Thin shell: the locked card sweep. Slow pass measures DPI across a standardized wallet card
+// (known width); fast pass cross-checks for acceleration. Marking uses onFire (a locked
+// primary-button press), so no cursor is needed.
 import { createPointerLock } from '../../input/pointer-lock';
 import { accelVerdict } from '../../input/accel-check';
 import { SweepAccumulator, dpiFromSweep, isPlausibleSweepDpi } from '../../input/dpi-sweep';
@@ -12,13 +13,13 @@ type Phase = 'idle-slow' | 'running-slow' | 'idle-fast' | 'running-fast';
 
 export function createSweepView(
   host: HTMLElement,
-  opts: { padWidthCm: number; onResult: (r: SweepResult) => void; onInvalid: () => void; onLockFailed: () => void },
+  opts: { referenceWidthCm: number; onResult: (r: SweepResult) => void; onInvalid: () => void; onLockFailed: () => void },
 ): SweepView {
   host.innerHTML = `
     <section class="screen screen--arena fade-in">
       <div class="wrap stack">
         <h2 class="display">+ the sweep</h2>
-        <p class="gate__lead" data-sweep="lead">click to lock, set your mouse at the <b>left edge</b> of your pad.</p>
+        <p class="gate__lead" data-sweep="lead">lay any card from your wallet flat. click to lock, then rest your mouse at the card's <b>left end</b>.</p>
         <div class="calibrate__stage">
           <canvas class="calibrate__canvas" data-sweep="canvas"></canvas>
           <div class="calibrate__hint" data-sweep="hint"><span>click to lock the pointer</span></div>
@@ -46,17 +47,17 @@ export function createSweepView(
 
   const offFire = pointer.onFire(() => {
     if (!pointer.isLocked()) return;
-    if (phase === 'idle-slow') { acc.reset(); phase = 'running-slow'; setLead('sweep SLOW to the right edge, then click'); }
+    if (phase === 'idle-slow') { acc.reset(); phase = 'running-slow'; setLead("slide SLOWLY across to the card's right end, then click"); }
     else if (phase === 'running-slow') { slowCounts = acc.total(); phase = 'idle-fast'; $('pass').textContent = 'fast';
-      setLead('back to the left edge, click, then sweep FAST to the right'); }
-    else if (phase === 'idle-fast') { acc.reset(); phase = 'running-fast'; setLead('sweep FAST to the right edge, then click'); }
+      setLead("back to the card's left end, click, then slide FAST across"); }
+    else if (phase === 'idle-fast') { acc.reset(); phase = 'running-fast'; setLead("slide FAST across to the card's right end, then click"); }
     else if (phase === 'running-fast') { finish(acc.total()); }
   });
 
   function setLead(t: string): void { $('lead').textContent = t; }
 
   function finish(fastCounts: number): void {
-    const dpi = dpiFromSweep(slowCounts, opts.padWidthCm);
+    const dpi = dpiFromSweep(slowCounts, opts.referenceWidthCm);
     $('dpi').textContent = isPlausibleSweepDpi(dpi) ? Math.round(dpi).toString() : 'invalid';
     if (!isPlausibleSweepDpi(dpi)) { pointer.exit(); opts.onInvalid(); return; }
     const { accelerated } = accelVerdict(slowCounts, fastCounts);

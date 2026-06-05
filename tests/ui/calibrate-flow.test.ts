@@ -4,14 +4,13 @@ import { calibrateReducer, initialCalState, type CalState } from '../../src/ui/c
 describe('calibrateReducer', () => {
   const s0: CalState = initialCalState();
 
-  it('guided start stores pad width and moves to the sweep', () => {
-    const s = calibrateReducer(s0, { type: 'start-guided', padWidthCm: 40 });
+  it('guided start moves to the sweep', () => {
+    const s = calibrateReducer(s0, { type: 'start-guided' });
     expect(s.step).toBe('sweep');
-    expect(s.padWidthCm).toBe(40);
   });
 
   it('a clean sweep stores DPI and advances to the turn', () => {
-    const s = calibrateReducer({ ...s0, step: 'sweep', padWidthCm: 40 },
+    const s = calibrateReducer({ ...s0, step: 'sweep' },
       { type: 'sweep-done', dpi: 1600, accelerated: false });
     expect(s.step).toBe('turn');
     expect(s.dpi).toBe(1600);

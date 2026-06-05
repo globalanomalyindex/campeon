@@ -5,6 +5,7 @@ import type { GameId } from '../types';
 import { GAME_YAW, yawFor } from '../convert/yaw-table';
 import { cmPer360 } from '../convert/cm360';
 import { boundsFromSeed } from './options/settings';
+import { CARD_WIDTH_CM } from '../input/dpi-sweep';
 import { calibrateReducer, initialCalState, type CalState } from './calibrate-flow';
 import { createSweepView, type SweepView } from './calibrate/sweep-view';
 import { createTurnView, type TurnView } from './calibrate/turn-view';
@@ -48,7 +49,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     host.replaceChildren();
 
     if (state.step === 'sweep') {
-      view = createSweepView(host, { padWidthCm: state.padWidthCm,
+      view = createSweepView(host, { referenceWidthCm: CARD_WIDTH_CM,
         onResult: (r) => dispatch({ type: 'sweep-done', dpi: r.dpi, accelerated: r.accelerated }),
         onInvalid: () => dispatch({ type: 'sweep-done', dpi: NaN, accelerated: true }),
         onLockFailed: () => dispatch({ type: 'start-manual' }) });
@@ -71,16 +72,14 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     if (state.step === 'intro') return `
       <div class="wrap stack setup__inner">
         <h2 class="display setup__title">+ calibrate</h2>
-        <p class="setup__lead">we'll measure your turn by feel, not by numbers. first, how wide is your mousepad?</p>
+        <p class="setup__lead">we'll measure your turn by feel, not by numbers. grab any card from your wallet - bank card, gym card, hotel key. they're all the same size.</p>
         ${reduced ? `<p class="setup__lead mono">reduced-motion is on - you can skip the rendered turn with "i already know my numbers" below.</p>` : ''}
-        <label class="field">mousepad width (cm)
-          <input class="mono" type="number" min="15" max="120" step="1" data-field="pad" value="${state.padWidthCm}"></label>
         <button class="action action--primary" data-action="start-guided">start</button>
         <button class="action action--ghost" data-action="start-manual">i already know my numbers</button>
       </div>`;
     if (state.step === 'blocked') return `
       <div class="wrap stack gate__inner">
-        <p class="gate__lead">mouse acceleration looks like it's on (or your pad width was off) - cm/360 is undefined under acceleration.</p>
+        <p class="gate__lead">mouse acceleration looks like it's on (or the card sweep was uneven) - cm/360 is undefined under acceleration.</p>
         <p>turn off OS/driver acceleration ("enhance pointer precision"), then retry.</p>
         <button class="action action--primary" data-action="retry">retry</button>
         <button class="action action--ghost" data-action="manual">type my numbers instead</button>
@@ -109,7 +108,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
   function wire(root: HTMLElement): void {
     const click = (sel: string, fn: () => void): void => root.querySelector(`[data-action="${sel}"]`)?.addEventListener('click', fn);
     const val = (sel: string): string => (root.querySelector(`[data-field="${sel}"]`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
-    click('start-guided', () => dispatch({ type: 'start-guided', padWidthCm: Number(val('pad')) }));
+    click('start-guided', () => dispatch({ type: 'start-guided' }));
     click('start-manual', () => dispatch({ type: 'start-manual' }));
     click('retry', () => dispatch({ type: 'retry' }));
     click('manual', () => dispatch({ type: 'start-manual' }));

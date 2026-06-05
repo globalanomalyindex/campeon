@@ -4,13 +4,12 @@ export type CalStep = 'intro' | 'sweep' | 'turn' | 'game' | 'manual' | 'blocked'
 
 export interface CalState {
   step: CalStep;
-  padWidthCm: number;
   dpi: number | null;
   seedCm360: number | null;
 }
 
 export type CalAction =
-  | { type: 'start-guided'; padWidthCm: number }
+  | { type: 'start-guided' }
   | { type: 'start-manual' }
   | { type: 'sweep-done'; dpi: number; accelerated: boolean }
   | { type: 'turn-done'; seedCm360: number }
@@ -18,13 +17,13 @@ export type CalAction =
   | { type: 'back-to-intro' };
 
 export function initialCalState(): CalState {
-  return { step: 'intro', padWidthCm: 40, dpi: null, seedCm360: null };
+  return { step: 'intro', dpi: null, seedCm360: null };
 }
 
 export function calibrateReducer(state: CalState, action: CalAction): CalState {
   switch (action.type) {
     case 'start-guided':
-      return { ...state, step: 'sweep', padWidthCm: action.padWidthCm };
+      return { ...state, step: 'sweep' };
     case 'start-manual':
       return { ...state, step: 'manual' };
     case 'sweep-done':

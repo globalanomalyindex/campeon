@@ -20,6 +20,7 @@ describe('setup (guided calibration orchestrator)', () => {
     setup(host, ctx).mount();
     expect(host.querySelector('[data-action="start-guided"]')).toBeTruthy();
     expect(host.querySelector('[data-action="start-manual"]')).toBeTruthy();
+    expect(host.querySelector('[data-field="pad"]')).toBeNull(); // no typed mousepad width
   });
 
   it('the typed fast path writes dpi/sens/game + seeded bounds and navigates to session', () => {
