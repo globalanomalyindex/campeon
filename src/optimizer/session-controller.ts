@@ -119,6 +119,13 @@ export interface SessionConfig {
   onTrial?: (trial: TrialResult, trials: readonly TrialResult[], interim: Report) => void;
   /** Bootstrap resamples for the per-trial interim report (default 120; cheaper than the final). */
   interimBootstrapIters?: number;
+  /** Pre-existing trials to resume from. When supplied, the loop starts with these (a copy) and
+   *  cold-start seeds only run if fewer than `coldStart` are present - so a converged session can be
+   *  continued ("keep refining") without re-seeding. */
+  initialTrials?: readonly TrialResult[];
+  /** Checked once at the top of each iteration; returning true breaks the loop and finalizes from the
+   *  trials gathered so far (a user "lock it in", or teardown). */
+  shouldStop?: () => boolean;
 }
 
 export interface SessionOutcome {
@@ -143,8 +150,9 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
   const iters = config.bootstrapIters ?? 400;
   const seedAt = (k: number): Cm360 => Math.exp(loX + ((k + 0.5) / coldStart) * (hiX - loX));
 
-  const trials: TrialResult[] = [];
+  const trials: TrialResult[] = config.initialTrials ? [...config.initialTrials] : [];
   while (trials.length < config.maxTrials) {
+    if (config.shouldStop?.()) break;
     const obs = trialsToObservations(trials, profile);
     const cm360 =
       trials.length < coldStart ? seedAt(trials.length) : clamp(engine.suggest(obs, bounds), lo, hi);

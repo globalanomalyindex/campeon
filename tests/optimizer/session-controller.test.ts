@@ -224,6 +224,43 @@ describe('runSession - convergence on synthetic players', () => {
   });
 });
 
+describe('runSession - shouldStop / initialTrials', () => {
+  const cfg = (extra: Record<string, unknown>) => ({
+    dpi: 800,
+    profile: profile({ flick: 1 }),
+    bounds: sessionBounds,
+    engine: makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' as const }),
+    instruments: instruments({ flick: synthetic('flick', 33) }),
+    scene: new FakeScene(),
+    schedule: ['flick'] as InstrumentId[],
+    maxTrials: 30,
+    coldStart: 4,
+    rng: mulberry32(5),
+    bootstrapIters: 80,
+    ...extra,
+  });
+
+  it('breaks the loop when shouldStop returns true (checked at the top of each iteration)', async () => {
+    let n = 0;
+    const { trials } = await runSession(cfg({ shouldStop: () => { n += 1; return n >= 6; } }));
+    expect(trials.length).toBe(5); // stops before the 6th trial (the 6th shouldStop check returns true)
+  });
+
+  it('resumes from initialTrials and skips cold-start (the seeds are preserved, new trials use suggest)', async () => {
+    const seed: TrialResult[] = Array.from({ length: 8 }, (_, i) => (
+      { instrument: 'flick', cm360: 28 + i, score: 0.5, raw: {}, at: 0 }
+    ));
+    const stub: SearchEngine = { suggest: () => 30, isDone: () => false };
+    const { trials } = await runSession(cfg({ engine: stub, initialTrials: seed, maxTrials: 10, coldStart: 4 }));
+    expect(trials.length).toBe(10);          // 8 seeded + 2 new
+    expect(trials[0]!.cm360).toBe(28);       // seed preserved at the front (proves resume, not a fresh run)
+    expect(trials[7]!.cm360).toBe(35);       // last seed preserved
+    // the 2 NEW trials use the engine's suggest (30), not log-spaced cold-start seeds → cold-start skipped
+    expect(trials[8]!.cm360).toBe(30);
+    expect(trials[9]!.cm360).toBe(30);
+  });
+});
+
 describe('runSession - live callbacks', () => {
   const base = () => ({
     dpi: 800,
