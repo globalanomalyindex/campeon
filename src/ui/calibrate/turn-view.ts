@@ -16,7 +16,7 @@ export function createTurnView(
     <section class="screen screen--arena fade-in">
       <div class="wrap stack">
         <h2 class="display">+ the turn</h2>
-        <p class="gate__lead">click to lock, then turn until <b>home</b> comes back around. nudge with up/down until a full turn feels right in one swipe; <span class="mono">enter</span> accepts, <span class="mono">esc</span> releases.</p>
+        <p class="gate__lead">click to lock, then swipe to spin. stop when <b>home</b> is back in front of you. tap up / down until one full spin feels comfortable in a single swipe; <span class="mono">enter</span> accepts, <span class="mono">esc</span> releases.</p>
         <div class="calibrate__progress"><div data-turn="bar"></div></div>
         <div class="calibrate__stage">
           <canvas class="calibrate__canvas" data-turn="canvas"></canvas>

@@ -98,7 +98,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     return `
       <div class="wrap stack setup__inner">
         <h2 class="display setup__title">+ your game</h2>
-        <p class="setup__lead">your comfortable turn is <span class="mono">${(state.seedCm360 ?? 0).toFixed(1)}</span> cm/360. pick your game so we can translate the result.</p>
+        <p class="setup__lead">your comfortable spin is <span class="mono">${(state.seedCm360 ?? 0).toFixed(1)}</span> cm per full turn. pick your game so we can give you the number to enter.</p>
         <label class="field">game<select data-field="game">${gameOptions(ctx.draft.currentGame)}</select></label>
         <label class="field">goal - precision to speed<input type="range" min="0" max="1" step="0.01" data-field="goal" value="${ctx.draft.profile.speedAccuracy}"></label>
         <button class="action action--primary" data-action="game-begin">play</button>
