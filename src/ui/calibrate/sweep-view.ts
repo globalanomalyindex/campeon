@@ -1,7 +1,9 @@
 // src/ui/calibrate/sweep-view.ts
-// Thin shell: the locked card sweep. Slow pass measures DPI across a standardized wallet card
-// (known width); fast pass cross-checks for acceleration. Marking uses onFire (a locked
-// primary-button press), so no cursor is needed.
+// Thin shell: the locked card sweep, guided ONE action at a time. The slow pass measures DPI across a
+// standardized wallet card; the fast pass cross-checks for acceleration (skipped on raw pointer input,
+// which bypasses OS accel at the source). Each phase shows a single instruction plus a visual cue:
+// a pulsing click target, a left-edge start marker, an animated direction arrow, a finish band, and a
+// pace meter. Runtime-verified, not unit-tested.
 import { createPointerLock } from '../../input/pointer-lock';
 import { accelVerdict, accelTolForWidth } from '../../input/accel-check';
 import { SweepAccumulator, dpiFromSweep, isPlausibleSweepDpi } from '../../input/dpi-sweep';
@@ -11,6 +13,11 @@ export interface SweepView { dispose(): void; }
 
 type Phase = 'idle-slow' | 'running-slow' | 'idle-fast' | 'running-fast';
 
+const READY_COUNTS = 150; // a running pass must move at least this far before "finish" is offered
+const PACE_SCALE = 6;     // counts/ms that fills the pace bar
+const SLOW_MAX = 2.2;     // counts/ms at or below = a good "slow" pace
+const FAST_MIN = 3.5;     // counts/ms at or above = a good "fast" pace
+
 export function createSweepView(
   host: HTMLElement,
   opts: { referenceWidthCm: number; onResult: (r: SweepResult) => void; onInvalid: () => void; onLockFailed: () => void },
@@ -18,38 +25,50 @@ export function createSweepView(
   host.innerHTML = `
     <section class="screen screen--arena fade-in">
       <div class="wrap stack">
+        <span class="cal-step" data-sweep="step">step 1 of 2 - the sweep</span>
         <h2 class="display">+ the sweep</h2>
-        <p class="gate__lead" data-sweep="lead">lay any card from your wallet flat. click to lock, then rest your mouse at the card's <b>left end</b>.</p>
+        <p class="gate__lead" data-sweep="lead">lay any card flat on your desk, lined up against the left edge of this box.</p>
+        <p class="cal-sub" data-sweep="sub">clicking hides your cursor so we can read raw motion - press Esc anytime to stop.</p>
         <div class="calibrate__stage">
           <canvas class="calibrate__canvas" data-sweep="canvas"></canvas>
-          <div class="calibrate__hint" data-sweep="hint"><span>click to lock the pointer</span></div>
+          <div class="calibrate__hint" data-sweep="hint"><span class="cal-pulse"><span class="cal-pulse__dot"></span></span></div>
         </div>
+        <div class="cal-pace" data-sweep="pacewrap" hidden><div class="cal-pace__fill" data-sweep="pace"></div></div>
+        <p class="cal-pace__label" data-sweep="pacelabel"></p>
         <div class="calibrate__readouts">
-          <div class="calibrate__ro"><div class="k">pass</div><div class="v mono" data-sweep="pass">slow</div></div>
+          <div class="calibrate__ro"><div class="k">step</div><div class="v mono" data-sweep="pass">pass 1 of 2 - slow</div></div>
           <div class="calibrate__ro"><div class="k">counts</div><div class="v mono" data-sweep="counts">0</div></div>
           <div class="calibrate__ro"><div class="k">measured dpi</div><div class="v mono" data-sweep="dpi">-</div></div>
         </div>
-        <p class="mono" data-sweep="status"></p>
       </div>
     </section>`;
 
-  const $ = (s: string) => host.querySelector(`[data-sweep="${s}"]`) as HTMLElement;
+  const $ = (s: string): HTMLElement => host.querySelector(`[data-sweep="${s}"]`) as HTMLElement;
   const canvas = $('canvas') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d');
   const pointer = createPointerLock(canvas);
-
-  const ctx2d = canvas.getContext('2d');
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const COUNTS_PER_PX = 4.5; // visual scale only; true DPI is unknown mid-sweep
-  const WOBBLE_GAIN = 0.5;   // px of vertical deflection per count of dy
+
+  let phase: Phase = 'idle-slow';
+  let slowCounts = 0;
+  let ready = false;  // current running pass has moved far enough to offer "finish"
+  let pace = 0;       // EMA pointer speed, counts/ms
+  let lastT = 0;
   let W = 0, H = 0;
+  let raf = 0;
+  const acc = new SweepAccumulator();
   let trail: Array<{ x: number; y: number }> = [];
+  const COUNTS_PER_PX = 4.5, WOBBLE_GAIN = 0.5;
+
+  const running = (): boolean => phase === 'running-slow' || phase === 'running-fast';
+  const fast = (): boolean => phase === 'idle-fast' || phase === 'running-fast';
 
   function sizeCanvas(): void {
     const r = canvas.getBoundingClientRect(); W = r.width; H = r.height;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-    ctx2d?.setTransform(dpr, 0, 0, dpr, 0, 0); drawTrail();
+    ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  function clearTrail(): void { trail = []; drawTrail(); }
+  function clearTrail(): void { trail = []; }
   function pushTrail(dy: number): void {
     const mid = H / 2;
     const x = Math.min(W - 2, acc.total() / COUNTS_PER_PX);
@@ -57,43 +76,92 @@ export function createSweepView(
     const y = Math.max(2, Math.min(H - 2, prevY + dy * WOBBLE_GAIN));
     trail.push({ x, y });
     if (trail.length > 2000) trail.shift();
-    drawTrail();
   }
-  function drawTrail(): void {
-    if (!ctx2d) return;
+
+  function draw(ts: number): void {
+    raf = requestAnimationFrame(draw);
+    if (!ctx) return;
     const mid = H / 2;
-    ctx2d.clearRect(0, 0, W, H);
-    ctx2d.strokeStyle = 'rgba(234,231,220,0.12)'; ctx2d.lineWidth = 1;
-    ctx2d.beginPath(); ctx2d.moveTo(0, mid); ctx2d.lineTo(W, mid); ctx2d.stroke();
+    ctx.clearRect(0, 0, W, H);
+    // left-edge start marker (where the card's left end goes)
+    ctx.strokeStyle = 'rgba(255,196,0,.55)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(6, H * 0.18); ctx.lineTo(6, H * 0.82); ctx.stroke();
+    // right-edge finish band during a running pass
+    if (running()) { ctx.fillStyle = 'rgba(255,196,0,.08)'; ctx.fillRect(W - W * 0.16, 0, W * 0.16, H); }
+    // animated direction arrow: rightward while sweeping, leftward to cue "go back" before the fast pass
+    const dir = phase === 'idle-fast' ? -1 : 1;
+    if (running() || phase === 'idle-fast') drawArrow(ctx, ts, dir, W, mid, ready && running());
+    // cardiogram trail
+    ctx.strokeStyle = 'rgba(234,231,220,.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
     if (trail.length >= 2) {
       const first = trail[0]!;
-      ctx2d.strokeStyle = '#FFC400'; ctx2d.lineWidth = 2;
-      ctx2d.beginPath(); ctx2d.moveTo(first.x, first.y);
-      for (let i = 1; i < trail.length; i++) { const p = trail[i]!; ctx2d.lineTo(p.x, p.y); }
-      ctx2d.stroke();
+      ctx.strokeStyle = '#FFC400'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < trail.length; i++) { const p = trail[i]!; ctx.lineTo(p.x, p.y); }
+      ctx.stroke();
       const head = trail[trail.length - 1]!;
-      ctx2d.fillStyle = '#FFC400'; ctx2d.beginPath(); ctx2d.arc(head.x, head.y, 3, 0, Math.PI * 2); ctx2d.fill();
+      ctx.fillStyle = '#FFC400'; ctx.beginPath(); ctx.arc(head.x, head.y, 3, 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  let phase: Phase = 'idle-slow';
-  let slowCounts = 0;
-  const acc = new SweepAccumulator();
-
-  const off = pointer.onSample((s) => { if (phase === 'running-slow' || phase === 'running-fast') {
-    acc.add(s); $('counts').textContent = Math.round(acc.total()).toString(); pushTrail(s.dy);
-  } });
+  const off = pointer.onSample((s) => {
+    if (!pointer.isLocked() || !running()) return;
+    acc.add(s);
+    if (lastT > 0) { const dt = s.t - lastT; if (dt > 0) pace = pace * 0.8 + (Math.abs(s.dx) / dt) * 0.2; }
+    lastT = s.t;
+    pushTrail(s.dy);
+    $('counts').textContent = Math.round(acc.total()).toString();
+    if (!ready && acc.total() >= READY_COUNTS) { ready = true; updateUi(); }
+    updatePace();
+  });
 
   const offFire = pointer.onFire(() => {
     if (!pointer.isLocked()) return;
-    if (phase === 'idle-slow') { acc.reset(); clearTrail(); phase = 'running-slow'; setLead("slide SLOWLY across to the card's right end, then click"); }
-    else if (phase === 'running-slow') { slowCounts = acc.total(); phase = 'idle-fast'; $('pass').textContent = 'fast';
-      setLead("back to the card's left end, click, then slide FAST across"); }
-    else if (phase === 'idle-fast') { acc.reset(); clearTrail(); phase = 'running-fast'; setLead("slide FAST across to the card's right end, then click"); }
-    else if (phase === 'running-fast') { finish(acc.total()); }
+    if (phase === 'idle-slow') { startPass('running-slow'); }
+    else if (phase === 'running-slow') { if (!ready) return nudge(); slowCounts = acc.total(); phase = 'idle-fast'; ready = false; updateUi(); }
+    else if (phase === 'idle-fast') { startPass('running-fast'); }
+    else if (phase === 'running-fast') { if (!ready) return nudge(); finish(acc.total()); }
   });
 
-  function setLead(t: string): void { $('lead').textContent = t; }
+  function startPass(next: Phase): void { acc.reset(); clearTrail(); pace = 0; lastT = 0; ready = false; phase = next; updateUi(); }
+  function nudge(): void { $('lead').textContent = 'keep sliding all the way to the card\'s right edge.'; }
+
+  function updatePace(): void {
+    if (!running()) { $('pacewrap').hidden = true; $('pacelabel').textContent = ''; return; }
+    $('pacewrap').hidden = false;
+    const fillEl = $('pace');
+    fillEl.style.width = Math.min(100, (pace / PACE_SCALE) * 100) + '%';
+    const ok = fast() ? pace >= FAST_MIN : pace <= SLOW_MAX;
+    fillEl.dataset['ok'] = ok ? 'true' : 'false';
+    $('pacelabel').textContent = fast()
+      ? (ok ? 'good - nice and quick' : 'a bit faster')
+      : (ok ? 'good - slow and steady' : 'ease off, a little slower');
+  }
+
+  function updateUi(): void {
+    const locked = pointer.isLocked();
+    $('hint').style.display = locked ? 'none' : 'flex';
+    $('pass').textContent = fast() ? 'pass 2 of 2 - fast' : 'pass 1 of 2 - slow';
+    $('step').textContent = fast() ? 'step 1 of 2 - the sweep (checking acceleration)' : 'step 1 of 2 - the sweep';
+    if (!locked) {
+      $('lead').textContent = 'lay any card flat on your desk, lined up against the left edge of this box.';
+      $('sub').textContent = 'clicking hides your cursor so we can read raw motion - press Esc anytime to stop.';
+    } else if (phase === 'idle-slow') {
+      $('lead').textContent = 'rest your mouse at the card\'s LEFT edge, then click once to start.';
+      $('sub').textContent = '';
+    } else if (phase === 'running-slow') {
+      $('lead').textContent = ready ? 'click to finish pass 1.' : 'slowly slide right, following the card to its RIGHT edge.';
+      $('sub').textContent = '';
+    } else if (phase === 'idle-fast') {
+      $('lead').textContent = 'now move your mouse back to the card\'s LEFT edge, then click to start the quick pass.';
+      $('sub').textContent = 'one more - this quick pass just checks your mouse is steady.';
+    } else if (phase === 'running-fast') {
+      $('lead').textContent = ready ? 'click to finish calibration.' : 'now slide FAST to the right edge - one quick motion.';
+      $('sub').textContent = '';
+    }
+    updatePace();
+  }
 
   function finish(fastCounts: number): void {
     const dpi = dpiFromSweep(slowCounts, opts.referenceWidthCm);
@@ -109,12 +177,40 @@ export function createSweepView(
     opts.onResult({ dpi: Math.round(dpi), accelerated });
   }
 
-  const onLock = (): void => { $('hint').style.display = pointer.isLocked() ? 'none' : 'flex'; };
+  const onLock = (): void => updateUi();
   const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onLockFailed()); };
   document.addEventListener('pointerlockchange', onLock);
   canvas.addEventListener('click', onCanvasClick);
   window.addEventListener('resize', sizeCanvas);
   sizeCanvas();
+  updateUi();
+  raf = requestAnimationFrame(draw);
 
-  return { dispose() { off(); offFire(); document.removeEventListener('pointerlockchange', onLock); window.removeEventListener('resize', sizeCanvas); canvas.removeEventListener('click', onCanvasClick); pointer.dispose(); } };
+  return { dispose() {
+    off(); offFire();
+    cancelAnimationFrame(raf);
+    document.removeEventListener('pointerlockchange', onLock);
+    canvas.removeEventListener('click', onCanvasClick);
+    window.removeEventListener('resize', sizeCanvas);
+    pointer.dispose();
+  } };
+}
+
+/** A trio of chevrons sliding in `dir` (+1 right, -1 left) along the mid-line - a looping demo of the
+ *  sweep direction. Turns green once the pass is far enough to finish. */
+function drawArrow(ctx: CanvasRenderingContext2D, ts: number, dir: number, W: number, y: number, done: boolean): void {
+  const period = 1400, span = W * 0.5, x0 = W * 0.25;
+  const t = (ts % period) / period;
+  ctx.strokeStyle = done ? 'rgba(57,217,138,.9)' : 'rgba(255,196,0,.8)';
+  ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const f = (t + i * 0.18) % 1;
+    const x = dir > 0 ? x0 + f * span : x0 + span - f * span;
+    const a = Math.sin(f * Math.PI); // fade in/out across the travel
+    ctx.globalAlpha = a;
+    ctx.beginPath();
+    ctx.moveTo(x - dir * 7, y - 7); ctx.lineTo(x + dir * 7, y); ctx.lineTo(x - dir * 7, y + 7);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }

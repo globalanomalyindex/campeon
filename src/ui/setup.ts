@@ -11,6 +11,18 @@ import { calibrateReducer, initialCalState, type CalState } from './calibrate-fl
 import { createSweepView, type SweepView } from './calibrate/sweep-view';
 import { createSpinView, type SpinView } from './calibrate/spin-view';
 
+/** The persistent 2-segment journey tracker overlaid across the sweep + spin steps. Pure markup so
+ *  it is unit-testable: the active step is highlighted, an earlier finished step gets a checkmark. */
+export function calibrationProgress(step: 'sweep' | 'spin'): string {
+  const seg = (n: string, label: string, st: 'done' | 'active' | 'todo'): string =>
+    `<span class="cal-progress__seg" data-state="${st}"><span class="cal-progress__num">${st === 'done' ? '✓' : n}</span>${label}</span>`;
+  return `<div class="cal-progress" data-cal-progress>${
+    seg('1', 'the sweep', step === 'sweep' ? 'active' : 'done')
+  }<span class="cal-progress__arrow">→</span>${
+    seg('2', 'the spin', step === 'spin' ? 'active' : 'todo')
+  }</div>`;
+}
+
 export function setup(host: HTMLElement, ctx: AppContext): Screen {
   let state: CalState = initialCalState();
   let view: SweepView | SpinView | null = null;
@@ -53,11 +65,13 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
         onResult: (r) => dispatch({ type: 'sweep-done', dpi: r.dpi, accelerated: r.accelerated }),
         onInvalid: () => dispatch({ type: 'sweep-invalid' }),
         onLockFailed: () => dispatch({ type: 'start-manual' }) });
+      host.insertAdjacentHTML('beforeend', calibrationProgress('sweep')); // fixed-position overlay tracker
       return;
     }
     if (state.step === 'spin' && state.dpi !== null) {
       const dpi = state.dpi;
       view = createSpinView(host, { dpi, onSeed: (cm) => commitGuided(cm) });
+      host.insertAdjacentHTML('beforeend', calibrationProgress('spin'));
       return;
     }
 
@@ -72,9 +86,14 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     if (state.step === 'intro') return `
       <div class="wrap stack setup__inner">
         <h2 class="display setup__title">+ calibrate</h2>
-        <p class="setup__lead">we'll measure your turn by feel, not by numbers. grab any card from your wallet - bank card, gym card, hotel key. they're all the same size.</p>
+        <p class="setup__lead">two quick steps, no numbers to look up - we just watch how your hand actually moves.</p>
+        <ol class="cal-preview">
+          <li><span class="cal-preview__n">1</span><span>the sweep - drag a card's width, so we learn your mouse.</span></li>
+          <li><span class="cal-preview__n">2</span><span>the spin - turn all the way around once.</span></li>
+        </ol>
+        <p class="setup__lead">first, grab any card from your wallet - bank card, gym card, hotel key. they're all exactly the same size.</p>
         ${reduced ? `<p class="setup__lead mono">reduced-motion is on - you can skip the rendered turn with "i already know my numbers" below.</p>` : ''}
-        <button class="action action--primary" data-action="start-guided">start</button>
+        <button class="action action--primary" data-action="start-guided">i've got a card - start</button>
         <button class="action action--ghost" data-action="start-manual">i already know my numbers</button>
       </div>`;
     if (state.step === 'blocked') {
