@@ -8,7 +8,6 @@ import { createShell, type Route, type ScreenFactory } from './ui/shell';
 import { createStorage } from './state/storage';
 import { hero } from './ui/hero';
 import { setup } from './ui/setup';
-import { gate } from './ui/gate';
 import { sessionView } from './ui/session-view';
 import { result } from './ui/result';
 import { caseStudy } from './ui/case-study/case-study';
@@ -26,7 +25,7 @@ async function boot(): Promise<void> {
     return;
   }
   const screens: Record<Route, ScreenFactory> = {
-    hero, setup, gate, session: sessionView, result,
+    hero, setup, session: sessionView, result,
     'case-study': caseStudy, options, range,
   };
   createShell(app, { storage: createStorage(), screens }).start();
