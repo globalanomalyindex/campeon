@@ -28,7 +28,7 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
           <canvas class="calibrate__canvas" data-spin="canvas"></canvas>
           <div class="calibrate__hint" data-spin="hint"><span class="cal-pulse"><span class="cal-pulse__dot"></span></span></div>
         </div>
-        <div class="cal-helper"><span><b>out of room?</b> press and HOLD the button, slide your mouse back to the middle, then let go - the ring won't move while you hold.</span></div>
+        <div class="cal-helper"><span><b>out of room?</b> hold the button, slide your mouse back, then let go.</span></div>
       </div>
     </section>`;
 
@@ -129,8 +129,8 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
     $('hint').style.display = locked ? 'none' : 'flex';
     if (!locked) { $('lead').textContent = "we'll measure one full turn. click the box to begin."; $('sub').textContent = ''; return; }
     if (repositioning) {
-      $('lead').textContent = 'slide your mouse back to the middle of your pad, then let go.';
-      $('sub').textContent = 'the ring is paused while you hold.'; return;
+      $('lead').textContent = 'slide your mouse back to the middle of your pad.';
+      $('sub').textContent = "let go when you're set - the ring stays put while you hold."; return;
     }
     if (progressDeg() >= MIN_DONE_DEG) {
       $('lead').textContent = 'facing forward again? quick-click to finish.';

@@ -14,6 +14,7 @@ export interface SweepView { dispose(): void; }
 type Phase = 'idle-slow' | 'running-slow' | 'idle-fast' | 'running-fast';
 
 const READY_COUNTS = 150; // a running pass must move at least this far before "finish" is offered
+const IDLE_HINT_MS = 1300; // after this long resting at the edge, swap from "position" to "click" cue
 const PACE_SCALE = 6;     // counts/ms that fills the pace bar
 const SLOW_MAX = 2.2;     // counts/ms at or below = a good "slow" pace
 const FAST_MIN = 3.5;     // counts/ms at or above = a good "fast" pace
@@ -51,7 +52,9 @@ export function createSweepView(
 
   let phase: Phase = 'idle-slow';
   let slowCounts = 0;
-  let ready = false;  // current running pass has moved far enough to offer "finish"
+  let ready = false;          // current running pass has moved far enough to offer "finish"
+  let idleClickReady = false; // an idle pass has shown "position" long enough to now cue "click"
+  let idleTimer: number | null = null;
   let pace = 0;       // EMA pointer speed, counts/ms
   let lastT = 0;
   let W = 0, H = 0;
@@ -124,8 +127,19 @@ export function createSweepView(
     else if (phase === 'running-fast') { if (!ready) return nudge(); finish(acc.total()); }
   });
 
-  function startPass(next: Phase): void { acc.reset(); clearTrail(); pace = 0; lastT = 0; ready = false; phase = next; updateUi(); }
+  function startPass(next: Phase): void {
+    acc.reset(); clearTrail(); pace = 0; lastT = 0; ready = false;
+    if (idleTimer !== null) { clearTimeout(idleTimer); idleTimer = null; }
+    phase = next; updateUi();
+  }
   function nudge(): void { $('lead').textContent = 'keep sliding all the way to the card\'s right edge.'; }
+  // One action at a time on an idle pass: show "position your mouse" first, then swap to "click" once
+  // they have had a beat to settle (clicking works the whole time - this only paces the guidance).
+  function armIdleHint(): void {
+    if (idleTimer !== null) clearTimeout(idleTimer);
+    idleClickReady = false; updateUi();
+    idleTimer = window.setTimeout(() => { idleClickReady = true; updateUi(); }, IDLE_HINT_MS);
+  }
 
   function updatePace(): void {
     if (!running()) { $('pacewrap').hidden = true; $('pacelabel').textContent = ''; return; }
@@ -148,14 +162,14 @@ export function createSweepView(
       $('lead').textContent = 'lay any card flat on your desk, lined up against the left edge of this box.';
       $('sub').textContent = 'clicking hides your cursor so we can read raw motion - press Esc anytime to stop.';
     } else if (phase === 'idle-slow') {
-      $('lead').textContent = 'rest your mouse at the card\'s LEFT edge, then click once to start.';
+      $('lead').textContent = idleClickReady ? 'now click once to start.' : 'rest your mouse at the card\'s LEFT edge.';
       $('sub').textContent = '';
     } else if (phase === 'running-slow') {
       $('lead').textContent = ready ? 'click to finish pass 1.' : 'slowly slide right, following the card to its RIGHT edge.';
       $('sub').textContent = '';
     } else if (phase === 'idle-fast') {
-      $('lead').textContent = 'now move your mouse back to the card\'s LEFT edge, then click to start the quick pass.';
-      $('sub').textContent = 'one more - this quick pass just checks your mouse is steady.';
+      $('lead').textContent = idleClickReady ? 'now click to start the quick pass.' : 'move your mouse back to the card\'s LEFT edge.';
+      $('sub').textContent = idleClickReady ? 'this quick pass just checks your mouse is steady.' : '';
     } else if (phase === 'running-fast') {
       $('lead').textContent = ready ? 'click to finish calibration.' : 'now slide FAST to the right edge - one quick motion.';
       $('sub').textContent = '';
@@ -177,7 +191,17 @@ export function createSweepView(
     opts.onResult({ dpi: Math.round(dpi), accelerated });
   }
 
-  const onLock = (): void => updateUi();
+  const onLock = (): void => {
+    const locked = pointer.isLocked();
+    if (!locked && running()) {
+      // Esc mid-pass: reset to the matching idle so a re-lock starts a clean pass (never finalize a
+      // partial sweep joined by an uncounted gap, which would yield a wrong DPI).
+      phase = phase === 'running-fast' ? 'idle-fast' : 'idle-slow';
+      acc.reset(); clearTrail(); ready = false; pace = 0; lastT = 0; $('counts').textContent = '0';
+    }
+    if (locked && (phase === 'idle-slow' || phase === 'idle-fast')) armIdleHint();
+    else updateUi();
+  };
   const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onLockFailed()); };
   document.addEventListener('pointerlockchange', onLock);
   canvas.addEventListener('click', onCanvasClick);
@@ -189,6 +213,7 @@ export function createSweepView(
   return { dispose() {
     off(); offFire();
     cancelAnimationFrame(raf);
+    if (idleTimer !== null) clearTimeout(idleTimer);
     document.removeEventListener('pointerlockchange', onLock);
     canvas.removeEventListener('click', onCanvasClick);
     window.removeEventListener('resize', sizeCanvas);
