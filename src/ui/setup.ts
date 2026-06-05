@@ -51,7 +51,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     if (state.step === 'sweep') {
       view = createSweepView(host, { referenceWidthCm: CARD_WIDTH_CM,
         onResult: (r) => dispatch({ type: 'sweep-done', dpi: r.dpi, accelerated: r.accelerated }),
-        onInvalid: () => dispatch({ type: 'sweep-done', dpi: NaN, accelerated: true }),
+        onInvalid: () => dispatch({ type: 'sweep-invalid' }),
         onLockFailed: () => dispatch({ type: 'start-manual' }) });
       return;
     }
@@ -77,13 +77,19 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
         <button class="action action--primary" data-action="start-guided">start</button>
         <button class="action action--ghost" data-action="start-manual">i already know my numbers</button>
       </div>`;
-    if (state.step === 'blocked') return `
+    if (state.step === 'blocked') {
+      const accel = state.blockReason === 'accel';
+      return `
       <div class="wrap stack gate__inner">
-        <p class="gate__lead">mouse acceleration looks like it's on (or the card sweep was uneven) - cm/360 is undefined under acceleration.</p>
-        <p>turn off OS/driver acceleration ("enhance pointer precision"), then retry.</p>
-        <button class="action action--primary" data-action="retry">retry</button>
+        ${accel
+          ? `<p class="gate__lead">looks like your mouse speeds up the faster you move - that's "mouse acceleration", and it makes one true turn distance impossible to pin down.</p>
+             <p>turn off "enhance pointer precision" (windows) or your mouse driver's acceleration, then try again.</p>`
+          : `<p class="gate__lead">that sweep didn't quite register - probably a little too short or uneven.</p>
+             <p>line the card up, rest your mouse at its left edge, and slide smoothly all the way to the right edge.</p>`}
+        <button class="action action--primary" data-action="retry">try again</button>
         <button class="action action--ghost" data-action="manual">type my numbers instead</button>
       </div>`;
+    }
     if (state.step === 'manual') return `
       <div class="wrap stack setup__inner">
         <h2 class="display setup__title">+ your numbers</h2>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accumulateMagnitude, accelVerdict, AccelMeter } from '../../src/input/accel-check';
+import { accumulateMagnitude, accelVerdict, accelTolForWidth, AccelMeter } from '../../src/input/accel-check';
 import type { AimSample } from '../../src/types';
 
 const s = (dx: number, dy: number): AimSample => ({ t: 0, dx, dy });
@@ -25,6 +25,23 @@ describe('accelVerdict', () => {
   });
   it('does not divide by zero on an empty slow swipe', () => {
     expect(accelVerdict(0, 0).ratio).toBe(0);
+  });
+});
+
+describe('accelTolForWidth', () => {
+  it('keeps the ~10% tolerance for a long mousepad-scale reference', () => {
+    expect(accelTolForWidth(40)).toBeCloseTo(0.10, 9);
+    expect(accelTolForWidth(20)).toBeCloseTo(0.10, 9);
+  });
+  it('loosens the tolerance for a short card so honest sweeps are not false-flagged', () => {
+    const tol = accelTolForWidth(8.56); // the ISO ID-1 card width
+    expect(tol).toBeGreaterThan(0.20);
+    expect(tol).toBeLessThanOrEqual(0.25);
+  });
+  it('clamps to a sane band and is safe for non-positive widths', () => {
+    expect(accelTolForWidth(2)).toBe(0.25);   // 2.0/2 = 1.0, clamped to the ceiling
+    expect(accelTolForWidth(0)).toBe(0.10);
+    expect(accelTolForWidth(-5)).toBe(0.10);
   });
 });
 

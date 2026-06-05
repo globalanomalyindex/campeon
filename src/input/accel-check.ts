@@ -23,6 +23,20 @@ export function accelVerdict(slowTotal: number, fastTotal: number, tol = 0.1): A
   return { accelerated: ratio > tol, ratio };
 }
 
+/**
+ * Acceleration cross-check tolerance scaled to the sweep reference width (cm). The 10% default was
+ * tuned for a ~40cm mousepad; on a short reference (the 8.56cm ID-1 card) the same physical
+ * edge-alignment slop is a far larger FRACTION of the sweep, so a fixed 10% false-positives on
+ * honest runs. We scale inversely with width (narrower reference -> looser tolerance), clamped to a
+ * sane band. A short card is inherently a weak two-pass cross-check, so this is a best-effort guard
+ * for os-adjusted browsers only - the primary acceleration defense is raw pointer input, which
+ * bypasses OS acceleration at the source (and where the sweep view skips this check entirely).
+ */
+export function accelTolForWidth(referenceWidthCm: number): number {
+  if (!(referenceWidthCm > 0)) return 0.1;
+  return Math.min(0.25, Math.max(0.1, 2.0 / referenceWidthCm));
+}
+
 /** Accumulates the count magnitude for one swipe phase. */
 export class AccelMeter {
   private sum = 0;

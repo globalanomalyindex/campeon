@@ -3,7 +3,7 @@
 // (known width); fast pass cross-checks for acceleration. Marking uses onFire (a locked
 // primary-button press), so no cursor is needed.
 import { createPointerLock } from '../../input/pointer-lock';
-import { accelVerdict } from '../../input/accel-check';
+import { accelVerdict, accelTolForWidth } from '../../input/accel-check';
 import { SweepAccumulator, dpiFromSweep, isPlausibleSweepDpi } from '../../input/dpi-sweep';
 
 export interface SweepResult { dpi: number; accelerated: boolean; }
@@ -99,7 +99,12 @@ export function createSweepView(
     const dpi = dpiFromSweep(slowCounts, opts.referenceWidthCm);
     $('dpi').textContent = isPlausibleSweepDpi(dpi) ? Math.round(dpi).toString() : 'invalid';
     if (!isPlausibleSweepDpi(dpi)) { pointer.exit(); opts.onInvalid(); return; }
-    const { accelerated } = accelVerdict(slowCounts, fastCounts);
+    // Raw pointer input (Chromium unadjustedMovement) bypasses OS acceleration at the source, so the
+    // slow/fast cross-check has nothing to detect there - skip it. On os-adjusted browsers run it
+    // with a tolerance scaled to the short card width (a fixed 10% false-positives on an 8.56cm card).
+    const accelerated = pointer.mode() === 'raw'
+      ? false
+      : accelVerdict(slowCounts, fastCounts, accelTolForWidth(opts.referenceWidthCm)).accelerated;
     pointer.exit();
     opts.onResult({ dpi: Math.round(dpi), accelerated });
   }
