@@ -49,6 +49,19 @@ describe('analyzeFlick', () => {
     expect(Number.isFinite(r.score)).toBe(true);
   });
 
+  it('emits a finite, positive throughput-scale scoreSE (P1-1 nugget)', () => {
+    // A grid with real condition-to-condition throughput spread → a measurable SE of the aggregate.
+    const grid = [
+      ...cond(40, 3, 250, 0.4),
+      ...cond(28, 2.2, 400, 0.6),
+      ...cond(12, 1.5, 650, 0.9),
+    ];
+    const r = analyzeFlick(grid, ctx());
+    expect(r.scoreSE).toBeDefined();
+    expect(Number.isFinite(r.scoreSE as number)).toBe(true);
+    expect(r.scoreSE as number).toBeGreaterThan(0);
+  });
+
   it('throws if a condition has too few taps to estimate spread', () => {
     expect(() => analyzeFlick([{ amplitude: 20, width: 3, mt: 400, errAlong: 0.5, nCorr: 0, hit: true }], ctx()))
       .toThrow();

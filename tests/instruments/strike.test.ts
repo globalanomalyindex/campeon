@@ -46,6 +46,16 @@ describe('analyzeStrike', () => {
     expect(r.raw.hitRate).toBeCloseTo(0.75, 6);
     expect(Number.isFinite(r.score)).toBe(true);
   });
+
+  it('emits a finite, positive scoreSE that grows with scatter (P1-1 nugget)', () => {
+    const tight = analyzeStrike(strikes(300, 0.5, 1), ctx());
+    const loose = analyzeStrike(strikes(300, 3, 1), ctx());
+    expect(tight.scoreSE).toBeDefined();
+    expect(Number.isFinite(tight.scoreSE as number)).toBe(true);
+    expect(tight.scoreSE as number).toBeGreaterThan(0);
+    // More scatter at the same TTK/hit-rate is a noisier trial → a larger SE.
+    expect(loose.scoreSE as number).toBeGreaterThan(tight.scoreSE as number);
+  });
 });
 
 describe('strike.run', () => {

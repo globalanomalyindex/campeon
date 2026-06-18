@@ -14,8 +14,36 @@ import { mean, sampleStd } from '../scoring/stats';
  * instrument's contribution). Note z-scoring gives every instrument equal variance regardless of how
  * many times it was sampled, so a sparsely-sampled instrument can transiently over-contribute
  * mid-sweep; that washes out once the controller fits the report on a dense, balanced sweep.
+ *
+ * P1-1 heteroscedastic nugget: when a trial carries a finite, positive measured `scoreSE`, the affine
+ * z-score maps it into a per-point GP noise term: noise = clamp((w·scoreSE/sd)², floorFrac·noiseVar,
+ * ceilFrac·noiseVar). The w² (here folded into squaring w·scoreSE/sd) keeps the map affine-consistent
+ * under non-unit weights, matching y = w·(score−mu)/sd. The floor stops a lucky-quiet trial from
+ * becoming an interpolating spike; the ceiling stops a disastrous-but-honest trial from being
+ * silenced. A missing/zero/NaN scoreSE leaves `noise` undefined, so existing flat-path observations
+ * (and their y/x values) stay byte-identical - reliability enters ONLY via the nugget, never by
+ * rescaling y, so no instrument's own optimum can move.
  */
-export function trialsToObservations(trials: readonly TrialResult[], profile: Profile): Observation[] {
+export interface ObjectiveOptions {
+  /** Default GP nugget σ_n² the per-point noise is clamped against (default 0.1, matching the GP). */
+  noiseVar?: number;
+  /** Floor as a fraction of noiseVar (default 0.25): the smallest honest per-point noise. */
+  floorFrac?: number;
+  /** Ceiling as a fraction of noiseVar (default 4.0): the largest honest per-point noise. */
+  ceilFrac?: number;
+}
+
+export function trialsToObservations(
+  trials: readonly TrialResult[],
+  profile: Profile,
+  opts: ObjectiveOptions = {},
+): Observation[] {
+  const noiseVar = opts.noiseVar ?? 0.1;
+  const floorFrac = opts.floorFrac ?? 0.25;
+  const ceilFrac = opts.ceilFrac ?? 4.0;
+  const floor = floorFrac * noiseVar;
+  const ceil = ceilFrac * noiseVar;
+
   const byId = new Map<InstrumentId, number[]>();
   for (const t of trials) {
     const arr = byId.get(t.instrument) ?? [];
@@ -31,7 +59,12 @@ export function trialsToObservations(trials: readonly TrialResult[], profile: Pr
     if (!w) continue; // weight 0 or missing → no contribution
     const s = stats.get(t.instrument);
     if (!s || !(s.sd > 0)) continue; // no spread / NaN → no usable signal (never fabricate one)
-    out.push({ x: Math.log(t.cm360), y: w * ((t.score - s.mu) / s.sd) });
+    const obs: Observation = { x: Math.log(t.cm360), y: w * ((t.score - s.mu) / s.sd) };
+    if (t.scoreSE !== undefined && Number.isFinite(t.scoreSE) && t.scoreSE > 0) {
+      const stdSE = (w * t.scoreSE) / s.sd; // standardized SE on the affine y scale
+      obs.noise = Math.min(Math.max(stdSE * stdSE, floor), ceil);
+    }
+    out.push(obs);
   }
   return out.sort((a, b) => a.x - b.x);
 }

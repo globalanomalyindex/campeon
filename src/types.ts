@@ -57,6 +57,12 @@ export interface TrialResult {
   score: number;                 // within-trial, higher = better (Phase 4 normalizes across the cm/360 sweep)
   raw: Record<string, number>;   // instrument-specific metrics
   at: Ms;
+  /** Optional MEASURED standard error of `score` on its own native scale (Phase 1 heteroscedastic
+   *  nugget). When finite > 0 the optimizer maps it through the affine z-score into a per-point GP
+   *  noise term so a noisy trial is trusted less; a missing/zero/NaN SE falls back to the flat
+   *  `noiseVar`. NEVER fabricated - an instrument with no honest within-trial spread (e.g. track's
+   *  single continuous recording) emits none. */
+  scoreSE?: number;
 }
 export interface Instrument {
   id: InstrumentId;

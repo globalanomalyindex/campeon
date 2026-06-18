@@ -9,7 +9,12 @@ import type {
   TrialContext,
   TrialResult,
 } from '../types';
-import { conditionThroughput, aggregateThroughput, type ConditionThroughput } from '../scoring/fitts';
+import {
+  conditionThroughput,
+  aggregateThroughput,
+  aggregateThroughputSE,
+  type ConditionThroughput,
+} from '../scoring/fitts';
 import { mean } from '../scoring/stats';
 import { segment } from '../scoring/submovement';
 import { speedTrace, type Frame } from './recording';
@@ -84,10 +89,19 @@ export function analyzeFlick(taps: readonly FlickTap[], ctx: TrialContext): Tria
   const nCorrMean = taps.length === 0 ? 0 : taps.reduce((s, t) => s + t.nCorr, 0) / taps.length;
   const mtMean = taps.length === 0 ? 0 : taps.reduce((s, t) => s + t.mt, 0) / taps.length;
 
+  // P1-1 reliability: the measured between-condition spread of the aggregate throughput, mapped onto
+  // the SCORE scale. The harmonic-mean score and the pooled throughput share the bits/s scale, so a
+  // first-order (delta-method) map is the score-to-throughput ratio. 0 conditions of spread → no SE
+  // (the optimizer falls back to the flat nugget); never fabricated.
+  const tpSE = aggregateThroughputSE(scored.map((s) => s.ct));
+  const scoreSE =
+    tpSE > 0 && throughput > 0 && Number.isFinite(score) ? tpSE * (score / throughput) : undefined;
+
   return {
     instrument: ID,
     cm360: ctx.cm360,
     score, // bits/s; higher = better. Phase 4 normalizes across the sweep.
+    ...(scoreSE !== undefined && scoreSE > 0 ? { scoreSE } : {}),
     raw: {
       throughput,
       ballisticTP: ballisticTP ?? NaN,

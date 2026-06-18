@@ -60,7 +60,7 @@ export interface CalibrationWeights {
   wt: number;
 }
 
-const DEFAULT_WEIGHTS: CalibrationWeights = { wb: 0.6, wv: 0.3, wt: 0.1 };
+export const DEFAULT_WEIGHTS: CalibrationWeights = { wb: 0.6, wv: 0.3, wt: 0.1 };
 
 /** Composite calibration cost C(s) = w_b·|b|² + w_v·σ_R² + w_t·(meanMt/tRef)². Lower = better. */
 export function calibrationCost(

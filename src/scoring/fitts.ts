@@ -43,3 +43,14 @@ export function aggregateThroughput(conditions: readonly ConditionThroughput[]):
   }
   return mean(conditions.map((c) => c.tp));
 }
+
+/**
+ * Standard error of the mean-of-means aggregate throughput: SD(tp across conditions)/√k. This is the
+ * measured between-condition spread of the throughput estimate (the P1-1 reliability signal), 0 with
+ * <2 conditions (no spread to estimate - the caller falls back to the flat nugget, never fabricates).
+ */
+export function aggregateThroughputSE(conditions: readonly ConditionThroughput[]): number {
+  const k = conditions.length;
+  if (k < 2) return 0;
+  return sampleStd(conditions.map((c) => c.tp)) / Math.sqrt(k);
+}

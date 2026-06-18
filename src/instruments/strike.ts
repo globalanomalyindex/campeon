@@ -18,12 +18,13 @@ export interface StrikeShot {
 /** Pure strike analysis: TTK operating point + scatter, scored by the speed/accuracy weight. */
 export function analyzeStrike(shots: readonly StrikeShot[], ctx: TrialContext): TrialResult {
   if (shots.length === 0) throw new RangeError('analyzeStrike: no shots');
-  const tR = shots.reduce((s, x) => s + x.tR, 0) / shots.length;
-  const tS = shots.reduce((s, x) => s + x.tS, 0) / shots.length;
-  const vPeak = shots.reduce((s, x) => s + x.vPeak, 0) / shots.length;
+  const n = shots.length;
+  const tR = shots.reduce((s, x) => s + x.tR, 0) / n;
+  const tS = shots.reduce((s, x) => s + x.tS, 0) / n;
+  const vPeak = shots.reduce((s, x) => s + x.vPeak, 0) / n;
   const ttkMs = tR + tS;
   const sigmaTheta = sampleStd(shots.map((s) => s.endpointError));
-  const hitRate = shots.filter((s) => s.hit).length / shots.length;
+  const hitRate = shots.filter((s) => s.hit).length / n;
 
   // Speed↔accuracy blend: w = speedAccuracy (1 = pure speed, 0 = pure accuracy).
   const w = Math.max(0, Math.min(1, ctx.profile.speedAccuracy));
@@ -31,10 +32,24 @@ export function analyzeStrike(shots: readonly StrikeShot[], ctx: TrialContext): 
   const speedTerm = 1 / ttkSec; // strikes per second
   const score = Math.pow(speedTerm, w) * Math.pow(Math.max(0, hitRate), 1 - w);
 
+  // P1-1 reliability: combine the measured speed SE and the measured accuracy SE into a score SE via
+  // the delta method. score = speedTerm^w · hitRate^(1−w), so the speed term contributes its RELATIVE
+  // SE d(ttk)/ttk with weight w. The accuracy term is the SE of the endpoint scatter, σ_θ/√n (degrees,
+  // per ISO the natural reliability of the endpoint estimate); we express it relative to a 1° reference
+  // with weight (1−w), so a larger scatter (a noisier, less-trustworthy trial) widens the nugget.
+  // Both relative SEs add in quadrature. 0 spread → no SE (flat-nugget fallback); never fabricated.
+  const ttkSE = sampleStd(shots.map((s) => (s.tR + s.tS) / 1000)) / Math.sqrt(n); // SE of TTK (s)
+  const relSpeed = ttkSE / ttkSec; // d(speedTerm)/speedTerm = d(ttk)/ttk
+  const ACC_REF_DEG = 1; // reference angular scale: σ_θ/√n read as a fraction of one degree
+  const relAcc = sigmaTheta / Math.sqrt(n) / ACC_REF_DEG; // grows with measured scatter
+  const relScore = Math.hypot(w * relSpeed, (1 - w) * relAcc);
+  const scoreSE = Number.isFinite(score) && score > 0 && relScore > 0 ? score * relScore : undefined;
+
   return {
     instrument: ID,
     cm360: ctx.cm360,
     score,
+    ...(scoreSE !== undefined && scoreSE > 0 ? { scoreSE } : {}),
     raw: { ttkMs, tR, tS, vPeak, sigmaTheta, hitRate },
     at: 0,
   };

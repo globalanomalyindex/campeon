@@ -33,6 +33,11 @@ describe('analyzeTrack', () => {
     expect(good.score).toBeGreaterThan(laggy.score);
   });
 
+  it('emits NO scoreSE - a single continuous recording falls back to the flat nugget (P1-1)', () => {
+    const r = analyzeTrack({ frames: tracking(0), fires: [] }, ctx());
+    expect(r.scoreSE).toBeUndefined();
+  });
+
   it('flags reactive lag with a negative predictive index', () => {
     const laggy = analyzeTrack({ frames: tracking(8), fires: [] }, ctx());
     expect(laggy.raw.pi).toBeLessThan(0);

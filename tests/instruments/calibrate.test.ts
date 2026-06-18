@@ -44,6 +44,16 @@ describe('analyzeCalibrate', () => {
     expect(r.score).toBeGreaterThan(0);
     expect(r.score).toBeLessThanOrEqual(1);
   });
+
+  it('emits a finite, positive scoreSE that grows with spread (P1-1 nugget)', () => {
+    const tight = analyzeCalibrate(shots(0.2, 0.3), ctx());
+    const messy = analyzeCalibrate(shots(0.2, 2.0), ctx());
+    expect(tight.scoreSE).toBeDefined();
+    expect(Number.isFinite(tight.scoreSE as number)).toBe(true);
+    expect(tight.scoreSE as number).toBeGreaterThan(0);
+    // A noisier burst (more shot-to-shot spread) is a less reliable trial → a larger SE.
+    expect(messy.scoreSE as number).toBeGreaterThan(tight.scoreSE as number);
+  });
 });
 
 describe('calibrate.run', () => {
