@@ -112,7 +112,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         if (!alive || !lastReport) return;
         const report = lastReport;
         const sessionId = `s-${allTrials.length}-${Math.round(report.optimalCm360 * 100)}`;
-        const result = buildResult(report, allTrials, ctx.draft.dpi, undefined, ctx.draft.bounds);
+        const result = buildResult(report, allTrials, ctx.draft.dpi, undefined, ctx.draft.bounds, ctx.draft.profile);
         ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: 0 });
         ctx.storage.saveResult(sessionId, result);
         ctx.lastResult = { sessionId, result };

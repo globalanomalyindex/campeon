@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildResult } from '../../src/optimizer/result';
 import { sensFor } from '../../src/convert/cm360';
 import { yawFor } from '../../src/convert/yaw-table';
-import type { Report, TrialResult } from '../../src/types';
+import type { Profile, Report, TrialResult } from '../../src/types';
 
 const report: Report = { optimalCm360: 32, ci90: [28, 37], curve: [{ x: Math.log(32), mean: 0.1 }] };
 const trials: TrialResult[] = [
@@ -10,6 +10,7 @@ const trials: TrialResult[] = [
   { instrument: 'calibrate', cm360: 37, score: 0.5, raw: { gain: 0.9, sigmaR: 0.35 }, at: 0 },
   { instrument: 'strike', cm360: 33, score: 1, raw: { ttkMs: 510, hitRate: 0.86 }, at: 0 },
 ];
+const profile: Profile = { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } };
 
 describe('buildResult', () => {
   it('carries the optimum + CI and computes native per-game sensitivities at the optimum', () => {
@@ -43,5 +44,25 @@ describe('buildResult', () => {
     const r = buildResult(report, trials, 800);
     expect(r.curve).toBeUndefined();
     expect(r.bounds).toBeUndefined();
+  });
+
+  it('threads the profile into the breakdown so track/flick fuse their affine contribution', () => {
+    const probe = (instrument: 'track' | 'flick', cm360: number, score: number): TrialResult => ({
+      instrument, cm360, score, raw: {}, at: 0,
+    });
+    const tf = [
+      ...trials,
+      probe('flick', 22, 0.4), probe('flick', 35, 0.9),
+      probe('track', 25, 0.5), probe('track', 40, 0.8),
+    ];
+    const r = buildResult(report, tf, 800, undefined, undefined, profile);
+    expect(Number.isFinite(r.breakdown.flickContribZ!)).toBe(true);
+    expect(Number.isFinite(r.breakdown.trackContribZ!)).toBe(true);
+  });
+
+  it('without a profile the affine contributions stay NaN (old callers stay number-only)', () => {
+    const r = buildResult(report, trials, 800);
+    expect(Number.isNaN(r.breakdown.trackContribZ!)).toBe(true);
+    expect(Number.isNaN(r.breakdown.flickContribZ!)).toBe(true);
   });
 });

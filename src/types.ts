@@ -113,7 +113,13 @@ export interface Result {
   optimalCm360: Cm360;
   ci90: [Cm360, Cm360];
   perGameSens: Partial<Record<GameId, number>>;
-  breakdown: { biasZeroCm360: Cm360; precisionFloorDeg: Degrees; ttkMs: Ms; hitRate: number };
+  breakdown: {
+    biasZeroCm360: Cm360; precisionFloorDeg: Degrees; ttkMs: Ms; hitRate: number;
+    /** Affine-fused track/flick contribution at the optimum (z-score σ units), the SAME quantity
+     *  objective.ts fuses. Optional + NaN-when-unmeasurable so OLD saved Results render number-only and a
+     *  tuned-by-feel value (which has no measured contribution) renders/plots none. */
+    trackContribZ?: number; flickContribZ?: number;
+  };
   /** Set when the number was hand-picked in the range, not measured. The result screen drops the 90% CI
    *  (a hand-picked value has no measured CI) and the exported JSON is self-describing (honesty). */
   tuned?: boolean;

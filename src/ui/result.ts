@@ -6,9 +6,13 @@ import { plotGeometry, renderConvergencePlot } from './convergence-plot';
 import { marksFromTrials } from './session-view';
 
 const fmt = (v: number, digits = 1): string => (Number.isFinite(v) ? v.toFixed(digits) : '-');
+// Signed standardized contribution (z-score units, σ). Dash for NaN/missing - never a fabricated facet pick.
+const fmtZ = (v: number | undefined): string =>
+  v !== undefined && Number.isFinite(v) ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}σ` : '-';
 
 // Fixed viewBox: clientWidth is 0 before layout, so the geometry must use a constant design size.
 const PLOT_SIZE = { width: 360, height: 200 };
+const FACET_SIZE = { width: 360, height: 96 };
 
 export function result(host: HTMLElement, ctx: AppContext): Screen {
   const r: Result | undefined = ctx.lastResult?.result;
@@ -16,6 +20,13 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
     mount() {
       if (!r) { ctx.navigate('hero'); return; }
       const tuned = r.tuned ?? false;
+      const bk = r.breakdown;
+      // The track/flick micro-plot needs the persisted axis (bounds) AND the affine contributions, both
+      // of which a tuned-by-feel value drops and an OLD saved Result never had. Gate on all three so old
+      // results render number-only and a hand-picked value makes no measured-facet claim (honesty).
+      const hasFacets =
+        !tuned && r.bounds !== undefined &&
+        (bk.trackContribZ !== undefined || bk.flickContribZ !== undefined);
       const root = document.createElement('section');
       root.className = 'screen screen--shell result fade-in';
       const rows = GAME_YAW.map((g) => {
@@ -36,11 +47,24 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
                 <figcaption class="mono">the four probes converging on your one number</figcaption></figure>`
             : ''}
           <p class="result__credit">your most-evolved sensitivity - the target-acquisition “brain” six predators sharpened across four environments: dragonfly · falcon · spider · raptor · archerfish · mantis shrimp</p>
-          <div class="result__breakdown">
-            <div><span class="result__bk-label">bias-zero <em>archerfish</em></span><span class="mono" data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
-            <div><span class="result__bk-label">precision floor</span><span class="mono" data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
-            <div><span class="result__bk-label">time-to-kill <em>mantis shrimp</em></span><span class="mono" data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
-            <div><span class="result__bk-label">hit rate</span><span class="mono" data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
+          <div class="result__tier" data-tier="origin">
+            <p class="result__tier-head mono">where the number comes from</p>
+            <div class="result__breakdown">
+              <div><span class="result__bk-label">bias-zero <em>archerfish</em></span><span class="mono" data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
+            </div>
+            ${hasFacets
+              ? `<figure class="result__facets"><svg data-facets aria-hidden="true"></svg>
+                  <figcaption class="mono">track + flick - the two intercept probes, marked where they pull on the blend
+                    <span class="result__facet-z">+track <span data-breakdown="trackContribZ">${fmtZ(bk.trackContribZ)}</span> · +flick <span data-breakdown="flickContribZ">${fmtZ(bk.flickContribZ)}</span></span></figcaption></figure>`
+              : ''}
+          </div>
+          <div class="result__tier" data-tier="readings">
+            <p class="result__tier-head mono">readings at that sensitivity</p>
+            <div class="result__breakdown">
+              <div><span class="result__bk-label">precision floor</span><span class="mono" data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
+              <div><span class="result__bk-label">time-to-kill <em>mantis shrimp</em></span><span class="mono" data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
+              <div><span class="result__bk-label">hit rate</span><span class="mono" data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
+            </div>
           </div>
           <label class="field result__game-pick">your game
             <select data-action="your-game">${GAME_YAW.map((g) => `<option value="${g.id}"${g.id === ctx.draft.currentGame ? ' selected' : ''}>${g.label}</option>`).join('')}</select></label>
@@ -80,6 +104,25 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
             curve: r.curve, ci90: r.ci90, peak: r.optimalCm360, size: PLOT_SIZE,
           });
           renderConvergencePlot(svg, g, 'blended score');
+        }
+      }
+
+      // The two intercept probes (track + flick) shown as organism-colored marks on the SAME shared
+      // ln(cm/360) axis, anchored to the one answer (peak line) - a small micro-plot, not extra grid
+      // numbers. Reuses the pure plotGeometry/renderConvergencePlot seam (no fork); marks come from the
+      // persisted trials via marksFromTrials, filtered to the two facets. Guard mirrors `hasFacets`.
+      if (hasFacets && r.bounds) {
+        const svg = root.querySelector('[data-facets]') as unknown as SVGElement | null;
+        if (svg) {
+          const sessionId = ctx.lastResult?.sessionId;
+          const trials = ctx.storage.loadSessions().find((s) => s.id === sessionId)?.trials ?? [];
+          const facetMarks = marksFromTrials(trials).filter(
+            (m) => m.instrument === 'track' || m.instrument === 'flick',
+          );
+          const g = plotGeometry({
+            bounds: r.bounds, marks: facetMarks, peak: r.optimalCm360, size: FACET_SIZE,
+          });
+          renderConvergencePlot(svg, g);
         }
       }
     },

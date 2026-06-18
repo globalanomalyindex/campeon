@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeBreakdown } from '../../src/optimizer/breakdown';
-import type { TrialResult } from '../../src/types';
+import { trialsToObservations } from '../../src/optimizer/objective';
+import type { InstrumentId, Profile, TrialResult } from '../../src/types';
 
 const cal = (cm360: number, gain: number, sigmaR: number): TrialResult => ({
   instrument: 'calibrate', cm360, score: 0.5,
@@ -8,6 +9,13 @@ const cal = (cm360: number, gain: number, sigmaR: number): TrialResult => ({
 });
 const str = (cm360: number, ttkMs: number, hitRate: number): TrialResult => ({
   instrument: 'strike', cm360, score: 1, raw: { ttkMs, hitRate }, at: 0,
+});
+const probe = (instrument: InstrumentId, cm360: number, score: number): TrialResult => ({
+  instrument, cm360, score, raw: {}, at: 0,
+});
+const prof = (weights: Partial<Record<InstrumentId, number>>): Profile => ({
+  speedAccuracy: 0.5,
+  instrumentWeights: { track: 0, flick: 0, calibrate: 0, strike: 0, ...weights },
 });
 
 describe('computeBreakdown', () => {
@@ -38,5 +46,37 @@ describe('computeBreakdown', () => {
   it('no gain bracket (all overshoot) → nearest-to-1 gain trial cm360, not interpolation', () => {
     const b = computeBreakdown([cal(20, 1.4, 0.5), cal(30, 1.1, 0.4)], 25);
     expect(b.biasZeroCm360).toBe(30); // gain 1.1 is closest to 1
+  });
+
+  it('track/flick contributions are the AFFINE-FUSED z-score objective.ts emits (nearest the optimum)', () => {
+    // The facet position must be the same w·(score−mu)/sd quantity the optimizer fuses - NOT a raw argmax.
+    const trials = [
+      probe('flick', 22, 0.4), probe('flick', 35, 0.9), probe('flick', 50, 0.3),
+      probe('track', 25, 0.5), probe('track', 40, 0.8),
+    ];
+    const profile = prof({ flick: 1, track: 1 });
+    const optimum = 36; // nearest flick trial = 35, nearest track trial = 40
+    const b = computeBreakdown(trials, optimum, profile);
+    // Reconstruct the exact fused y the optimizer would emit for the nearest-the-optimum trial.
+    const obs = trialsToObservations(trials, profile);
+    const yAt = (cm: number) => obs.find((o) => Math.abs(Math.exp(o.x) - cm) < 1e-9)!.y;
+    expect(b.trackContribZ).toBeCloseTo(yAt(40), 12);
+    expect(b.flickContribZ).toBeCloseTo(yAt(35), 12);
+  });
+
+  it('track/flick contributions are NaN with <2 trials / no spread (no fabricated facet recommendation)', () => {
+    const b = computeBreakdown(
+      [probe('flick', 30, 0.7), probe('track', 25, 0.5), probe('track', 40, 0.5)],
+      30,
+      prof({ flick: 1, track: 1 }),
+    );
+    expect(Number.isNaN(b.flickContribZ)).toBe(true); // 1 flick trial → no spread
+    expect(Number.isNaN(b.trackContribZ)).toBe(true); // 2 equal track scores → sd 0
+  });
+
+  it('track/flick contributions are NaN when no profile is supplied (old callers stay number-only)', () => {
+    const b = computeBreakdown([probe('flick', 22, 0.4), probe('flick', 35, 0.9)], 30);
+    expect(Number.isNaN(b.trackContribZ)).toBe(true);
+    expect(Number.isNaN(b.flickContribZ)).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
-import type { Cm360, Degrees, Ms, TrialResult } from '../types';
+import type { Cm360, Degrees, InstrumentId, Ms, Profile, TrialResult } from '../types';
+import { mean, sampleStd } from '../scoring/stats';
 
 export interface Breakdown {
   /** cm/360 where the calibrate gain crosses 1 (the bias-zero sensitivity, spec §4.3). */
@@ -9,6 +10,13 @@ export interface Breakdown {
   ttkMs: Ms;
   /** Strike hit rate at the optimum. */
   hitRate: number;
+  /** Track's AFFINE-FUSED contribution at the optimum: the SAME w·(score−mu)/sd quantity the optimizer
+   *  fuses (objective.ts), evaluated at the track trial nearest the optimum in ln-space. NOT a raw-score
+   *  argmax masquerading as a facet recommendation. NaN when <2 trials / no spread / no profile, exactly
+   *  like biasZero/precisionFloor already dash. Optional so OLD saved Results render number-only. */
+  trackContribZ?: number;
+  /** Flick's AFFINE-FUSED contribution at the optimum - see `trackContribZ`. */
+  flickContribZ?: number;
 }
 
 const byInstrument = (trials: readonly TrialResult[], id: TrialResult['instrument']) =>
@@ -34,8 +42,39 @@ function biasZero(cal: readonly TrialResult[]): Cm360 {
   return pts.reduce((best, p) => (Math.abs(p.g - 1) < Math.abs(best.g - 1) ? p : best)).cm;
 }
 
+/**
+ * Track/flick's AFFINE-FUSED contribution at the optimum: the SAME w·(score−mu)/sd quantity objective.ts
+ * fuses (mu/sd taken across THIS instrument's own trials, weight from the profile), evaluated at the trial
+ * nearest the optimum in ln-space. This is deliberately NOT a standalone raw-score argmax. Returns NaN
+ * (→ dash) with <2 trials, no spread (sd not > 0), or no profile - exactly as biasZero/precisionFloor dash.
+ */
+function fusedContribAt(
+  trials: readonly TrialResult[],
+  id: InstrumentId,
+  optimalCm360: Cm360,
+  profile?: Profile,
+): number {
+  if (!profile) return NaN;
+  const w = profile.instrumentWeights[id];
+  if (!w) return NaN;
+  const own = byInstrument(trials, id);
+  const scores = own.map((t) => t.score);
+  const sd = sampleStd(scores);
+  if (!(sd > 0)) return NaN; // <2 trials / all-equal / NaN-poisoned → no usable signal (mirror objective.ts)
+  const mu = mean(scores);
+  const lOpt = Math.log(optimalCm360);
+  const nearest = own.reduce((best, t) =>
+    Math.abs(Math.log(t.cm360) - lOpt) < Math.abs(Math.log(best.cm360) - lOpt) ? t : best,
+  );
+  return w * ((nearest.score - mu) / sd);
+}
+
 /** Pure breakdown of the one answer into each facet's contribution. Missing data → NaN (no fabrication). */
-export function computeBreakdown(trials: readonly TrialResult[], optimalCm360: Cm360): Breakdown {
+export function computeBreakdown(
+  trials: readonly TrialResult[],
+  optimalCm360: Cm360,
+  profile?: Profile,
+): Breakdown {
   const cal = byInstrument(trials, 'calibrate');
   const str = byInstrument(trials, 'strike');
 
@@ -58,5 +97,7 @@ export function computeBreakdown(trials: readonly TrialResult[], optimalCm360: C
     precisionFloorDeg,
     ttkMs: nearest ? (nearest.raw.ttkMs ?? NaN) : NaN,
     hitRate: nearest ? (nearest.raw.hitRate ?? NaN) : NaN,
+    trackContribZ: fusedContribAt(trials, 'track', optimalCm360, profile),
+    flickContribZ: fusedContribAt(trials, 'flick', optimalCm360, profile),
   };
 }

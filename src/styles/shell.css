@@ -265,6 +265,14 @@
 .result__number small { font-size: .18em; color: var(--text-muted); font-family: var(--font-mono); }
 .result__ci { color: var(--text-muted); }
 .result__credit { color: var(--text-muted); font-size: .8rem; font-style: italic; opacity: .85; margin-top: var(--space-1); }
+.result__tier { margin: var(--space-4) 0; text-align: left; }
+.result__tier-head { color: var(--text-muted); text-transform: lowercase; letter-spacing: .04em;
+  font-size: .78rem; margin-bottom: var(--space-2); }
+.result__tier[data-tier="origin"] .result__breakdown { grid-template-columns: 1fr; }
+.result__facets { margin: var(--space-3) 0 0; }
+.result__facets svg[data-facets] { display: block; width: 100%; height: auto; aspect-ratio: 360 / 96; }
+.result__facets figcaption { margin-top: var(--space-1); color: var(--text-muted); font-size: .78rem; }
+.result__facet-z { display: block; margin-top: 2px; color: var(--text); }
 .result__breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); text-align: left; margin: var(--space-4) 0; }
 .result__breakdown > div { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-strong); background: var(--surface-raised); border-radius: 2px; }
