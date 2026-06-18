@@ -15,25 +15,59 @@ function rms(xs: readonly number[]): number {
   return Math.sqrt(s / xs.length);
 }
 
+const mean = (xs: readonly number[]): number =>
+  xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : 0;
+
 /**
- * Continuous lag (in samples) of the peak aim↔target cross-correlation along an axis; >0 = aim
- * trails. Zero-mean covariance (not a raw dot product) so a constant offset cannot tip the peak,
- * then parabolic sub-sample refinement of that peak - a smooth target's latency lives between
+ * Continuous lag (in samples) of the peak aim↔target cross-correlation, fused across BOTH the yaw
+ * and pitch axes; >0 = aim trails. Each axis contributes its own zero-mean covariance, and we sum
+ * those covariance functions into ONE cov(lag) = yawCov(lag) + pitchCov(lag) before any peak-find.
+ *
+ * Two reasons for one summed function rather than two refined peaks:
+ *   • Covariance is inherently amplitude-weighted, so a low-SNR axis (e.g. a small/noisy yaw weave)
+ *     contributes little and a clean high-amplitude axis dominates - the estimate stays stable.
+ *   • Averaging two INDEPENDENTLY-refined per-axis peaks would reinject each axis's own noise; the
+ *     player has a single tracking latency, so we recover it from the combined evidence at once.
+ *
+ * Zero-mean covariance (not a raw dot product) so a constant offset cannot tip the peak, then
+ * parabolic sub-sample refinement of that single peak - a smooth target's latency lives between
  * frames, so quantizing it to whole frames would inject a parity artifact into the residual.
  */
-function bestLag(aim: readonly number[], target: readonly number[], maxLag: number): number {
-  const ma = aim.length ? aim.reduce((s, v) => s + v, 0) / aim.length : 0;
-  const mt = target.length ? target.reduce((s, v) => s + v, 0) / target.length : 0;
-  const cov = (lag: number): number => {
+export function bestLag(
+  aimYaw: readonly number[],
+  tgtYaw: readonly number[],
+  aimPitch: readonly number[],
+  tgtPitch: readonly number[],
+  maxLag: number,
+): number {
+  const maY = mean(aimYaw);
+  const mtY = mean(tgtYaw);
+  const maP = mean(aimPitch);
+  const mtP = mean(tgtPitch);
+  // Per-axis zero-mean covariance at a given lag, with that axis's own overlap normalization.
+  const axisCov = (
+    aim: readonly number[],
+    tgt: readonly number[],
+    ma: number,
+    mt: number,
+    lag: number,
+  ): number => {
     let c = 0;
     let n = 0;
     for (let i = 0; i < aim.length; i++) {
       const j = i - lag;
-      if (j < 0 || j >= target.length) continue;
-      c += (aim[i]! - ma) * (target[j]! - mt);
+      if (j < 0 || j >= tgt.length) continue;
+      c += (aim[i]! - ma) * (tgt[j]! - mt);
       n += 1;
     }
     return n > 0 ? c / n : -Infinity;
+  };
+  // The single combined covariance function: sum the two axes BEFORE peak-finding.
+  const cov = (lag: number): number => {
+    const cy = axisCov(aimYaw, tgtYaw, maY, mtY, lag);
+    const cp = axisCov(aimPitch, tgtPitch, maP, mtP, lag);
+    if (!Number.isFinite(cy) || !Number.isFinite(cp)) return -Infinity;
+    return cy + cp;
   };
   let best = 0;
   let bestScore = -Infinity;
@@ -104,6 +138,8 @@ export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
   const tgt: [Degrees, Degrees][] = [];
   const aimYaw: number[] = [];
   const tgtYaw: number[] = [];
+  const aimPitch: number[] = [];
+  const tgtPitch: number[] = [];
   const aimSpeeds: number[] = [];
   const slip: number[] = [];
   const dts: number[] = [];
@@ -120,6 +156,8 @@ export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
     tgt.push(target);
     aimYaw.push(f.aim[0]);
     tgtYaw.push(target[0]);
+    aimPitch.push(f.aim[1]);
+    tgtPitch.push(target[1]);
     if (i > 0) {
       dts.push(dt);
       const aimVel = separation(frames[i - 1]!.aim, f.aim) / dt;
@@ -130,7 +168,9 @@ export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
   }
 
   // The player's tracking latency L: lag of the peak aim↔target cross-correlation, in seconds.
-  const lag = bestLag(aimYaw, tgtYaw, Math.min(20, frames.length - 1));
+  // Fused across yaw AND pitch via a single combined (amplitude-weighted) covariance so the weave's
+  // ±5° pitch reinforces the estimate and a low-SNR axis cannot dominate it.
+  const lag = bestLag(aimYaw, tgtYaw, aimPitch, tgtPitch, Math.min(20, frames.length - 1));
   const pi = -lag;
   const latencySec = clamp(lag * (dts.length ? median(dts) : 0.016), 0, MAX_LEAD_SEC);
 
