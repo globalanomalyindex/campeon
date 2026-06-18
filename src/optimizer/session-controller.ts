@@ -72,6 +72,9 @@ export function finalizeReport(
   const peak = clamp(fit.optimalCm360, lo, hi);
   let ci: [Cm360, Cm360];
   try {
+    // The obs carry their per-point `noise` (the P1-1 heteroscedastic nugget) all the way through, so
+    // bootstrapCi resamples residuals reliability-aware (P1-3): a loud facet widens the CI, a quiet
+    // facet is not contaminated, and the band can only ever widen past the conservative pooled bound.
     const raw = bootstrapCi([...obs], iters, rng);
     ci = [clamp(Math.min(raw[0], raw[1]), lo, hi), clamp(Math.max(raw[0], raw[1]), lo, hi)];
   } catch {

@@ -67,6 +67,20 @@ describe('finalizeReport', () => {
     expect(r.curve).toEqual([]);
   });
 
+  it('plumbs per-point noise: a loud facet widens the CI vs the same data scored as homoscedastic', () => {
+    // Identical points and seed; the only difference is that one facet carries a large measured
+    // Observation.noise. finalizeReport must hand that noise through to the reliability-aware bootstrap
+    // so the CI is at least as wide as the flat-noise counterpart (never narrower) - the P1-3 honesty.
+    const flat = concave(34, 0.05); // no per-point noise → homoscedastic pooled path
+    // Loud facet at a high-leverage end point (last cm) - its uncertainty must inflate the peak CI.
+    const loud = flat.map((o, i) => (i === 6 ? { ...o, noise: 6.0 } : { ...o, noise: 0.05 }));
+    const flatR = finalizeReport(flat, bounds, mulberry32(909), { bootstrapIters: 400 });
+    const loudR = finalizeReport(loud, bounds, mulberry32(909), { bootstrapIters: 400 });
+    const flatW = flatR.ci90[1] - flatR.ci90[0];
+    const loudW = loudR.ci90[1] - loudR.ci90[0];
+    expect(loudW).toBeGreaterThan(flatW);
+  });
+
   it('the fallback curve is the observed points as {x, mean}, sorted by x', () => {
     // Convex (a valley) → no interior maximum → fitPeak throws → fallback path. cm order shuffled
     // to also exercise the sort.
