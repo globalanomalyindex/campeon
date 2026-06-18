@@ -14,6 +14,7 @@ import { fitPeak } from '../stats/peak-fit';
 import { bootstrapCi } from '../stats/bootstrap';
 import { mulberry32 } from '../stats/rng';
 import { trialsToObservations } from './objective';
+import { fitGpParams } from './gp';
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -185,9 +186,19 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
   }
 
   // Final report: cross-check the parabola peak against the surrogate's posterior-mean argmax so the
-  // CI widens honestly when the global quadratic and the flexible GP disagree (spec §5.3).
+  // CI widens honestly when the global quadratic and the flexible GP disagree (spec §5.3). At FINALIZE
+  // ONLY (never inside evolution.suggest, which would desync the stateful lineage) we first sharpen
+  // the GP hyperparameters by exact marginal likelihood (P1-2). The fit only ever sharpens this
+  // cross-check peak; it never rescales y and never replaces the conservative CI, so it can only
+  // WIDEN the honest CI. When the engine exposes no GP params we keep the unfitted posteriorPeak.
   const finalObs = trialsToObservations(trials, profile);
-  const gpPeak = engine.posteriorPeak?.(finalObs, bounds);
+  let gpPeak: Cm360 | undefined;
+  if (engine.gpParams !== undefined && engine.posteriorPeakWith !== undefined) {
+    const fitted = fitGpParams(finalObs, engine.gpParams, bounds);
+    gpPeak = engine.posteriorPeakWith(finalObs, bounds, fitted);
+  } else {
+    gpPeak = engine.posteriorPeak?.(finalObs, bounds);
+  }
   const report = finalizeReport(finalObs, bounds, rng, {
     bootstrapIters: iters,
     ...(gpPeak !== undefined ? { gpPeakCm360: gpPeak } : {}),

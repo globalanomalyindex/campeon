@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GP, matern52, type GpParams } from '../../src/optimizer/gp';
+import { GP, matern52, fitGpParams, type GpParams } from '../../src/optimizer/gp';
 import type { Observation } from '../../src/types';
 
 const params: GpParams = { signalVar: 1, lengthScale: 0.5, noiseVar: 1e-6 };
@@ -56,5 +56,48 @@ describe('GP regression', () => {
     const noisy = new GP(params, [...base, { x: 0.1, y: 5, noise: 1e3 }]);
     // The trusted y=5 point pulls the estimate at x=0.1 far harder than the noisy one.
     expect(trusted.predict(0.1).mean).toBeGreaterThan(noisy.predict(0.1).mean + 1);
+  });
+});
+
+describe('fitGpParams (marginal-likelihood hyperparameter fit, finalize-only)', () => {
+  const bounds: [number, number] = [15, 60]; // L = ln(60/15) = ln(4) ≈ 1.386
+  const base: GpParams = { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 };
+  const L = Math.log(bounds[1] / bounds[0]);
+
+  /** A smooth (low-curvature) and a jagged (alternating) field over the same x-grid. */
+  const grid = (n: number): number[] =>
+    Array.from({ length: n }, (_, i) => Math.log(bounds[0]) + (i / (n - 1)) * L);
+
+  it('returns base unchanged for fewer than 8 observations', () => {
+    const obs: Observation[] = grid(6).map((x, i) => ({ x, y: Math.sin(x) + 0.01 * i }));
+    expect(fitGpParams(obs, base, bounds)).toEqual(base);
+  });
+
+  it('pins signalVar to base and keeps lengthScale / noiseVar inside the spec grid bounds', () => {
+    const xs = grid(12);
+    const obs: Observation[] = xs.map((x) => ({ y: -((x - 3.2) ** 2), x }));
+    const fit = fitGpParams(obs, base, bounds);
+    expect(fit.signalVar).toBe(base.signalVar);
+    expect(fit.lengthScale).toBeGreaterThanOrEqual(0.1 * L - 1e-12);
+    expect(fit.lengthScale).toBeLessThanOrEqual(1.0 * L + 1e-12);
+    expect(fit.noiseVar).toBeGreaterThanOrEqual(1e-3 * base.signalVar - 1e-12);
+    expect(fit.noiseVar).toBeLessThanOrEqual(1 * base.signalVar + 1e-12);
+  });
+
+  it('picks a larger lengthScale for clearly-smooth data than for a jagged set', () => {
+    const lo = Math.log(bounds[0]);
+    const xs = grid(20);
+    // Both are deterministic structure (so neither is honestly "noise"), but the jagged field
+    // oscillates many times faster across the range, so resolving it demands a SHORTER lengthScale.
+    const smooth: Observation[] = xs.map((x) => ({ y: Math.sin(((x - lo) / L) * Math.PI), x }));
+    const jagged: Observation[] = xs.map((x) => ({ y: Math.sin(((x - lo) / L) * Math.PI * 6), x }));
+    const smoothFit = fitGpParams(smooth, base, bounds);
+    const jaggedFit = fitGpParams(jagged, base, bounds);
+    expect(smoothFit.lengthScale).toBeGreaterThan(jaggedFit.lengthScale);
+  });
+
+  it('is deterministic (same obs → same params)', () => {
+    const obs: Observation[] = grid(12).map((x) => ({ y: -((x - 3.0) ** 2), x }));
+    expect(fitGpParams(obs, base, bounds)).toEqual(fitGpParams(obs, base, bounds));
   });
 });

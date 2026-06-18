@@ -95,10 +95,17 @@ export function makeBo(config: BoConfig): SearchEngine {
     /** The GP posterior-mean argmax over the grid - the surrogate's own best-guess optimum,
      *  used by the controller to cross-check (and widen the CI against) the parabola peak. */
     posteriorPeak(history: Observation[], bounds: [Cm360, Cm360]): Cm360 {
+      return this.posteriorPeakWith!(history, bounds, config.gp);
+    },
+    /** The base GP hyperparameters - exposed so the controller can fit sharper ones at FINALIZE
+     *  ONLY (the per-trial `suggest` always uses `config.gp`). */
+    gpParams: config.gp,
+    /** Posterior-mean argmax under EXPLICIT params (finalize-only cross-check under fitted params). */
+    posteriorPeakWith(history: Observation[], bounds: [Cm360, Cm360], params: GpParams): Cm360 {
       const loX = Math.log(bounds[0]);
       const hiX = Math.log(bounds[1]);
       if (history.length === 0) return Math.exp((loX + hiX) / 2);
-      const gp = new GP(config.gp, history);
+      const gp = new GP(params, history);
       let bestX = loX;
       let best = -Infinity;
       for (let i = 0; i <= gridSize; i++) {

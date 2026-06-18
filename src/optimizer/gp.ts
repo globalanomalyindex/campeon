@@ -112,3 +112,89 @@ export class GP {
     return { mean, variance: Math.max(0, this.params.signalVar - vv) };
   }
 }
+
+/**
+ * Exact log marginal likelihood of the data under `params` (constant prior mean = mean(y)):
+ *   logML = −½ yᵀ K⁻¹ y − Σ log diag(L) − (n/2) log 2π,  K = L Lᵀ.
+ * Throws (via `cholesky`) when the candidate kernel is not positive-definite. Per-point
+ * `Observation.noise` overrides the flat `noiseVar` on the diagonal, exactly as `GP` does, so the
+ * heteroscedastic nugget is honoured in the fit.
+ */
+function logMarginalLikelihood(params: GpParams, obs: readonly Observation[]): number {
+  const n = obs.length;
+  const priorMean = obs.reduce((s, o) => s + o.y, 0) / n;
+  const K: number[][] = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      let k = matern52(obs[i].x, obs[j].x, params.signalVar, params.lengthScale);
+      if (i === j) k += (obs[i].noise ?? params.noiseVar) + 1e-9 * params.signalVar;
+      K[i][j] = k;
+    }
+  }
+  const L = cholesky(K); // throws on non-PD; the caller treats that as an honest fallback
+  const y = obs.map((o) => o.y - priorMean);
+  const alpha = backSub(L, forwardSub(L, y));
+  let yKy = 0;
+  for (let i = 0; i < n; i++) yKy += y[i] * alpha[i];
+  let logDet = 0;
+  for (let i = 0; i < n; i++) logDet += Math.log(L[i][i]);
+  return -0.5 * yKy - logDet - 0.5 * n * Math.log(2 * Math.PI);
+}
+
+/**
+ * Fit the GP `lengthScale` and `noiseVar` by maximizing the exact log marginal likelihood over a
+ * COARSE DETERMINISTIC grid (no RNG, no calculus - pure and reproducible). `signalVar` is PINNED to
+ * `base.signalVar` (the prior amplitude is set by the affine z-score, not re-estimated here); only:
+ *   - lengthScale ∈ [0.1·L, 1.0·L]   where L = ln(hi/lo) from `bounds` (the search-space span)
+ *   - noiseVar    ∈ [1e-3, 1]·signalVar
+ * are tuned. This is wired at FINALIZE ONLY (never inside `evolution.suggest`, which would desync the
+ * stateful (1+λ)-ES lineage). Honest fallbacks that return `base` UNCHANGED:
+ *   - fewer than 8 observations (not enough data to fit two hyperparameters honestly),
+ *   - any candidate kernel is non-PD (Cholesky throws) at the best point, or
+ *   - the best grid logML does not beat `base`'s logML by at least a small epsilon.
+ * Because the fit can only ever sharpen the surrogate's cross-check peak (it never rescales y and
+ * never replaces the conservative bootstrap CI), it can only WIDEN the honest CI, never narrow it.
+ */
+export function fitGpParams(
+  obs: readonly Observation[],
+  base: GpParams,
+  bounds: [number, number],
+): GpParams {
+  if (obs.length < 8) return base;
+
+  const L = Math.log(bounds[1] / bounds[0]);
+  const lengthGrid = [0.1, 0.2, 0.35, 0.5, 0.7, 0.85, 1.0].map((f) => f * L);
+  const noiseGrid = [1e-3, 3e-3, 1e-2, 3e-2, 0.1, 0.3, 1].map((f) => f * base.signalVar);
+
+  // Baseline: the data's likelihood under the unchanged base params. A non-PD base (should not
+  // happen with a positive nugget) means we cannot honestly compare, so keep base.
+  let baseLogML: number;
+  try {
+    baseLogML = logMarginalLikelihood(base, obs);
+  } catch {
+    return base;
+  }
+
+  let bestLogML = -Infinity;
+  let bestLength = base.lengthScale;
+  let bestNoise = base.noiseVar;
+  for (const lengthScale of lengthGrid) {
+    for (const noiseVar of noiseGrid) {
+      let logML: number;
+      try {
+        logML = logMarginalLikelihood({ signalVar: base.signalVar, lengthScale, noiseVar }, obs);
+      } catch {
+        continue; // non-PD candidate → skip it (honest: never accept an unstable kernel)
+      }
+      if (logML > bestLogML) {
+        bestLogML = logML;
+        bestLength = lengthScale;
+        bestNoise = noiseVar;
+      }
+    }
+  }
+
+  const EPS = 1e-6; // require a real (not numerical-noise) improvement to move off base
+  if (!Number.isFinite(bestLogML) || bestLogML < baseLogML + EPS) return base;
+  return { signalVar: base.signalVar, lengthScale: bestLength, noiseVar: bestNoise };
+}

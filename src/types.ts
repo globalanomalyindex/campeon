@@ -75,6 +75,7 @@ export interface Tap { mt: Ms; endpointErrorAlongAxis: Degrees; }
 export interface Shot { error: [Degrees, Degrees]; required: Degrees; }
 
 // ── optimizer (optimizer/) ─────────────────────────────────────────────
+import type { GpParams } from './optimizer/gp';
 export interface Observation { x: number; y: number; noise?: number; }  // x = ln(cm360)
 export interface SearchEngine {
   suggest(history: Observation[], bounds: [Cm360, Cm360]): Cm360;
@@ -85,6 +86,13 @@ export interface SearchEngine {
    *  from `suggest`'s acquisition argmax. The controller passes it to the report so the CI honestly
    *  widens when the flexible surrogate and the global parabola disagree (spec §5.3). */
   posteriorPeak?(history: Observation[], bounds: [Cm360, Cm360]): Cm360;
+  /** Optional: the engine's BASE GP hyperparameters. Exposed so the controller can fit sharper
+   *  hyperparameters by marginal likelihood at FINALIZE ONLY (never inside `suggest`, which would
+   *  desync a stateful lineage). Present only on GP-backed engines. */
+  gpParams?: GpParams;
+  /** Optional: posterior-mean argmax computed with EXPLICITLY-supplied GP params - the finalize-only
+   *  cross-check peak under fitted hyperparameters. Falls back to `posteriorPeak` when absent. */
+  posteriorPeakWith?(history: Observation[], bounds: [Cm360, Cm360], params: GpParams): Cm360;
 }
 
 // ── reporting (stats/) ─────────────────────────────────────────────────

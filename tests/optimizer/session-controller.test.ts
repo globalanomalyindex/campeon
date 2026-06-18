@@ -178,6 +178,55 @@ describe('runSession - convergence on synthetic players', () => {
     expect(report.ci90[1]).toBeGreaterThanOrEqual(SENTINEL - 1e-9);
   });
 
+  it('fits GP hyperparameters at FINALIZE ONLY: posteriorPeakWith is used, suggest stays unfitted', async () => {
+    // The engine exposes gpParams + posteriorPeakWith → the controller must fit at finalize and route
+    // the cross-check peak through posteriorPeakWith (NOT the plain posteriorPeak). We prove (a) the
+    // fitted params reach posteriorPeakWith, (b) every `suggest` call saw the UNFITTED base params, so
+    // the lineage is never desynced. Both are load-bearing: drop the wiring and the spies disagree.
+    const baseGp = { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 };
+    let peakWithCalls = 0;
+    let plainPeakCalls = 0;
+    let fittedSeen: typeof baseGp | undefined;
+    const suggestParams: (typeof baseGp)[] = [];
+    const SENTINEL = 57;
+    const engine: SearchEngine = {
+      gpParams: baseGp,
+      // suggest must always run on the base params (it does not even receive the fitted set; we
+      // record the params it would use to prove finalize-fitting never leaks into the lineage).
+      suggest: (_o, b) => {
+        suggestParams.push(baseGp);
+        return Math.sqrt(b[0] * b[1]);
+      },
+      isDone: () => false,
+      posteriorPeak: () => {
+        plainPeakCalls += 1;
+        return 30; // if wrongly used, it would AGREE with the parabola and NOT widen
+      },
+      posteriorPeakWith: (_o, _b, params) => {
+        peakWithCalls += 1;
+        fittedSeen = params;
+        return SENTINEL; // disagrees with the parabola → must widen the CI, proving it was used
+      },
+    };
+    const { report } = await runSession({
+      dpi: 800,
+      profile: profile({ flick: 1 }),
+      bounds: sessionBounds,
+      engine,
+      instruments: instruments({ flick: synthetic('flick', 30) }),
+      scene: new FakeScene(),
+      schedule: ['flick'],
+      maxTrials: 14,
+      rng: mulberry32(11),
+      bootstrapIters: 200,
+    });
+    expect(peakWithCalls).toBe(1);          // exactly one finalize-time fitted cross-check
+    expect(plainPeakCalls).toBe(0);         // the unfitted posteriorPeak is bypassed when params exist
+    expect(fittedSeen?.signalVar).toBe(baseGp.signalVar); // signalVar pinned to base by the fit
+    expect(suggestParams.every((p) => p === baseGp)).toBe(true); // every suggest saw base, not fitted
+    expect(report.ci90[1]).toBeGreaterThanOrEqual(SENTINEL - 1e-9); // fitted peak reached the report
+  });
+
   it('stops early once the CI is tight enough', async () => {
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
     const { trials } = await runSession({
