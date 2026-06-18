@@ -34,13 +34,19 @@ describe('bootstrap CI', () => {
   });
 
   describe('reliability-aware (heteroscedastic)', () => {
-    // A clean concave dataset. We will attach per-point Observation.noise to make it
-    // heteroscedastic and assert the CI reacts to WHERE the noise lives.
-    const clean = (): Observation[] => {
+    // A concave dataset carrying GENUINE residual spread (residual sd ~0.4): the parabola does NOT
+    // pass through the points, so there are real residuals for the per-point sd to scale. A
+    // zero-residual fixture would leave the sd-weighting nothing to amplify, making the WIDENS test
+    // pass from a band-count artifact rather than from the reliability mechanism (see the END-vs-CENTRAL
+    // test below). We attach per-point Observation.noise to make it heteroscedastic and assert the CI
+    // reacts to WHERE the loud facet lives.
+    const noisy = (seed: number): Observation[] => {
       const peakX = Math.log(35);
+      const rng = mulberry32(seed);
       return [18, 22, 26, 30, 35, 40, 46, 52, 58].map((s) => {
         const x = Math.log(s);
-        return { x, y: -2 * (x - peakX) ** 2 + 5 };
+        const fit = -2 * (x - peakX) ** 2 + 5;
+        return { x, y: fit + (rng() - 0.5) * 0.8 }; // ~uniform residual on (-0.4, 0.4)
       });
     };
 
@@ -57,33 +63,40 @@ describe('bootstrap CI', () => {
     });
 
     it('is deterministic under the seeded RNG with heteroscedastic noise', () => {
-      const obs = clean().map((o, i) => ({ ...o, noise: i === 4 ? 4.0 : 0.05 }));
+      const obs = noisy(1).map((o, i) => ({ ...o, noise: i === 4 ? 4.0 : 0.05 }));
       const a = bootstrapCi(obs.map((o) => ({ ...o })), 400, mulberry32(77));
       const b = bootstrapCi(obs.map((o) => ({ ...o })), 400, mulberry32(77));
       expect(a).toEqual(b);
     });
 
-    it('a high-noise point WIDENS the CI; a quiet point does not', () => {
-      const quietCi = bootstrapCi(
-        clean().map((o) => ({ ...o, noise: 0.05 })),
+    it('a loud facet at a HIGH-LEVERAGE end widens the CI more than the same loud facet CENTRAL', () => {
+      // Load-bearing for the sd-scaling itself, NOT for the band-count artifact. Both inputs are
+      // heteroscedastic (one loud facet at noise 6.0, the rest at 0.05) so BOTH take the 2-band union
+      // path - the band count is held constant. The ONLY difference is WHERE the loud facet sits. The
+      // peak estimate is far more sensitive to a loud point at a high-leverage END of the sampled range
+      // than to a loud point in the CENTER, so the reliability-aware rescale-to-target-sd must make the
+      // end-loud CI strictly wider. If the sd-weighting in bootstrap.ts is stripped (raw residual draws),
+      // facet placement becomes irrelevant and the two widths collapse to byte-identical - failing this.
+      const base = noisy(1);
+      const endLoud = bootstrapCi(
+        base.map((o, i) => ({ ...o, noise: i === 8 ? 6.0 : 0.05 })), // loud at the last (end) sample
         600,
-        mulberry32(123),
+        mulberry32(99),
       );
-      // Inject one loud facet at the peak-adjacent sample; everything else stays quiet.
-      const loudCi = bootstrapCi(
-        clean().map((o, i) => ({ ...o, noise: i === 5 ? 6.0 : 0.05 })),
+      const centralLoud = bootstrapCi(
+        base.map((o, i) => ({ ...o, noise: i === 4 ? 6.0 : 0.05 })), // loud at the central sample
         600,
-        mulberry32(123),
+        mulberry32(99),
       );
-      const quietW = quietCi[1] - quietCi[0];
-      const loudW = loudCi[1] - loudCi[0];
-      expect(loudW).toBeGreaterThan(quietW);
+      const endW = endLoud[1] - endLoud[0];
+      const centralW = centralLoud[1] - centralLoud[0];
+      expect(endW).toBeGreaterThan(centralW);
     });
 
     it('never narrows below the conservative (pooled) bound', () => {
       // Heteroscedastic facets that genuinely disagree must not produce a CI tighter than
       // the uniformly-pooled bound on the same residuals/seed.
-      const obs = clean().map((o, i) => ({ ...o, noise: i % 2 === 0 ? 5.0 : 0.05 }));
+      const obs = noisy(1).map((o, i) => ({ ...o, noise: i % 2 === 0 ? 5.0 : 0.05 }));
       const pooled = bootstrapCi(
         obs.map(({ x, y }) => ({ x, y })), // strip noise → pooled bag
         500,

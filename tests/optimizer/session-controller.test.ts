@@ -67,18 +67,24 @@ describe('finalizeReport', () => {
     expect(r.curve).toEqual([]);
   });
 
-  it('plumbs per-point noise: a loud facet widens the CI vs the same data scored as homoscedastic', () => {
-    // Identical points and seed; the only difference is that one facet carries a large measured
-    // Observation.noise. finalizeReport must hand that noise through to the reliability-aware bootstrap
-    // so the CI is at least as wide as the flat-noise counterpart (never narrower) - the P1-3 honesty.
-    const flat = concave(34, 0.05); // no per-point noise → homoscedastic pooled path
-    // Loud facet at a high-leverage end point (last cm) - its uncertainty must inflate the peak CI.
-    const loud = flat.map((o, i) => (i === 6 ? { ...o, noise: 6.0 } : { ...o, noise: 0.05 }));
-    const flatR = finalizeReport(flat, bounds, mulberry32(909), { bootstrapIters: 400 });
-    const loudR = finalizeReport(loud, bounds, mulberry32(909), { bootstrapIters: 400 });
-    const flatW = flatR.ci90[1] - flatR.ci90[0];
-    const loudW = loudR.ci90[1] - loudR.ci90[0];
-    expect(loudW).toBeGreaterThan(flatW);
+  it('plumbs per-point noise to the reliability-aware bootstrap: a loud facet widens the CI more at a high-leverage end than at the center', () => {
+    // finalizeReport must hand each point's measured Observation.noise straight through to the
+    // reliability-aware bootstrap. We hold EVERYTHING constant - same points, same seed, same
+    // heteroscedastic shape (exactly one loud facet at noise 6.0, the rest at 0.05, so BOTH inputs take
+    // the union path) - and vary ONLY where the loud facet sits. The data carries genuine residual
+    // spread (concave with 0.4 noise) so the per-point sd has real residuals to scale. A loud point at a
+    // high-leverage END of the sampled range perturbs the peak far more than a loud point in the CENTER,
+    // so the end-loud CI must be strictly wider. This is load-bearing for the sd-weighting AND its
+    // plumbing: drop the noise plumbing (or strip the sd-scaling in bootstrap.ts) and facet placement
+    // stops mattering, collapsing the two widths and failing this.
+    const base = concave(34, 0.4); // genuine residual spread, not a zero-residual fit
+    const endLoud = base.map((o, i) => ({ ...o, noise: i === 6 ? 6.0 : 0.05 }));   // loud at last (end) cm
+    const centralLoud = base.map((o, i) => ({ ...o, noise: i === 3 ? 6.0 : 0.05 })); // loud at central cm
+    const endR = finalizeReport(endLoud, bounds, mulberry32(909), { bootstrapIters: 400 });
+    const centralR = finalizeReport(centralLoud, bounds, mulberry32(909), { bootstrapIters: 400 });
+    const endW = endR.ci90[1] - endR.ci90[0];
+    const centralW = centralR.ci90[1] - centralR.ci90[0];
+    expect(endW).toBeGreaterThan(centralW);
   });
 
   it('the fallback curve is the observed points as {x, mean}, sorted by x', () => {
