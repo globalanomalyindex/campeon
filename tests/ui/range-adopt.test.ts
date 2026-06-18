@@ -8,6 +8,8 @@ const measured: Result = {
   ci90: [28, 32],
   perGameSens: perGameSens(30, 800),
   breakdown: { biasZeroCm360: 30, precisionFloorDeg: 0.8, ttkMs: 420, hitRate: 0.7 },
+  curve: [{ x: Math.log(30), mean: 0.1 }],
+  bounds: [15, 60],
 };
 
 describe('adoptResult', () => {
@@ -29,5 +31,10 @@ describe('adoptResult', () => {
     const before = JSON.parse(JSON.stringify(measured));
     adoptResult(measured, 42, 800);
     expect(measured).toEqual(before);
+  });
+  it('DROPS the measured curve/bounds (a hand-picked value has no measured curve - honesty)', () => {
+    const tuned = adoptResult(measured, 42, 800);
+    expect(tuned.curve).toBeUndefined();
+    expect(tuned.bounds).toBeUndefined();
   });
 });

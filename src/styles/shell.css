@@ -277,6 +277,9 @@
 .result__games [data-current="true"] { color: var(--text); background: color-mix(in oklab, var(--gold) 20%, transparent); }
 .result__actions { display: flex; gap: var(--space-4); justify-content: center; margin-top: var(--space-5); flex-wrap: wrap; }
 .result__ci--tuned { color: var(--text-muted); font-style: italic; }
+.result__plot { margin: var(--space-4) auto 0; width: min(100%, 420px); }
+.result__plot svg[data-plot] { display: block; width: 100%; height: auto; aspect-ratio: 360 / 200; }
+.result__plot figcaption { margin-top: var(--space-1); color: var(--text-muted); font-size: .78rem; text-align: center; }
 
 /* ─── Range (free-play) ────────────────────────────────────────────────────── */
 /* HUD: live cm/360 + delta, top-left, never eats clicks (the nudge keys work while locked). */

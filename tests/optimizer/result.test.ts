@@ -32,4 +32,16 @@ describe('buildResult', () => {
     const r = buildResult(report, trials, 800, ['cs2', 'valorant']);
     expect(Object.keys(r.perGameSens).sort()).toEqual(['cs2', 'valorant']);
   });
+
+  it('copies the report curve VERBATIM and stores the search bounds for the plot', () => {
+    const r = buildResult(report, trials, 800, undefined, [15, 60]);
+    expect(r.curve).toEqual(report.curve); // byte-for-byte, no smoothing/refit
+    expect(r.bounds).toEqual([15, 60]);
+  });
+
+  it('omits curve/bounds when no bounds are supplied (old/headless callers stay number-only)', () => {
+    const r = buildResult(report, trials, 800);
+    expect(r.curve).toBeUndefined();
+    expect(r.bounds).toBeUndefined();
+  });
 });

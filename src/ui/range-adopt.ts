@@ -6,11 +6,13 @@ import { perGameSens } from '../convert/schools';
  * per-game sensitivities for the new number; KEEPS the measured breakdown (it characterizes the measured
  * run, not the hand-picked value). The measured CI is carried unchanged; the result screen drops it when
  * the result is flagged `tuned` - a hand-picked number has no measured CI (honesty). Pure: returns a new
- * object, never mutates the input.
+ * object, never mutates the input. DROPS the measured `curve`/`bounds`: a hand-picked value has no
+ * measured performance curve, so the result screen must not (and cannot) plot one for it (honesty).
  */
 export function adoptResult(measured: Result, adoptedCm360: Cm360, dpi: Dpi): Result {
+  const { curve: _curve, bounds: _bounds, ...rest } = measured;
   return {
-    ...measured,
+    ...rest,
     optimalCm360: adoptedCm360,
     perGameSens: perGameSens(adoptedCm360, dpi),
     tuned: true,

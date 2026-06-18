@@ -117,6 +117,14 @@ export interface Result {
   /** Set when the number was hand-picked in the range, not measured. The result screen drops the 90% CI
    *  (a hand-picked value has no measured CI) and the exported JSON is self-describing (honesty). */
   tuned?: boolean;
+  /** The fitted performance curve, copied VERBATIM from `Report.curve` (x = ln(cm/360)). Optional so OLD
+   *  saved Results (which lack it) render number-only; a `tuned`-by-feel Result carries none (honesty -
+   *  `adoptResult` drops it). The result screen reuses it to redraw the convergence plot as the climax. */
+  curve?: { x: number; mean: number }[];
+  /** The search bounds [lo, hi] cm/360 the curve was fit over - persisted so the plot's x-axis is correct
+   *  after a localStorage reload (the in-memory draft bounds are gone by then). Optional + dropped on
+   *  `tuned`, exactly like `curve`. */
+  bounds?: [Cm360, Cm360];
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────
