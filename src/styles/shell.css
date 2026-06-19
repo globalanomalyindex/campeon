@@ -258,6 +258,39 @@
 .session__dialed-ci { opacity: .75; }
 .session__dialed-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; justify-content: center; }
 
+/* Pre-lock "begin" overlay + the Esc abort scrim share the calibrate scrim idiom: a translucent
+   full-bleed backing the arena reads through, centered copy, and ONE focusable primary action. The
+   pre-lock pulse reuses .cal-pulse to invite the start gesture. */
+.session__prelock,
+.session__abort {
+  position: fixed; inset: 0; z-index: 22;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2); text-align: center;
+  padding: var(--space-5);
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  color: var(--text);
+}
+.session__prelock[hidden], .session__abort[hidden] { display: none; }
+.session__prelock-label,
+.session__abort-label {
+  letter-spacing: .14em; text-transform: uppercase; color: var(--gold);
+  margin: var(--space-2) 0 0;
+}
+.session__prelock-lead,
+.session__abort-lead {
+  max-width: 44ch; color: var(--text-muted); line-height: 1.5; margin: 0;
+}
+.session__prelock-sub { font-size: .85rem; opacity: .85; }
+.session__prelock-sub kbd {
+  font-family: var(--font-mono); font-size: .85em;
+  padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 4px;
+  background: color-mix(in oklab, var(--cinema-ink) 60%, transparent);
+}
+.session__prelock .action,
+.session__abort-actions { margin-top: var(--space-3); }
+.session__abort-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: center; }
+
 /* ─── Result screen ────────────────────────────────────────────────────────── */
 .result__inner { max-width: 40rem; margin-inline: auto; text-align: center; padding: var(--space-6) 0; }
 .result__lead { color: var(--text-muted); text-transform: lowercase; letter-spacing: .04em; }

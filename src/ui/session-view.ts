@@ -1,5 +1,5 @@
 import { makeEvolution } from '../optimizer/evolution';
-import { runSession } from '../optimizer/session-controller';
+import { runSession as runSessionImpl, type SessionConfig, type SessionOutcome } from '../optimizer/session-controller';
 import { buildResult } from '../optimizer/result';
 import { INSTRUMENTS } from '../instruments/registry';
 import { mulberry32 } from '../stats/rng';
@@ -35,7 +35,18 @@ export function searchLabel(index: number, cm360: number, coldStart: number): st
     : `generation ${index - coldStart + 1} · ${testing}`;
 }
 
-export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
+/** Thin-shell injection seam: the production defaults build the real WebGL stage + run the real
+ *  Bayesian session, but a jsdom test can swap in fakes to exercise the shell wiring (abort/begin
+ *  states) without WebGL. Pure-core estimators are unchanged; only the view shell is injectable. */
+export interface SessionViewDeps {
+  createStage: typeof createArenaStage;
+  runSession: (config: SessionConfig) => Promise<SessionOutcome>;
+}
+
+const DEFAULT_DEPS: SessionViewDeps = { createStage: createArenaStage, runSession: runSessionImpl };
+
+export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionViewDeps = DEFAULT_DEPS): Screen {
+  const { createStage, runSession } = deps;
   let alive = true;
   let cleanup: (() => void) | null = null;
 
@@ -46,10 +57,19 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       root.innerHTML = `
         <canvas class="session__canvas"></canvas>
         <div class="session__crosshair" aria-hidden="true"></div>
-        <header class="session__hud mono"><span data-hud="instruction">click to lock in</span>
+        <header class="session__hud mono"><span data-hud="instruction">click to begin</span>
           <span data-hud="progress"></span></header>
         <figure class="session__plot"><svg data-plot aria-label="convergence on your optimal cm/360"></svg>
           <figcaption class="mono" data-hud="estimate"></figcaption></figure>
+        <div class="session__prelock" data-prelock>
+          <span class="cal-pulse"><span class="cal-pulse__dot"></span></span>
+          <p class="mono session__prelock-label">the hunt</p>
+          <p class="session__prelock-lead">watch the prey break cover, then snap on and fire. each round tests one
+            sensitivity; the search evolves toward your sharpest cm/360.</p>
+          <p class="session__prelock-lead session__prelock-sub">when the search settles you'll get to lock it in - or
+            keep refining. press <kbd>Esc</kbd> any time to pause.</p>
+          <button class="action action--primary" data-prelock="begin">begin</button>
+        </div>
         <div class="session__dialed" data-panel hidden>
           <p class="mono session__dialed-label">dialed in</p>
           <p class="display session__dialed-num"><span data-dialed="num"></span><small> cm/360</small></p>
@@ -57,6 +77,14 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
           <div class="session__dialed-actions">
             <button class="action action--primary" data-dialed="lock">lock it in</button>
             <button class="action action--ghost" data-dialed="refine">keep refining</button>
+          </div>
+        </div>
+        <div class="session__abort" data-abort role="dialog" aria-label="session paused" hidden>
+          <p class="mono session__abort-label">paused</p>
+          <p class="session__abort-lead">the hunt is still in flight - your sensitivity search hasn't been touched.</p>
+          <div class="session__abort-actions">
+            <button class="action action--primary" data-abort="resume">resume</button>
+            <button class="action action--ghost" data-abort="quit">quit to menu</button>
           </div>
         </div>`;
       host.appendChild(root);
@@ -67,10 +95,14 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       const hudProgress = root.querySelector('[data-hud="progress"]')!;
       const hudEstimate = root.querySelector('[data-hud="estimate"]')!;
       const panel = root.querySelector('[data-panel]') as HTMLElement;
+      const prelock = root.querySelector('[data-prelock]') as HTMLElement;
+      const beginBtn = root.querySelector('[data-prelock="begin"]') as HTMLButtonElement;
+      const abort = root.querySelector('[data-abort]') as HTMLElement;
       const $d = (s: string) => root.querySelector(`[data-dialed="${s}"]`) as HTMLElement;
+      const $a = (s: string) => root.querySelector(`[data-abort="${s}"]`) as HTMLButtonElement;
 
       const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const stage = createArenaStage(root, { canvas, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, reducedMotion: reduced });
+      const stage = createStage(root, { canvas, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, reducedMotion: reduced });
       const engine = makeEvolution({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 }, sigma0: 0.3, maxTrials: MAX_TRIALS });
 
       let allTrials: TrialResult[] = [];
@@ -135,6 +167,15 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         showPanel(lastReport!);
       };
 
+      // Reveal the abort scrim ONLY when the lock dropped while a segment is mid-flight: lock dropped
+      // AND running AND the dialed-in panel is hidden AND the user hasn't already committed. This is
+      // pure SHELL wiring - it appends NO scored trial and never touches the gold target / cm360.
+      const syncAbort = (): void => {
+        const lockDropped = document.pointerLockElement !== canvas;
+        abort.hidden = !(lockDropped && running && panel.hidden && !lockedIn);
+      };
+      document.addEventListener('pointerlockchange', syncAbort);
+
       $d('lock').addEventListener('click', () => { lockedIn = true; panel.hidden = true; finalize(); });
       $d('refine').addEventListener('click', () => {
         if (running) return;
@@ -145,11 +186,26 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
         void runSegment(target, undefined).then(() => { if (alive && !lockedIn) showPanel(lastReport!); });
       });
 
-      canvas.addEventListener('click', () => void stage.requestLock().then(begin).catch(begin), { once: true });
+      // Abort scrim: resume re-acquires the lock ONLY (the in-flight trial continues, the gold target
+      // keeps cm/360 byte-identical); quit navigates home ONLY (the shell's unmount→cleanup disposes
+      // once via the guarded `alive` flag - we add NO second dispose here, and NO scored trial).
+      $a('resume').addEventListener('click', () => {
+        abort.hidden = true;
+        void stage.requestLock().catch(() => {});
+      });
+      $a('quit').addEventListener('click', () => { ctx.navigate('hero'); });
+
+      // ONE start gesture, pinned to the focusable begin button (no canvas-click hybrid, so the start
+      // path can never desync). The button hands off to the lock request, then the segment loop.
+      beginBtn.addEventListener('click', () => {
+        prelock.hidden = true;
+        void stage.requestLock().then(begin).catch(begin);
+      });
 
       cleanup = () => {
         alive = false;
         lockedIn = true; // break any in-flight segment so it never touches a torn-down context
+        document.removeEventListener('pointerlockchange', syncAbort);
         stage.dispose();
       };
     },
