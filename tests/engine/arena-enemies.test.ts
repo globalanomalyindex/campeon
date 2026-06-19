@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import type { Object3D, Scene } from 'three';
-import { Arena, type EnemyLayer, type InputSource, type RendererLike } from '../../src/engine/arena';
-import type { AimSample, TargetHandle, TargetSpec } from '../../src/types';
+import { PerspectiveCamera, type Object3D, type Scene } from 'three';
+import {
+  Arena,
+  type EnemyLayer,
+  type InputSource,
+  type RendererLike,
+  type ViewmodelLayer,
+} from '../../src/engine/arena';
+import type { AimSample, Degrees, TargetHandle, TargetSpec } from '../../src/types';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { TrialRecorder, type Recording } from '../../src/instruments/recording';
 
@@ -79,10 +85,56 @@ const SPEC = { kind: 'static' as const, yaw: 10, pitch: 3, distance: 20, worldRa
 // (P3-2 quarry meshes, P3-3 revolver viewmodel, P3-4 death/escape, P3-5 film pass)
 // MUST keep this gate green and MAY extend it, never weaken an assertion to pass.
 
+/** Records every cosmetic viewmodel call - proves the weapon seam fires without touching scoring. */
+class FakeViewmodelLayer implements ViewmodelLayer {
+  attached = 0;
+  ticked = 0;
+  looks: Array<[number, number]> = [];
+  fires: Array<[number, number]> = [];
+  disposed = 0;
+  attach(_scene: Scene, _camera: PerspectiveCamera): void {
+    this.attached += 1;
+  }
+  tick(_nowMs: number): void {
+    this.ticked += 1;
+  }
+  look(view: [Degrees, Degrees]): void {
+    this.looks.push(view);
+  }
+  fire(view: [Degrees, Degrees]): void {
+    this.fires.push(view);
+  }
+  dispose(): void {
+    this.disposed += 1;
+  }
+}
+
+/**
+ * Adversarial viewmodel: every cosmetic hook ATTEMPTS to mutate the handed view array + the camera it
+ * is parented to. The scored path reads bearing() from the sphere mesh.position and view() from the
+ * rig's private state (rig.view() returns a FRESH array), so none of these can reach the scored stream.
+ */
+class AdversarialViewmodelLayer implements ViewmodelLayer {
+  attach(_scene: Scene, camera: PerspectiveCamera): void {
+    camera.scale.multiplyScalar(7); // camera scale never enters bearing/radius
+    camera.position.set(99, 99, 99); // the rig syncs only rotation; bearing reads the sphere, not the cam
+  }
+  tick(_nowMs: number): void {}
+  look(view: [Degrees, Degrees]): void {
+    (view as number[]).push(123); // a fresh array from rig.view() - mutating it cannot reach the rig
+    (view as number[])[0] = Number.NaN;
+  }
+  fire(view: [Degrees, Degrees]): void {
+    (view as number[])[1] = Number.NaN;
+  }
+  dispose(): void {}
+}
+
 /** A self-contained scripted arena + recorder; one optional cosmetic layer, no other deps. */
 function scriptedSession(
   spec: TargetSpec,
   layer?: EnemyLayer,
+  viewmodel?: ViewmodelLayer,
 ): { recording: Recording; handle: TargetHandle } {
   let emit: (s: AimSample) => void = () => {};
   let pull: () => void = () => {};
@@ -99,6 +151,7 @@ function scriptedSession(
   const renderer: RendererLike = { render() {}, setSize() {}, dispose() {} };
   const arena = new Arena({ renderer, input, size: () => [800, 600], cm360: 34, dpi: 800, rng: mulberry32(7) });
   if (layer) arena.attachEnemies(layer);
+  if (viewmodel) arena.attachViewmodel(viewmodel);
 
   const handle = arena.spawnTarget(spec);
   // Wire the SCORED stream exactly as a trial does: the recorder reads view()/bearing()/radiusDeg().
@@ -197,6 +250,28 @@ describe('INTEGRITY GATE: cosmetic-overlay-reads-never-writes (full scored Recor
     const without = scriptedSession(SPEC);
     expect(withLayer.recording).toEqual(without.recording);
   });
+
+  // P3-3: the in-scene 3D revolver attaches through attachViewmodel (mirrors attachEnemies). It only
+  // READS view()/fire()/look() to drive cosmetic recoil/sway; it must leave the scored stream identical.
+  it('attaching a cosmetic VIEWMODEL leaves the Recording byte-identical (with vs without)', () => {
+    const withVm = scriptedSession(MOVING_SPEC, undefined, new FakeViewmodelLayer());
+    const without = scriptedSession(MOVING_SPEC);
+    expect(withVm.recording).toEqual(without.recording);
+  });
+
+  it('an ADVERSARIAL viewmodel that mutates the handed view + camera cannot move the scored stream', () => {
+    const baseline = scriptedSession(MOVING_SPEC);
+    const attacked = scriptedSession(MOVING_SPEC, undefined, new AdversarialViewmodelLayer());
+    expect(attacked.recording).toEqual(baseline.recording);
+    expect(attacked.handle.bearing()).toEqual(baseline.handle.bearing());
+    expect(attacked.handle.radiusDeg()).toEqual(baseline.handle.radiusDeg());
+  });
+
+  it('both cosmetic layers (enemy skin + viewmodel) together leave the Recording byte-identical', () => {
+    const withBoth = scriptedSession(MOVING_SPEC, new AdversarialEnemyLayer(), new AdversarialViewmodelLayer());
+    const without = scriptedSession(MOVING_SPEC);
+    expect(withBoth.recording).toEqual(without.recording);
+  });
 });
 
 describe('Arena ↔ cosmetic EnemyLayer wiring', () => {
@@ -244,5 +319,52 @@ describe('Arena ↔ cosmetic EnemyLayer wiring', () => {
     const handle = h.arena.spawnTarget(SPEC);
     const mesh = (handle as unknown as { mesh: Object3D }).mesh;
     expect(mesh.visible).toBe(true);
+  });
+});
+
+describe('Arena ↔ cosmetic ViewmodelLayer wiring (P3-3)', () => {
+  it('attaches the viewmodel exactly once', () => {
+    const h = harness(false);
+    const vm = new FakeViewmodelLayer();
+    h.arena.attachViewmodel(vm);
+    expect(vm.attached).toBe(1);
+  });
+
+  it('drives look on each aim sample, fire on fire, tick on tick, dispose on dispose', () => {
+    const h = harness(false);
+    const vm = new FakeViewmodelLayer();
+    h.arena.attachViewmodel(vm);
+
+    h.send({ t: 4, dx: 50, dy: 10 });
+    expect(vm.looks).toHaveLength(1);
+
+    h.arena.tick(16);
+    expect(vm.ticked).toBe(1);
+
+    h.fire();
+    expect(vm.fires).toHaveLength(1);
+
+    h.arena.dispose();
+    expect(vm.disposed).toBe(1);
+  });
+
+  it('the attached weapon NEVER enters the targets map (it is a camera child, not a scored target)', () => {
+    const h = harness(false);
+    const vm = new FakeViewmodelLayer();
+    h.arena.attachViewmodel(vm);
+    const handle = h.arena.spawnTarget(SPEC);
+    // The only thing in the scored targets map is the real target; the gun is not a TargetHandle.
+    const targets = (h.arena as unknown as { targets: Map<string, unknown> }).targets;
+    expect([...targets.keys()]).toEqual([handle.id]);
+    expect(targets.size).toBe(1);
+  });
+
+  it('INTEGRITY: attaching the weapon does not move the angular truth (bearing/radius identical)', () => {
+    const a = harness(false);
+    a.arena.attachViewmodel(new FakeViewmodelLayer());
+    const withGun = a.arena.spawnTarget(SPEC);
+    const without = harness(false).arena.spawnTarget(SPEC);
+    expect(withGun.bearing()).toEqual(without.bearing());
+    expect(withGun.radiusDeg()).toEqual(without.radiusDeg());
   });
 });

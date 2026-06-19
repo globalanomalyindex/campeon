@@ -4,7 +4,7 @@ import {
   GridHelper,
   HemisphereLight,
   type Object3D,
-  PerspectiveCamera,
+  type PerspectiveCamera,
   Scene,
 } from 'three';
 import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, Ms, TargetHandle, TargetSpec } from '../types';
@@ -48,6 +48,26 @@ export interface EnemyLayer {
   dispose(): void;
 }
 
+/**
+ * A cosmetic first-person VIEWMODEL skin (e.g. the in-scene 3D revolver). MIRRORS `EnemyLayer`'s
+ * reads-never-writes shape exactly: the arena drives its lifecycle but it NEVER feeds back into samples
+ * or scores. `attach` parents the weapon to the rig camera (and adds the camera to the scene so its
+ * children render); `look` is handed the current view each aim sample (the layer computes its own sway
+ * delta); `fire` is handed the current view on each shot (cosmetic recoil only); `tick` advances the
+ * weapon springs. None of these may write a sample/score/Observation into the scored stream.
+ */
+export interface ViewmodelLayer {
+  /** Parent the weapon to `camera` and ensure the camera is in `scene` (called once on attach). */
+  attach(scene: Scene, camera: PerspectiveCamera): void;
+  /** Per-frame: advance the recoil/sway springs and re-pose the weapon. */
+  tick(nowMs: Ms): void;
+  /** An aim sample arrived; `view` is the new crosshair bearing - nudge sway (cosmetic). */
+  look(view: [Degrees, Degrees]): void;
+  /** A shot was fired with the crosshair at `view` - play the recoil punch (cosmetic). */
+  fire(view: [Degrees, Degrees]): void;
+  dispose(): void;
+}
+
 export interface ArenaOptions {
   renderer: RendererLike;
   input: InputSource;
@@ -83,6 +103,7 @@ export class Arena implements ArenaScene {
   private nowMs: Ms = 0;
   private readonly post: PostProcessor | undefined;
   private enemies: EnemyLayer | undefined;
+  private viewmodel: ViewmodelLayer | undefined;
 
   constructor(opts: ArenaOptions) {
     this.renderer = opts.renderer;
@@ -115,6 +136,7 @@ export class Arena implements ArenaScene {
   private handleSample(sample: AimSample): void {
     this.rig.apply(sample);
     const view = this.rig.view();
+    this.viewmodel?.look(view); // cosmetic weapon sway reads the new bearing; writes nothing
     for (const cb of this.aimCbs) cb(sample, view);
   }
 
@@ -122,6 +144,7 @@ export class Arena implements ArenaScene {
     // Classify against the LIVE target first - before an instrument's fire handler clears/advances it -
     // so the pop reads the target you actually shot. Cosmetic only: reads view+bearings, writes nothing.
     this.enemies?.fire(this.nowMs, this.rig.view(), [...this.targets.values()]);
+    this.viewmodel?.fire(this.rig.view()); // cosmetic recoil; reads view, writes nothing scored
     for (const cb of this.fireCbs) cb(this.nowMs);
   }
 
@@ -139,6 +162,18 @@ export class Arena implements ArenaScene {
     layer.attach(this.scene);
   }
 
+  /**
+   * Attach a cosmetic first-person viewmodel (the in-scene 3D revolver). MIRRORS `attachEnemies`
+   * exactly: the layer parents its weapon to the rig camera (and adds the camera to the scene so its
+   * children render) and only READS view()/fire()/look() to react. It NEVER enters the targets map,
+   * never replaces the scored sphere, and never writes a sample/score into the scored stream - so
+   * bearing()/radiusDeg()/cm360 stay byte-identical with or without the weapon.
+   */
+  attachViewmodel(vm: ViewmodelLayer): void {
+    this.viewmodel = vm;
+    vm.attach(this.scene, this.rig.camera);
+  }
+
   /** Current arena clock (ms since construction). */
   now(): Ms {
     return this.nowMs;
@@ -154,6 +189,7 @@ export class Arena implements ArenaScene {
     this.nowMs += dtMs;
     for (const t of this.moving) t.update(this.nowMs);
     this.enemies?.update(this.nowMs); // follow target positions + advance sprite animations (cosmetic)
+    this.viewmodel?.tick(this.nowMs); // advance the weapon recoil/sway springs (cosmetic)
     for (const cb of this.frameCbs) cb(dtMs, this.nowMs);
   }
 
@@ -256,6 +292,7 @@ export class Arena implements ArenaScene {
     this.frameCbs.clear();
     this.fireCbs.clear();
     this.enemies?.dispose();
+    this.viewmodel?.dispose();
     for (const d of this.envDisposables) d.dispose();
     this.post?.dispose();
     this.renderer.dispose();
