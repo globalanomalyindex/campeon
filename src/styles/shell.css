@@ -264,6 +264,13 @@
 .result__number { font-size: clamp(4rem, 16vw, 9rem); color: var(--gold); }
 .result__number small { font-size: .18em; color: var(--text-muted); font-family: var(--font-mono); }
 .result__ci { color: var(--text-muted); }
+.result__concord { color: var(--text-muted); font-size: .82rem; max-width: 46ch; margin: var(--space-1) auto 0; }
+.result__concord[data-concord="tight"] { color: color-mix(in oklab, var(--gold) 70%, var(--text-muted)); }
+.result__lean { display: inline-block; margin-left: .4em; padding: 1px 6px; font-size: .68rem;
+  border: 1px solid var(--line-strong); border-radius: 999px; color: color-mix(in oklab, var(--gold) 55%, var(--text-muted));
+  text-transform: lowercase; letter-spacing: .02em; vertical-align: middle; }
+.result__lean-note { color: var(--text-muted); font-size: .72rem; font-style: italic; opacity: .85;
+  margin-top: var(--space-2); max-width: 52ch; }
 .result__credit { color: var(--text-muted); font-size: .8rem; font-style: italic; opacity: .85; margin-top: var(--space-1); }
 .result__tier { margin: var(--space-4) 0; text-align: left; }
 .result__tier-head { color: var(--text-muted); text-transform: lowercase; letter-spacing: .04em;

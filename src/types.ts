@@ -131,6 +131,12 @@ export interface Result {
    *  after a localStorage reload (the in-memory draft bounds are gone by then). Optional + dropped on
    *  `tuned`, exactly like `curve`. */
   bounds?: [Cm360, Cm360];
+  /** The speed↔accuracy lean the optimizer actually fused with (`Profile.speedAccuracy`, 0 = pure
+   *  accuracy, 1 = pure speed) - the REAL taste knob, NOT the hardcoded `instrumentWeights.strike` (=1).
+   *  Copied verbatim so the result screen can label the strike rows as the user's chosen lean. Optional so
+   *  OLD saved Results (which lack it) render number-only; carried unchanged through `adoptResult` (the lean
+   *  is the user's stated taste, not a measurement). */
+  speedAccuracy?: number;
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────

@@ -193,4 +193,76 @@ describe('result screen', () => {
     expect(host.querySelector('[data-breakdown="trackContribZ"]')).toBeNull();
     expect(host.querySelector('[data-result="cm360"]')!.textContent).toContain('32.4');
   });
+
+  it('shows the CI-concord readout (tight) for a sharp measured CI', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult!.result = { ...RESULT, ci90: [32.0, 32.6] }; // tight
+    resultScreen(host, ctx).mount();
+    const concord = host.querySelector('[data-result="concord"]')!;
+    expect(concord).toBeTruthy();
+    expect(concord.textContent!.toLowerCase()).toContain('concur');
+  });
+
+  it('frames a wide CI as a possibility LIST naming BOTH causes (never asserts one)', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult!.result = { ...RESULT, ci90: [18, 50] }; // wide
+    resultScreen(host, ctx).mount();
+    const txt = host.querySelector('[data-result="concord"]')!.textContent!.toLowerCase();
+    // a wide CI cannot distinguish sampling noise from facet disagreement - copy must name BOTH
+    expect(txt).toContain('short');   // short-session sampling noise
+    expect(txt).toContain('disagree'); // facets disagreeing
+    // never asserts a single cause
+    expect(txt).not.toMatch(/because the (facets|views) disagree/);
+  });
+
+  it('gates the concord readout behind !tuned (a hand-picked value has no measured concord)', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, tuned: true } };
+    resultScreen(host, ctx).mount();
+    expect(host.querySelector('[data-result="concord"]')).toBeNull();
+  });
+
+  it('omits the concord readout for an OLD result whose CI is degenerate', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, ci90: [NaN, NaN] } };
+    resultScreen(host, ctx).mount();
+    expect(host.querySelector('[data-result="concord"]')).toBeNull();
+  });
+
+  it('labels the strike rows with the speed/accuracy lean sourced from the profile (your call)', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult!.result = { ...RESULT, speedAccuracy: 0.8 }; // leaning speed
+    resultScreen(host, ctx).mount();
+    const lean = host.querySelector('[data-result="strikeLean"]')!;
+    expect(lean).toBeTruthy();
+    const t = lean.textContent!.toLowerCase();
+    expect(t).toContain('speed');
+    expect(t).toContain('your call');
+    // the note must make clear track/flick/calibrate are pure skill while strike encodes the chosen lean
+    expect(host.textContent!.toLowerCase()).toContain('skill');
+  });
+
+  it('labels the lean toward accuracy when the profile leans that way', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult!.result = { ...RESULT, speedAccuracy: 0.2 }; // leaning accuracy
+    resultScreen(host, ctx).mount();
+    expect(host.querySelector('[data-result="strikeLean"]')!.textContent!.toLowerCase()).toContain('accuracy');
+  });
+
+  it('omits the strike lean label for an OLD result that lacks speedAccuracy', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    const { ...old } = RESULT; // RESULT has no speedAccuracy
+    ctx.lastResult = { sessionId: 's1', result: old };
+    resultScreen(host, ctx).mount();
+    expect(host.querySelector('[data-result="strikeLean"]')).toBeNull();
+    // the strike readings still render (graceful)
+    expect(host.querySelector('[data-breakdown="ttkMs"]')!.textContent).toBe('511 ms');
+  });
 });

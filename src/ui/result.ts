@@ -4,8 +4,26 @@ import { GAME_YAW } from '../convert/yaw-table';
 import { buildExportBundle, toJson, triggerDownload } from '../state/export';
 import { plotGeometry, renderConvergencePlot } from './convergence-plot';
 import { marksFromTrials } from './session-view';
+import { ciConcord } from '../optimizer/result';
 
 const fmt = (v: number, digits = 1): string => (Number.isFinite(v) ? v.toFixed(digits) : '-');
+
+// CI-concord copy. The descriptor is a width bucket only; this copy NEVER asserts a single cause - a wide
+// CI cannot distinguish short-session sampling noise from facet disagreement, so it names BOTH as a
+// possibility list (honesty invariant). A tight CI is the only one that earns a confident reading.
+const CONCORD_COPY: Record<'tight' | 'moderate' | 'wide', string> = {
+  tight: 'the four views concur on a sharp answer',
+  moderate: 'the four views broadly agree; a few more trials would tighten this band',
+  wide: 'this band is wide - that could be short-session sampling noise, the facets disagreeing, or both; more trials would tell them apart',
+};
+
+// The strike lean. track / flick / calibrate are pure skill readings; strike is the only facet that encodes
+// the user's chosen speed↔accuracy taste (profile.speedAccuracy, NOT the hardcoded instrumentWeights.strike).
+// Claim only what the weighting provably does - which side it leans - never a fabricated counterfactual ms.
+const strikeLean = (sa: number): string => {
+  const side = sa > 0.5 ? 'speed' : sa < 0.5 ? 'accuracy' : 'a balanced speed/accuracy point';
+  return `leaning toward ${side} (your call)`;
+};
 // Signed standardized contribution (z-score units, σ). Dash for NaN/missing - never a fabricated facet pick.
 const fmtZ = (v: number | undefined): string =>
   v !== undefined && Number.isFinite(v) ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}σ` : '-';
@@ -27,6 +45,12 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       const hasFacets =
         !tuned && r.bounds !== undefined &&
         (bk.trackContribZ !== undefined || bk.flickContribZ !== undefined);
+      // CI concord: a measured-only readout (gated !tuned - a hand-picked value has no measured CI/concord).
+      // undefined for a degenerate/old CI so nothing is fabricated.
+      const concord = !tuned ? ciConcord(r.optimalCm360, r.ci90) : undefined;
+      // The strike lean comes from the user's real taste knob (carried as r.speedAccuracy); OLD results lack
+      // it (number-only), and it is the only facet that encodes a chosen lean rather than pure skill.
+      const lean = r.speedAccuracy;
       const root = document.createElement('section');
       root.className = 'screen screen--shell result fade-in';
       const rows = GAME_YAW.map((g) => {
@@ -42,6 +66,9 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
           ${tuned
             ? `<p class="result__ci result__ci--tuned mono">tuned by feel - not a measured optimum</p>`
             : `<p class="result__ci mono">90% CI <span data-result="ci">${fmt(r.ci90[0])}–${fmt(r.ci90[1])}</span> cm/360</p>`}
+          ${concord
+            ? `<p class="result__concord" data-result="concord" data-concord="${concord}">${CONCORD_COPY[concord]}</p>`
+            : ''}
           ${!tuned && r.curve && r.bounds
             ? `<figure class="result__plot"><svg data-plot aria-hidden="true"></svg>
                 <figcaption class="mono">the four probes converging on your one number</figcaption></figure>`
@@ -62,9 +89,12 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
             <p class="result__tier-head mono">readings at that sensitivity</p>
             <div class="result__breakdown">
               <div><span class="result__bk-label">precision floor</span><span class="mono" data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
-              <div><span class="result__bk-label">time-to-kill <em>mantis shrimp</em></span><span class="mono" data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
+              <div><span class="result__bk-label">time-to-kill <em>mantis shrimp</em>${lean !== undefined ? ` <span class="result__lean" data-result="strikeLean">${strikeLean(lean)}</span>` : ''}</span><span class="mono" data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
               <div><span class="result__bk-label">hit rate</span><span class="mono" data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
             </div>
+            ${lean !== undefined
+              ? `<p class="result__lean-note mono">track, flick and calibrate are pure skill readings; the strike pair encodes your chosen speed/accuracy lean, not a measured optimum.</p>`
+              : ''}
           </div>
           <label class="field result__game-pick">your game
             <select data-action="your-game">${GAME_YAW.map((g) => `<option value="${g.id}"${g.id === ctx.draft.currentGame ? ' selected' : ''}>${g.label}</option>`).join('')}</select></label>

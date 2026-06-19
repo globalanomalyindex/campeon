@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildResult } from '../../src/optimizer/result';
+import { buildResult, ciConcord } from '../../src/optimizer/result';
 import { sensFor } from '../../src/convert/cm360';
 import { yawFor } from '../../src/convert/yaw-table';
 import type { Profile, Report, TrialResult } from '../../src/types';
@@ -64,5 +64,38 @@ describe('buildResult', () => {
     const r = buildResult(report, trials, 800);
     expect(Number.isNaN(r.breakdown.trackContribZ!)).toBe(true);
     expect(Number.isNaN(r.breakdown.flickContribZ!)).toBe(true);
+  });
+
+  it('plumbs the profile speedAccuracy lean into the Result (the real taste knob)', () => {
+    const r = buildResult(report, trials, 800, undefined, undefined, { ...profile, speedAccuracy: 0.7 });
+    expect(r.speedAccuracy).toBeCloseTo(0.7, 9);
+  });
+
+  it('omits speedAccuracy without a profile (old/headless callers stay number-only)', () => {
+    const r = buildResult(report, trials, 800);
+    expect(r.speedAccuracy).toBeUndefined();
+  });
+});
+
+describe('ciConcord', () => {
+  // The descriptor is a LOG-SPACE WIDTH-RELATIVE threshold bucket, NOT an invented agreement score:
+  // it reads only ln(hi) - ln(lo), so it is scale-invariant (a CI from 30→33 buckets the same as 60→66).
+  it('buckets a narrow CI as tight', () => {
+    expect(ciConcord(31, [30, 32])).toBe('tight'); // ln width ≈ 0.065
+  });
+  it('buckets a mid CI as moderate', () => {
+    expect(ciConcord(32, [28, 37])).toBe('moderate'); // ln width ≈ 0.279
+  });
+  it('buckets a broad CI as wide', () => {
+    expect(ciConcord(30, [18, 50])).toBe('wide'); // ln width ≈ 1.02
+  });
+  it('is scale-invariant (width-relative in ln space, not absolute)', () => {
+    expect(ciConcord(31, [30, 32])).toBe(ciConcord(62, [60, 64]));
+    expect(ciConcord(32, [28, 37])).toBe(ciConcord(64, [56, 74]));
+  });
+  it('returns undefined for a degenerate/non-finite CI (no fabricated descriptor)', () => {
+    expect(ciConcord(30, [NaN, 32])).toBeUndefined();
+    expect(ciConcord(30, [0, 32])).toBeUndefined();
+    expect(ciConcord(30, [32, 30])).toBeUndefined(); // hi <= lo
   });
 });
