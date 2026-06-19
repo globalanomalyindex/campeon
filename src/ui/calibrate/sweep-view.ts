@@ -6,7 +6,7 @@
 // pace meter. Runtime-verified, not unit-tested.
 import { createPointerLock } from '../../input/pointer-lock';
 import { accelVerdict, accelTolForWidth } from '../../input/accel-check';
-import { SweepAccumulator, dpiFromSweep, isPlausibleSweepDpi } from '../../input/dpi-sweep';
+import { SweepAccumulator, dpiFromPasses, isPlausibleSweepDpi } from '../../input/dpi-sweep';
 import { hex, rgba } from '../../palette';
 
 export interface SweepResult { dpi: number; accelerated: boolean; }
@@ -14,6 +14,7 @@ export interface SweepView { dispose(): void; }
 
 type Phase = 'idle-slow' | 'running-slow' | 'idle-fast' | 'running-fast';
 
+const SLOW_PASSES = 2;    // number of slow passes combined (median + outlier reject) into the committed DPI
 const READY_COUNTS = 150; // a running pass must move at least this far before "finish" is offered
 const IDLE_HINT_MS = 1300; // after this long resting at the edge, swap from "position" to "click" cue
 const PACE_SCALE = 6;     // counts/ms that fills the pace bar
@@ -52,7 +53,7 @@ export function createSweepView(
   const dpr = Math.max(1, window.devicePixelRatio || 1);
 
   let phase: Phase = 'idle-slow';
-  let slowCounts = 0;
+  const slowPassCounts: number[] = []; // committed counts from each completed slow pass (length 0..SLOW_PASSES)
   let ready = false;          // current running pass has moved far enough to offer "finish"
   let idleClickReady = false; // an idle pass has shown "position" long enough to now cue "click"
   let idleTimer: number | null = null;
@@ -123,7 +124,13 @@ export function createSweepView(
   const offFire = pointer.onFire(() => {
     if (!pointer.isLocked()) return;
     if (phase === 'idle-slow') { startPass('running-slow'); }
-    else if (phase === 'running-slow') { if (!ready) return nudge(); slowCounts = acc.total(); phase = 'idle-fast'; ready = false; updateUi(); }
+    else if (phase === 'running-slow') {
+      if (!ready) return nudge();
+      slowPassCounts.push(acc.total());
+      // Run SLOW_PASSES slow passes (combined via median + outlier reject) before the fast cross-check.
+      phase = slowPassCounts.length < SLOW_PASSES ? 'idle-slow' : 'idle-fast';
+      ready = false; updateUi();
+    }
     else if (phase === 'idle-fast') { startPass('running-fast'); }
     else if (phase === 'running-fast') { if (!ready) return nudge(); finish(acc.total()); }
   });
@@ -156,17 +163,26 @@ export function createSweepView(
 
   function updateUi(): void {
     const locked = pointer.isLocked();
+    const slowPassNum = Math.min(SLOW_PASSES, slowPassCounts.length + 1); // 1-based current slow pass
+    const totalPasses = SLOW_PASSES + 1;
     $('hint').style.display = locked ? 'none' : 'flex';
-    $('pass').textContent = fast() ? 'pass 2 of 2 - fast' : 'pass 1 of 2 - slow';
+    $('pass').textContent = fast()
+      ? `pass ${totalPasses} of ${totalPasses} - fast`
+      : `pass ${slowPassNum} of ${totalPasses} - slow`;
     $('step').textContent = fast() ? 'step 1 of 2 - the sweep (checking acceleration)' : 'step 1 of 2 - the sweep';
     if (!locked) {
       $('lead').textContent = 'lay any card flat on your desk, next to your mouse.';
       $('sub').textContent = 'click here to begin (it hides the cursor so we can read your mouse\'s raw motion). press Esc anytime to stop.';
     } else if (phase === 'idle-slow') {
-      $('lead').textContent = idleClickReady ? 'lined up? click once to start sliding.' : 'now line your mouse up with the LEFT edge of your card.';
-      $('sub').textContent = '';
+      const again = slowPassCounts.length > 0;
+      $('lead').textContent = idleClickReady
+        ? 'lined up? click once to start sliding.'
+        : (again ? 'one more slow pass - line up with the LEFT edge again.' : 'now line your mouse up with the LEFT edge of your card.');
+      $('sub').textContent = again && !idleClickReady ? 'two slow passes let us cross-check the reading.' : '';
     } else if (phase === 'running-slow') {
-      $('lead').textContent = ready ? 'reached the right edge? click to finish pass 1.' : 'slowly slide your mouse across the card to its RIGHT edge.';
+      $('lead').textContent = ready
+        ? `reached the right edge? click to finish slow pass ${slowPassNum}.`
+        : 'slowly slide your mouse across the card to its RIGHT edge.';
       $('sub').textContent = '';
     } else if (phase === 'idle-fast') {
       $('lead').textContent = idleClickReady ? 'click to start a quick second pass.' : 'bring your mouse back to the card\'s LEFT edge.';
@@ -179,15 +195,23 @@ export function createSweepView(
   }
 
   function finish(fastCounts: number): void {
-    const dpi = dpiFromSweep(slowCounts, opts.referenceWidthCm);
+    // Combine the slow passes: per-pass DPI -> median -> drop outliers -> surviving mean, plus a
+    // CONSISTENCY indicator (spreadPct) and an agreement flag (never a measured CI).
+    const passes = dpiFromPasses(slowPassCounts, opts.referenceWidthCm);
+    const dpi = passes.dpi;
     $('dpi').textContent = isPlausibleSweepDpi(dpi) ? Math.round(dpi).toString() : 'invalid';
     if (!isPlausibleSweepDpi(dpi)) { pointer.exit(); opts.onInvalid(); return; }
+    // Passes that disagree beyond threshold get the gentle redo (same path as an implausible DPI).
+    if (!passes.agreed) { pointer.exit(); opts.onInvalid(); return; }
+    // The COMBINED slow magnitude that produced the committed DPI (inverse of dpiFromSweep), so the
+    // accel cross-check and the committed DPI share one slow magnitude rather than a stale single pass.
+    const combinedSlowCounts = (dpi * opts.referenceWidthCm) / 2.54;
     // Raw pointer input (Chromium unadjustedMovement) bypasses OS acceleration at the source, so the
     // slow/fast cross-check has nothing to detect there - skip it. On os-adjusted browsers run it
     // with a tolerance scaled to the short card width (a fixed 10% false-positives on an 8.56cm card).
     const accelerated = pointer.mode() === 'raw'
       ? false
-      : accelVerdict(slowCounts, fastCounts, accelTolForWidth(opts.referenceWidthCm)).accelerated;
+      : accelVerdict(combinedSlowCounts, fastCounts, accelTolForWidth(opts.referenceWidthCm)).accelerated;
     pointer.exit();
     opts.onResult({ dpi: Math.round(dpi), accelerated });
   }

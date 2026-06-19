@@ -6,6 +6,7 @@
 // pulse that appears only when valid, a freeze visual while holding, and a proactive out-of-room
 // helper. Runtime-verified, not unit-tested.
 import { createPointerLock } from '../../input/pointer-lock';
+import { SpinSeedAccumulator } from '../../input/dpi-sweep';
 import { degPerCountFor, cm360FromTurnCounts } from '../../convert/turn-rate';
 import { hex, rgba } from '../../palette';
 import type { Cm360 } from '../../types';
@@ -40,7 +41,7 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   const degPerCount = degPerCountFor(PROVISIONAL_CM360, opts.dpi);
 
-  let swept = 0;             // signed accumulated horizontal counts (magnitude = total travel)
+  const acc = new SpinSeedAccumulator(); // path-length seed + signed swept (dial visual only)
   let paused = false;        // counting suspended (set on mousedown until classified)
   let repositioning = false; // UI: showing the reposition prompt (set by the hold timer)
   let nearDone = false;      // swept >= MIN_DONE_DEG (drives the lead swap)
@@ -50,7 +51,9 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
   let holdTimer: number | null = null;
   let raf = 0;
 
-  const progressDeg = (): number => Math.abs(swept) * degPerCount;
+  // Dial VISUAL uses the SIGNED swept value (so wobble back un-fills the ring, matching the felt
+  // direction). The measured SEED uses path length (acc.pathLength()) - see onUp.
+  const progressDeg = (): number => Math.abs(acc.swept()) * degPerCount;
 
   function sizeCanvas(): void {
     const r = canvas.getBoundingClientRect(); W = r.width; H = r.height;
@@ -99,7 +102,7 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
   const off = pointer.onSample((s) => {
     if (!pointer.isLocked()) return;
     if (paused) { pressMoved += Math.abs(s.dx); return; } // movement during a press classifies tap vs hold; never counts
-    swept += s.dx;
+    acc.add(s);
     const near = progressDeg() >= MIN_DONE_DEG;
     if (near !== nearDone) { nearDone = near; updateUi(); }
   });
@@ -117,7 +120,10 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
     const isTap = dt < TAP_MS && pressMoved < TAP_MOVE_MAX; // quick AND still = a tap (done); else a reposition
     if (isTap && progressDeg() >= MIN_DONE_DEG) {
       pointer.exit();
-      opts.onSeed(cm360FromTurnCounts(Math.abs(swept), opts.dpi));
+      // Seed from horizontal PATH-LENGTH (sum of |dx|), not the signed sum: unheld wobble cancels in
+      // a signed sum and under-counts the turn, biasing the seed fast. The seed flows ONLY into
+      // boundsFromSeed (a guess to search around, not the answer).
+      opts.onSeed(cm360FromTurnCounts(acc.pathLength(), opts.dpi));
       return;
     }
     if (isTap) flashUntil = ev.timeStamp + 900; // a too-early tap: explain the no-op instead of staying silent
