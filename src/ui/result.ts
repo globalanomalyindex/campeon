@@ -28,6 +28,14 @@ const strikeLean = (sa: number): string => {
 const fmtZ = (v: number | undefined): string =>
   v !== undefined && Number.isFinite(v) ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}σ` : '-';
 
+// A single screen-reader summary sentence rendered ONCE near the number (not a live region - the
+// result is static). The CI range is spelled " to " so no en-dash glyph is ever voiced; a tuned-by-feel
+// value carries NO measured-CI claim (honesty), so it is announced as tuned without a band.
+const srSummary = (r: Result, tuned: boolean): string =>
+  tuned
+    ? `Your sensitivity, tuned by feel: ${fmt(r.optimalCm360)} centimetres per 360. This is a hand-picked value, not a measured optimum.`
+    : `Your most-evolved sensitivity is ${fmt(r.optimalCm360)} centimetres per 360, with a 90% confidence interval from ${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}.`;
+
 // Fixed viewBox: clientWidth is 0 before layout, so the geometry must use a constant design size.
 const PLOT_SIZE = { width: 360, height: 200 };
 const FACET_SIZE = { width: 360, height: 96 };
@@ -63,6 +71,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
         <div class="wrap stack result__inner">
           <p class="result__lead">your sweet spot</p>
           <h1 class="display result__number"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
+          <p class="result__sr-summary sr-only">${srSummary(r, tuned)}</p>
           ${tuned
             ? `<p class="result__ci result__ci--tuned mono">tuned by feel - not a measured optimum</p>`
             : `<p class="result__ci mono">90% CI <span data-result="ci">${fmt(r.ci90[0])}–${fmt(r.ci90[1])}</span> cm/360</p>`}

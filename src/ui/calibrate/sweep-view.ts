@@ -38,6 +38,7 @@ export function createSweepView(
         </div>
         <div class="cal-pace" data-sweep="pacewrap" hidden><div class="cal-pace__fill" data-sweep="pace"></div></div>
         <p class="cal-pace__label" data-sweep="pacelabel"></p>
+        <p class="cal-method mono" data-sweep="method">card sweeps land within about 3 to 5 percent; we search a window around it.</p>
         <div class="calibrate__readouts">
           <div class="calibrate__ro"><div class="k">step</div><div class="v mono" data-sweep="pass">pass 1 of 2 - slow</div></div>
           <div class="calibrate__ro"><div class="k">counts</div><div class="v mono" data-sweep="counts">0</div></div>

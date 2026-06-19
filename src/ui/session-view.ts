@@ -35,6 +35,12 @@ export function searchLabel(index: number, cm360: number, coldStart: number): st
     : `generation ${index - coldStart + 1} · ${testing}`;
 }
 
+/** Concise spoken summary for the estimate live region (P4-3). The CI range is spelled " to " so a
+ *  screen reader never voices a raw en-dash glyph; announced only at segment-meaningful moments. */
+export function announceEstimate(report: Pick<Report, 'optimalCm360' | 'ci90'>): string {
+  return `dialed in around ${report.optimalCm360.toFixed(1)} cm/360, 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
+}
+
 /** Thin-shell injection seam: the production defaults build the real WebGL stage + run the real
  *  Bayesian session, but a jsdom test can swap in fakes to exercise the shell wiring (abort/begin
  *  states) without WebGL. Pure-core estimators are unchanged; only the view shell is injectable. */
@@ -59,8 +65,9 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         <div class="session__crosshair" aria-hidden="true"></div>
         <header class="session__hud mono"><span data-hud="instruction">click to begin</span>
           <span data-hud="progress"></span></header>
-        <figure class="session__plot"><svg data-plot aria-label="convergence on your optimal cm/360"></svg>
-          <figcaption class="mono" data-hud="estimate"></figcaption></figure>
+        <figure class="session__plot"><svg data-plot aria-hidden="true"></svg>
+          <span class="mono session__estimate-visual" data-hud="estimate-visual" aria-hidden="true"></span>
+          <figcaption class="mono" data-hud="estimate" aria-live="polite" aria-atomic="true"></figcaption></figure>
         <div class="session__prelock" data-prelock>
           <span class="cal-pulse"><span class="cal-pulse__dot"></span></span>
           <p class="mono session__prelock-label">the hunt</p>
@@ -93,7 +100,8 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       const svg = root.querySelector('[data-plot]') as unknown as SVGElement;
       const hudInstruction = root.querySelector('[data-hud="instruction"]')!;
       const hudProgress = root.querySelector('[data-hud="progress"]')!;
-      const hudEstimate = root.querySelector('[data-hud="estimate"]')!;
+      const hudEstimate = root.querySelector('[data-hud="estimate"]')!;        // aria-live: meaningful moments only
+      const hudEstimateVisual = root.querySelector('[data-hud="estimate-visual"]')!; // per-trial visual readout (aria-hidden)
       const panel = root.querySelector('[data-panel]') as HTMLElement;
       const prelock = root.querySelector('[data-prelock]') as HTMLElement;
       const beginBtn = root.querySelector('[data-prelock="begin"]') as HTMLButtonElement;
@@ -109,6 +117,10 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       let lastReport: Report | null = null;
       let lockedIn = false;
       let running = false;
+      // The estimate figcaption is an aria-live region; we write to it ONLY at segment-meaningful
+      // moments (an instrument switch, the dialed-in panel), never on every trial, so a screen reader
+      // is not flooded. This is read-only narration over already-pure values; it appends no score.
+      let announcedInstrument: InstrumentId | null = null;
 
       const drawPlot = (report: Report, trials: readonly TrialResult[]): void => {
         const g = plotGeometry({
@@ -117,7 +129,9 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
           size: { width: svg.clientWidth || 360, height: svg.clientHeight || 180 },
         });
         renderConvergencePlot(svg, g, 'blended score');
-        hudEstimate.textContent = `most-evolved · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)}`;
+        // Per-trial visual readout only (aria-hidden): the live region stays quiet until a meaningful
+        // moment. Range spelled " to " so no en-dash glyph ever reaches assistive tech.
+        hudEstimateVisual.textContent = `most-evolved · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
       };
 
       const runSegment = async (maxTrials: number, ciStopWidth: number | undefined): Promise<void> => {
@@ -131,6 +145,8 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
           onTrialStart: (id, i, cm360) => {
             hudInstruction.textContent = instructionFor(id);
             hudProgress.textContent = searchLabel(i, cm360, COLD_START);
+            // Announce ONLY when the instrument changes (a segment-meaningful moment), not every trial.
+            if (id !== announcedInstrument) { announcedInstrument = id; hudEstimate.textContent = instructionFor(id); }
             stage.setEnemyEnvironment(id); // skin this trial's targets with the environment's prey
             stage.arena.clearTargets();
           },
@@ -154,6 +170,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       const showPanel = (report: Report): void => {
         stage.exitLock(); // hand the cursor back so the panel buttons are clickable
         drawPlot(report, allTrials);
+        hudEstimate.textContent = announceEstimate(report); // dialed-in: a meaningful moment to announce
         $d('num').textContent = report.optimalCm360.toFixed(1);
         $d('ci').textContent = `${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)} cm/360`;
         panel.hidden = false;

@@ -54,7 +54,7 @@ export function hero(host: HTMLElement, ctx: AppContext): Screen {
         </div>`}
         <div class="hero__menu${menuOn}" data-menu>
           <h1 class="hero__mark" data-mark>campe<span class="hero__eye">ó</span>n</h1>
-          <p class="hero__tagline">one number. six predators. the sensitivity your hands were built for.</p>
+          <p class="hero__tagline">one number. six predators across four environments. the sensitivity your hands were built for.</p>
           <button class="action action--primary" data-action="start">start</button>
           <p class="hero__byline">by christopher robin fiore</p>
           <nav class="hero__nav">
@@ -162,8 +162,12 @@ export function hero(host: HTMLElement, ctx: AppContext): Screen {
       // here) a no-op once the menu is live.
       const onRootClick = (): void => advance();
       const onSkipClick = (e: Event): void => { e.stopPropagation(); skip(); };
+      // Global Escape skips the whole intro sequence straight to the resolved menu (a keyboard escape
+      // hatch matching the on-screen skip control). No-op once the menu is live (the `done` guard).
+      const onKeyDown = (e: KeyboardEvent): void => { if (e.key === 'Escape') skip(); };
       root.addEventListener('click', onRootClick);
       q('[data-skip]').addEventListener('click', onSkipClick);
+      document.addEventListener('keydown', onKeyDown);
 
       advance(); // reveal the first line
 
@@ -172,6 +176,7 @@ export function hero(host: HTMLElement, ctx: AppContext): Screen {
         clearTimer();
         if (weaveRaf) cancelAnimationFrame(weaveRaf);
         root.removeEventListener('click', onRootClick);
+        document.removeEventListener('keydown', onKeyDown);
       };
     },
     unmount() {

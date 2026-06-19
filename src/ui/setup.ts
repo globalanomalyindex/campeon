@@ -92,9 +92,10 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
           <li><span class="cal-preview__n">2</span><span>the spin - turn all the way around once.</span></li>
         </ol>
         <p class="setup__lead">first, grab any card from your wallet - bank card, gym card, hotel key. they're all exactly the same size.</p>
-        ${reduced ? `<p class="setup__lead mono">reduced-motion is on - you can skip the rendered turn with "i already know my numbers" below.</p>` : ''}
+        ${reduced ? `<p class="setup__lead mono">reduced-motion is on - you can skip the rendered turn with "i'll type my numbers instead" below.</p>` : ''}
         <button class="action action--primary" data-action="start-guided">i've got a card - start</button>
-        <button class="action action--ghost" data-action="start-manual">i already know my numbers</button>
+        <button class="action action--ghost" data-action="start-manual">i'll type my numbers instead</button>
+        <p class="setup__lead setup__manual-note mono">we use them only as a starting point to search around - not as the answer.</p>
       </div>`;
     if (state.step === 'blocked') {
       const accel = state.blockReason === 'accel';
@@ -106,7 +107,8 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
           : `<p class="gate__lead">that sweep didn't quite register - probably a little too short or uneven.</p>
              <p>line the card up, rest your mouse at its left edge, and slide smoothly all the way to the right edge.</p>`}
         <button class="action action--primary" data-action="retry">try again</button>
-        <button class="action action--ghost" data-action="manual">type my numbers instead</button>
+        <button class="action action--ghost" data-action="manual">i'll type my numbers instead</button>
+        <p class="setup__lead setup__manual-note mono">we use them only as a starting point to search around - not as the answer.</p>
       </div>`;
     }
     if (state.step === 'manual') return `

@@ -36,6 +36,22 @@ describe('setup (guided calibration orchestrator)', () => {
     expect(onSpin).toMatch(/data-state="active"[^>]*>.*the spin/);
   });
 
+  it('rewords the typed fork so it stops inviting the read-my-sens misconception, with a starting-point note (P4-3)', () => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    const manual = host.querySelector('[data-action="start-manual"]')!;
+    expect(manual.textContent!.toLowerCase()).toContain("i'll type my numbers");
+    // a starting-point note must clarify the typed numbers seed the search, not read out as the answer
+    expect(host.textContent!.toLowerCase()).toContain('starting point');
+  });
+
+  it('keeps the manual fast path reachable from the intro (reduced-motion / lock-denial escape hatch)', () => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
+    expect(host.querySelector('[data-field="dpi"]')).toBeTruthy(); // the typed form is still reachable
+  });
+
   it('the typed fast path writes dpi/sens/game + seeded bounds and navigates to session', () => {
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();

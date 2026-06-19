@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { marksFromTrials, instructionFor, searchLabel, sessionView, type SessionViewDeps } from '../../src/ui/session-view';
+import { marksFromTrials, instructionFor, searchLabel, announceEstimate, sessionView, type SessionViewDeps } from '../../src/ui/session-view';
 import type { AppContext } from '../../src/ui/shell';
 import type { Report, TrialResult } from '../../src/types';
 import type { ArenaStage } from '../../src/ui/arena-stage';
@@ -93,6 +93,29 @@ function dropLock(): void {
 
 /** Flush microtasks so the begin button's requestLock().then(begin) chain has set running=true. */
 const flush = (): Promise<void> => Promise.resolve().then(() => undefined);
+
+describe('session-view: assistive-tech narration (P4-3)', () => {
+  it('marks the decorative convergence plot aria-hidden', () => {
+    const { root, screen } = mountWithRunningSegment();
+    const svg = root.querySelector('[data-plot]') as unknown as SVGElement;
+    expect(svg.getAttribute('aria-hidden')).toBe('true');
+    screen.unmount();
+  });
+
+  it('makes the estimate figcaption a polite + atomic live region', () => {
+    const { root, screen } = mountWithRunningSegment();
+    const cap = root.querySelector('[data-hud="estimate"]')!;
+    expect(cap.getAttribute('aria-live')).toBe('polite');
+    expect(cap.getAttribute('aria-atomic')).toBe('true');
+    screen.unmount();
+  });
+
+  it('announces a concise summary using " to " for the range, never an en-dash glyph', () => {
+    expect(announceEstimate({ optimalCm360: 32.4, ci90: [29.1, 36.0] } as Report))
+      .toBe('dialed in around 32.4 cm/360, 90% CI 29.1 to 36.0');
+    expect(announceEstimate({ optimalCm360: 32.4, ci90: [29.1, 36.0] } as Report)).not.toContain('–');
+  });
+});
 
 describe('session-view: pre-lock begin state (P4-2)', () => {
   it('opens on "click to begin" - never the lock-it-in commit copy', () => {

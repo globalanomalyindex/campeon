@@ -42,6 +42,19 @@ describe('result screen', () => {
     expect(ci).toContain('36.0');
   });
 
+  it('renders a single sr-only summary sentence near the number (rendered once, NOT a live region)', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount();
+    const summaries = host.querySelectorAll('.result__sr-summary');
+    expect(summaries.length).toBe(1); // exactly one, rendered once
+    const sr = summaries[0]!;
+    expect(sr.getAttribute('aria-live')).toBeNull(); // NOT a live region
+    const t = sr.textContent!.toLowerCase();
+    expect(t).toContain('32.4'); // the number
+    expect(t).toContain('to');   // CI range spoken as "to", never an en-dash
+    expect(sr.textContent).not.toContain('–');
+  });
+
   it('renders a per-game row for every game and highlights the current one', () => {
     const host = document.createElement('div');
     resultScreen(host, fakeCtx()).mount();

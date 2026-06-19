@@ -31,6 +31,7 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
           <div class="calibrate__hint" data-spin="hint"><span class="cal-pulse"><span class="cal-pulse__dot"></span></span></div>
         </div>
         <div class="cal-helper"><span><b>out of room?</b> hold the button, slide your mouse back, then let go.</span></div>
+        <p class="cal-method mono" data-spin="seed">this spin gives a guess to search around, not your answer.</p>
       </div>
     </section>`;
 
@@ -123,7 +124,10 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
       // Seed from horizontal PATH-LENGTH (sum of |dx|), not the signed sum: unheld wobble cancels in
       // a signed sum and under-counts the turn, biasing the seed fast. The seed flows ONLY into
       // boundsFromSeed (a guess to search around, not the answer).
-      opts.onSeed(cm360FromTurnCounts(acc.pathLength(), opts.dpi));
+      const seed = cm360FromTurnCounts(acc.pathLength(), opts.dpi);
+      // Prescribe-not-readout: name the seed as a starting point, never a measured result.
+      $('seed').textContent = `starting near ${seed.toFixed(1)} cm/360 - a guess to search around, not your answer.`;
+      opts.onSeed(seed);
       return;
     }
     if (isTap) flashUntil = ev.timeStamp + 900; // a too-early tap: explain the no-op instead of staying silent

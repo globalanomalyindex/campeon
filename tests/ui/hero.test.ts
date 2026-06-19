@@ -66,4 +66,22 @@ describe('hero', () => {
     screen.unmount();
     expect(host.children.length).toBe(0);
   });
+
+  // ── P4-3: canon predator/environment count + global Escape skip ──────────────
+  it('reconciles the tagline to the canon: six predators across four environments', () => {
+    const host = document.createElement('div');
+    hero(host, fakeCtx()).mount();
+    const tagline = host.querySelector('.hero__tagline')!.textContent!.toLowerCase();
+    expect(tagline).toContain('six predators');
+    expect(tagline).toContain('four environments');
+  });
+
+  it('Escape skips the intro sequence straight to the resolved menu', () => {
+    const host = document.createElement('div');
+    hero(host, fakeCtx()).mount();
+    expect(host.querySelector('[data-intro]')).not.toBeNull(); // intro is playing
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(host.querySelector('.hero__menu')?.classList.contains('is-on')).toBe(true);
+    expect(host.querySelector('[data-intro]')).toBeNull();
+  });
 });
