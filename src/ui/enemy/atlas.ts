@@ -1,17 +1,15 @@
 /**
- * Pure geometry + timing for the enemy "merc-prey" billboard sprite sheets
- * (public/sprites/{track,flick,calibrate,strike}.png).
+ * Pure timing + state contract (and legacy UV geometry) for the enemy "quarry" animations.
  *
- * Each sheet is a CLEAN, uniform 8-column × 5-row grid (1448×1086) on a flat magenta key -
- * verified from the pixels. (Unlike the non-uniform Deagle viewmodel sheet, which forced a measured
- * band table; here the grid is uniform, so cells are computed arithmetically with a small inset that
- * keeps NearestFilter from sampling the gutter or a neighbour.) Rows are the animation "state
- * contract" the arena drives:
+ * The procedural 3D quarry layer (`enemy-layer.ts`) reads the `ANIMATIONS` table - per-state row /
+ * frame range / fps / loop - as the timing/state contract that drives its transform/opacity/emissive
+ * tweens, and reuses the `EnemyState` union and the `EnemyController` state machine VERBATIM. The
+ * rows define the animation states the arena drives:
  *   row 0 spawn · row 1 idle · row 2 flinch · row 3 death · row 4 escape.
  *
- * Pure: no THREE, no DOM. Returns normalized UV sub-rects in THREE texture space (V measured from the
- * BOTTOM) for the WebGL shell to apply as `map.offset` / `map.repeat`. The shell owns the canvas, the
- * chroma-key, and the per-sprite texture.
+ * The UV helpers (`cellUV` / `frameUV` / `staticFrameUV`) are the original sprite-sheet geometry,
+ * retained because the shared controller still returns a UV per frame; the 3D layer simply ignores
+ * the UV and animates the procedural mesh instead. Pure: no THREE, no DOM.
  */
 
 export interface UVRect {

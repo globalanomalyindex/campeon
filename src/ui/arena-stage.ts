@@ -7,7 +7,6 @@ import { mulberry32 } from '../stats/rng';
 import { createViewmodel3D, asViewmodelLayer } from './viewmodel/viewmodel-3d';
 import { createEnemyLayer, type EnemyLayerHandle } from './enemy/enemy-layer';
 import { createShotFeedback } from './feedback';
-import type { AnimName } from './viewmodel/atlas';
 import type { InstrumentId } from '../types';
 
 export interface ArenaStage {
@@ -20,8 +19,6 @@ export interface ArenaStage {
   setCm360(cm360: number): void;
   /** Skin subsequent target spawns with an environment's prey sheet (null-safe if not yet loaded). */
   setEnemyEnvironment(id: InstrumentId): void;
-  /** Play a viewmodel animation (null-safe). */
-  playViewmodel(name: AnimName, then?: AnimName | null): void;
   /** Resolves once the async viewmodel + enemy layers have attached. */
   readonly ready: Promise<void>;
   dispose(): void;
@@ -97,10 +94,6 @@ export function createArenaStage(
     exitLock: () => pointer.exit(),
     setCm360: (next) => arena.setSensitivity(next, dpi),
     setEnemyEnvironment: (id) => enemies?.setEnvironment(id),
-    // The 3D revolver reacts only to fire/look (no named draw/idle sprite animations). Kept as a
-    // null-safe no-op so the session-view reveal call site stays byte-compatible; the holster-draw
-    // reveal is a Chromium feel pass on the 3D weapon (see humanVerifyNotes), not a sprite animation.
-    playViewmodel: (_name, _then = null) => {},
     ready,
     dispose() {
       alive = false;

@@ -128,7 +128,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext): Screen {
       };
 
       const begin = async (): Promise<void> => {
-        stage.playViewmodel('flickDraw', 'idleReady'); // flick the cigarette, draw the deagle (the reveal)
+        // The reveal is now the in-scene 3D revolver's own look/fire motion (no named sprite draw anim).
         await runSegment(Math.min(MAX_TRIALS, COLD_START + 12), FIRST_STOP_CI);
         if (!alive) return;
         if (lockedIn) { finalize(); return; }
