@@ -183,6 +183,68 @@ function scriptedSession(
   return { recording: structuredClone(recorder.recording()), handle };
 }
 
+/**
+ * A scripted session that also drives the P3-4 death/escape LIFECYCLE on the cosmetic layer: it fires
+ * (the kill→death trigger), then clears + removes + respawns targets (the cleared-without-kill escape
+ * trigger). The scored Recording must be byte-identical with vs without a cosmetic layer, proving the
+ * death/escape motion is purely downstream and never perturbs the stream.
+ */
+function scriptedLifecycleSession(spec: TargetSpec, layer?: EnemyLayer): Recording {
+  let emit: (s: AimSample) => void = () => {};
+  let pull: () => void = () => {};
+  const input: InputSource = {
+    onSample(cb) {
+      emit = cb;
+      return () => {};
+    },
+    onFire(cb) {
+      pull = cb;
+      return () => {};
+    },
+  };
+  const renderer: RendererLike = { render() {}, setSize() {}, dispose() {} };
+  const arena = new Arena({ renderer, input, size: () => [800, 600], cm360: 34, dpi: 800, rng: mulberry32(11) });
+  if (layer) arena.attachEnemies(layer);
+
+  let handle = arena.spawnTarget(spec);
+  let recorder = new TrialRecorder(arena, () => handle);
+
+  arena.tick(16);
+  emit({ t: 4, dx: 120, dy: -30 });
+  arena.tick(16);
+  pull(); // fire → cosmetic layer may play death; scored fires++ regardless
+  recorder.stop();
+  const r1 = structuredClone(recorder.recording());
+
+  // Cleared-without-kill: removeTarget (escape) then a fresh spawn; the layer must not feed back.
+  arena.removeTarget(handle.id);
+  handle = arena.spawnTarget(spec);
+  recorder = new TrialRecorder(arena, () => handle);
+  arena.tick(16);
+  emit({ t: 8, dx: -40, dy: 18 });
+  arena.tick(16);
+  pull();
+  recorder.stop();
+  const r2 = structuredClone(recorder.recording());
+
+  // clearTargets() (escape on every live quarry) then one more spawn + trial.
+  arena.clearTargets();
+  handle = arena.spawnTarget(spec);
+  recorder = new TrialRecorder(arena, () => handle);
+  arena.tick(16);
+  emit({ t: 12, dx: 75, dy: 60 });
+  arena.tick(16);
+  pull();
+  recorder.stop();
+  const r3 = structuredClone(recorder.recording());
+
+  // Concatenate the three trials' streams into one comparable Recording.
+  return {
+    frames: [...r1.frames, ...r2.frames, ...r3.frames],
+    fires: [...r1.fires, ...r2.fires, ...r3.fires],
+  };
+}
+
 const MOVING_SPEC: TargetSpec = {
   kind: 'moving',
   yaw: 8,
@@ -220,8 +282,15 @@ class AdversarialEnemyLayer implements EnemyLayer {
     (view as number[])[0] = Number.NaN;
     (targets as TargetHandle[]).push(...this.poisoned); // a fresh spread - the targets Map is untouched
   }
-  clear(): void {}
-  remove(_id: string): void {}
+  // P3-4: clear()/remove() are the "cleared-without-kill" escape triggers + fire()'s kill path is the
+  // death trigger. An adversarial layer's death/escape hooks must NOT be able to perturb the scored
+  // stream, so here they ALSO attempt to vandalize and to push poison - and the Recording stays equal.
+  clear(): void {
+    this.poisoned.push({ id: 'ghost', bearing: () => [Number.NaN, Number.NaN], radiusDeg: () => Number.NaN });
+  }
+  remove(_id: string): void {
+    this.poisoned.push({ id: 'ghost', bearing: () => [Number.NaN, Number.NaN], radiusDeg: () => Number.NaN });
+  }
   dispose(): void {}
 }
 
@@ -271,6 +340,24 @@ describe('INTEGRITY GATE: cosmetic-overlay-reads-never-writes (full scored Recor
     const withBoth = scriptedSession(MOVING_SPEC, new AdversarialEnemyLayer(), new AdversarialViewmodelLayer());
     const without = scriptedSession(MOVING_SPEC);
     expect(withBoth.recording).toEqual(without.recording);
+  });
+
+  // P3-4: death (fire→kill) + escape (clear/remove without a kill) are driven HERE through the arena
+  // lifecycle. An adversarial layer whose clear()/remove()/fire()/spawn() all attempt to vandalize +
+  // push poison must NOT perturb the scored stream across a fire + remove + clear + respawn script.
+  it('driving the death/escape LIFECYCLE (fire + remove + clear) leaves the Recording byte-identical', () => {
+    const baseline = scriptedLifecycleSession(MOVING_SPEC);
+    const attacked = scriptedLifecycleSession(MOVING_SPEC, new AdversarialEnemyLayer());
+    expect(attacked).toEqual(baseline);
+    // Sanity: the lifecycle script actually exercised the scored stream.
+    expect(baseline.frames.length).toBeGreaterThan(0);
+    expect(baseline.fires.length).toBeGreaterThan(0);
+  });
+
+  it('the death/escape lifecycle also holds for a static target', () => {
+    const baseline = scriptedLifecycleSession(SPEC);
+    const attacked = scriptedLifecycleSession(SPEC, new AdversarialEnemyLayer());
+    expect(attacked).toEqual(baseline);
   });
 });
 

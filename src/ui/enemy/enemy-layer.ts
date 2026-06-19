@@ -7,6 +7,9 @@ import { classifyHit, type HitClass } from './hit';
 import {
   cloneQuarryMaterials,
   createQuarryMaterials,
+  disposeDust,
+  dustMaterial,
+  dustPuff,
   materialList,
   quarryMesh,
   quarryWorldHeight,
@@ -34,6 +37,8 @@ interface EnemyRecord {
   shownState: EnemyState;
   /** When the currently-shown state began (for the tween phase). */
   stateStartMs: Ms;
+  /** Sign (-1 | +1) of the escape sprint direction, fixed at spawn so the bolt reads consistent. */
+  escapeDir: number;
 }
 
 export interface EnemyLayerHandle extends EnemyLayer {
@@ -60,6 +65,7 @@ function stateDurationMs(state: EnemyState): number {
 interface Pose {
   scale: number; // multiple of baseScale
   lift: number; // fraction of baseScale added on Y
+  lateral: number; // fraction of baseScale added on the camera-relative X (sideways sprint)
   yaw: number; // radians about Y
   emissive: number; // weak-spot emissiveIntensity
   opacity: number;
@@ -68,33 +74,42 @@ interface Pose {
 function poseFor(state: EnemyState, p: number, reduced: boolean): Pose {
   if (reduced) {
     // Reduced motion: a single static idle pose, no time-driven motion.
-    return { scale: 1, lift: 0, yaw: 0, emissive: 0.9, opacity: 1 };
+    return { scale: 1, lift: 0, lateral: 0, yaw: 0, emissive: 0.9, opacity: 1 };
   }
   switch (state) {
     case 'spawn': {
       const e = easeOut(p);
-      return { scale: 0.4 + 0.6 * e, lift: 0, yaw: (1 - e) * 0.5, emissive: 0.5 + 0.7 * e, opacity: e };
+      return { scale: 0.4 + 0.6 * e, lift: 0, lateral: 0, yaw: (1 - e) * 0.5, emissive: 0.5 + 0.7 * e, opacity: e };
     }
     case 'idle': {
       // Gentle perpetual breathing - bounded, no bounce. p loops 0→1.
       const s = Math.sin(p * Math.PI * 2);
-      return { scale: 1 + 0.02 * s, lift: 0.01 * s, yaw: 0.08 * Math.sin(p * Math.PI), emissive: 0.85 + 0.15 * s, opacity: 1 };
+      return {
+        scale: 1 + 0.02 * s,
+        lift: 0.01 * s,
+        lateral: 0,
+        yaw: 0.08 * Math.sin(p * Math.PI),
+        emissive: 0.85 + 0.15 * s,
+        opacity: 1,
+      };
     }
     case 'flinch': {
       // Quick recoil that settles back - a clipped graze, stays alive.
       const e = easeOut(p);
       const kick = Math.sin(p * Math.PI); // up then back
-      return { scale: 1 - 0.06 * kick, lift: 0, yaw: -0.18 * kick, emissive: 1.0 + 0.6 * (1 - e), opacity: 1 };
+      return { scale: 1 - 0.06 * kick, lift: 0, lateral: 0, yaw: -0.18 * kick, emissive: 1.0 + 0.6 * (1 - e), opacity: 1 };
     }
     case 'death': {
-      // Topple + sink + fade (P3-4 will refine; first-pass keeps it a clean fall-away).
+      // Topple + sink + fade: rotates over (yaw), drops below the hitbox center (lift<0), shrinks
+      // slightly + fades to nothing. Ease-out, no bounce. P3-4: the clean-kill fall-away.
       const e = easeOut(p);
-      return { scale: 1 - 0.15 * e, lift: -0.45 * e, yaw: 1.2 * e, emissive: 0.9 * (1 - e), opacity: 1 - e };
+      return { scale: 1 - 0.15 * e, lift: -0.45 * e, lateral: 0, yaw: 1.2 * e, emissive: 0.9 * (1 - e), opacity: 1 - e };
     }
     case 'escape': {
-      // Lateral sprint-and-fade.
+      // Lateral sprint-and-fade: a live quarry cleared WITHOUT a kill bolts sideways (lateral) while
+      // turning away (yaw) and fading. Transform/opacity only, ease-out, no bounce. P3-4.
       const e = easeOut(p);
-      return { scale: 1, lift: 0, yaw: 0.6 * e, emissive: 0.8 * (1 - e), opacity: 1 - e };
+      return { scale: 1, lift: 0.05 * e, lateral: 1.6 * e, yaw: 0.9 * e, emissive: 0.8 * (1 - e), opacity: 1 - e };
     }
   }
 }
@@ -104,6 +119,9 @@ function applyPose(rec: EnemyRecord, pose: Pose): void {
   rec.mesh.scale.setScalar(s);
   rec.mesh.position.copy(rec.object.position);
   rec.mesh.position.y += rec.baseScale * pose.lift;
+  // Camera-relative sideways sprint: offset along the world X axis (the dominant screen-horizontal for
+  // the level rig). Cosmetic only - the scored sphere's own position is never touched.
+  rec.mesh.position.x += rec.baseScale * pose.lateral * rec.escapeDir;
   rec.mesh.rotation.y = pose.yaw;
   (rec.weakspot.material as MeshStandardMaterial).emissiveIntensity = pose.emissive;
   // Opacity: fade the whole skin via material transparency (per-record clones, so no cross-stomp).
@@ -150,9 +168,61 @@ export async function createEnemyLayer(
   // opacity/emissive tweens stay per-instance. Disposed on teardown alongside any live clones.
   const materialTemplate = createQuarryMaterials();
   const enemies = new Map<string, EnemyRecord>();
-  const fadeouts: EnemyRecord[] = []; // dying quarry handed off here so a new spawn/clear can't cut them short
+  const fadeouts: EnemyRecord[] = []; // dying/escaping quarry handed off here so a new spawn/clear can't cut them short
   let activeEnv: InstrumentId = 'flick';
   let scene: Scene | null = null;
+  // Last clock the layer saw (from spawn/update/fire). remove()/clear() carry no time argument, so the
+  // escape one-shot they kick off starts from this - the same clock the next update() advances against.
+  let lastNowMs: Ms = 0;
+
+  // ── Pooled dust-puffs (kill punctuation) ─────────────────────────────────
+  // A small fixed-capacity pool of dust groups, allocated ONCE and reused. A kill takes a free puff,
+  // positions it at the fallen quarry, and animates its opacity; when it finishes it returns to the
+  // pool (never re-allocated). Reduced motion never emits a puff at all.
+  const DUST_POOL = 3;
+  const DUST_MS = 420; // puff lifetime (ms) - a quick kick-up that settles, ease-out
+  interface ActiveDust {
+    group: Group;
+    startMs: Ms;
+  }
+  const dustPool: Group[] = []; // free puffs, parked + hidden
+  const activeDust: ActiveDust[] = []; // currently animating puffs
+  if (!reduced) {
+    for (let i = 0; i < DUST_POOL; i++) {
+      const d = dustPuff();
+      dustPool.push(d);
+      group.add(d); // parented once; visibility toggles, never re-added/removed
+    }
+  }
+
+  /** Kick up a pooled dust-puff at a world position. No-op (and no alloc) if the pool is exhausted. */
+  const emitDust = (pos: { x: number; y: number; z: number }, baseScale: number, nowMs: Ms): void => {
+    const d = dustPool.pop();
+    if (!d) return; // pool exhausted - drop the puff rather than allocate (strict pool)
+    d.position.set(pos.x, pos.y - baseScale * 0.35, pos.z);
+    d.scale.setScalar(baseScale);
+    d.visible = true;
+    dustMaterial(d).opacity = 0;
+    activeDust.push({ group: d, startMs: nowMs });
+  };
+
+  /** Advance every active puff; settle + return finished puffs to the pool (no disposal, no alloc). */
+  const updateDust = (nowMs: Ms): void => {
+    for (let i = activeDust.length - 1; i >= 0; i--) {
+      const a = activeDust[i]!;
+      const p = (nowMs - a.startMs) / DUST_MS;
+      if (p >= 1) {
+        a.group.visible = false;
+        dustMaterial(a.group).opacity = 0;
+        dustPool.push(a.group);
+        activeDust.splice(i, 1);
+        continue;
+      }
+      const e = easeOut(Math.max(0, p));
+      // Fade out over the lifetime (ease-out, no bounce); position fixed at the fallen quarry's feet.
+      dustMaterial(a.group).opacity = (1 - e) * 0.7;
+    }
+  };
 
   /** Advance the controller, detect a state transition, and apply the matching tween pose. */
   const render = (rec: EnemyRecord, nowMs: Ms): void => {
@@ -181,6 +251,32 @@ export async function createEnemyLayer(
   const retire = (id: string, rec: EnemyRecord): void => {
     release(rec);
     enemies.delete(id);
+  };
+
+  /**
+   * A live quarry cleared WITHOUT a kill: under live motion, play a one-shot ESCAPE (lateral
+   * sprint-and-fade) and hand it to the fade-out set so a fresh spawn can't cut it short; under
+   * reduced motion, an INSTANT static fade (retire now - no frames to play). Already-retiring quarry
+   * (death/escape) are left alone. Returns true if the record was handed off (caller should not retire).
+   */
+  const escapeOff = (rec: EnemyRecord, nowMs: Ms): boolean => {
+    if (reduced) return false; // instant static fade: caller retires immediately
+    const cur = rec.ctrl.current();
+    if (cur === 'death' || cur === 'escape') return true; // already in a terminal play-out
+    playState(rec, 'escape', nowMs);
+    fadeouts.push(rec);
+    return true;
+  };
+
+  /**
+   * Drive a controller state AND pin the tween clock to the play instant, so a one-shot handed to the
+   * fade-out set (death/escape) animates from the moment it was triggered - not from the next update()
+   * frame that first notices the transition (which would restart its phase and freeze it at p=0).
+   */
+  const playState = (rec: EnemyRecord, state: EnemyState, nowMs: Ms, then: EnemyState | null = null): void => {
+    rec.ctrl.play(state, nowMs, then);
+    rec.shownState = state;
+    rec.stateStartMs = nowMs;
   };
 
   return {
@@ -216,13 +312,18 @@ export async function createEnemyLayer(
         baseScale,
         shownState: ctrl.current(),
         stateStartMs: nowMs,
+        // Bolt away from screen center: a quarry on the right of the arena runs right, and vice-versa
+        // (so the escape never sprints back through the crosshair). Fixed at spawn.
+        escapeDir: object.position.x >= 0 ? 1 : -1,
       };
       group.add(mesh);
+      lastNowMs = nowMs;
       render(rec, nowMs);
       enemies.set(id, rec);
     },
 
     update(nowMs: Ms): void {
+      lastNowMs = nowMs;
       for (const [id, rec] of enemies) {
         if (!reduced && rec.ctrl.isFinished(nowMs)) {
           retire(id, rec);
@@ -230,7 +331,7 @@ export async function createEnemyLayer(
         }
         render(rec, nowMs); // follows the (possibly weaving) target via applyPose → object.position
       }
-      // Dying quarry play out where they fell - independent of the live target's spawn/clear.
+      // Dying/escaping quarry play out where they fell - independent of the live target's spawn/clear.
       for (let i = fadeouts.length - 1; i >= 0; i--) {
         const rec = fadeouts[i]!;
         if (rec.ctrl.isFinished(nowMs)) {
@@ -240,10 +341,12 @@ export async function createEnemyLayer(
           render(rec, nowMs);
         }
       }
+      updateDust(nowMs);
     },
 
     fire(nowMs: Ms, view: [Degrees, Degrees], targets: ReadonlyArray<TargetHandle>): void {
       if (reduced) return; // no hit reactions (or miss tick) under reduced motion
+      lastNowMs = nowMs;
       let best: HitClass = 'miss';
       for (const t of targets) {
         const cls = classifyHit(view, t.bearing(), t.radiusDeg());
@@ -254,12 +357,16 @@ export async function createEnemyLayer(
         const cur = rec.ctrl.current();
         if (cur === 'death' || cur === 'escape') continue; // already retiring
         if (cls === 'kill') {
-          rec.ctrl.play('death', nowMs, null);
-          // Hand off to fadeouts: the instrument is about to clear + spawn, but the death plays on.
+          // Topple + sink + fade, pinned to the fire instant so it animates from now (not the next
+          // update frame). Hand off to fadeouts: the instrument is about to clear + spawn, but the
+          // death plays on.
+          playState(rec, 'death', nowMs, null);
           enemies.delete(t.id);
           fadeouts.push(rec);
+          // Punctuate the kill with a pooled dust-puff at the quarry's feet (reused, never allocated).
+          emitDust(rec.object.position, rec.baseScale, nowMs);
         } else if (cls === 'graze') {
-          rec.ctrl.play('flinch', nowMs, 'idle');
+          playState(rec, 'flinch', nowMs, 'idle');
         }
       }
       onShot?.(best); // 'miss' → the HUD flashes a miss tick; 'graze'/'kill' → the quarry itself reacts
@@ -267,11 +374,16 @@ export async function createEnemyLayer(
 
     remove(id: string): void {
       const rec = enemies.get(id);
-      if (rec) retire(id, rec); // a still-live record (e.g. reduced motion, where fire() never fades it out)
+      if (!rec) return;
+      enemies.delete(id);
+      // Cleared without a kill: a lateral sprint-and-fade (live) or an instant static fade (reduced).
+      if (!escapeOff(rec, lastNowMs)) retire(id, rec);
     },
 
     clear(): void {
-      for (const [id, rec] of enemies) retire(id, rec);
+      for (const [id, rec] of enemies) {
+        if (!escapeOff(rec, lastNowMs)) retire(id, rec);
+      }
       enemies.clear();
     },
 
@@ -280,6 +392,11 @@ export async function createEnemyLayer(
       enemies.clear();
       for (const rec of fadeouts) release(rec);
       fadeouts.length = 0;
+      // Free the pooled dust-puffs (allocated once on construction; active + free both live in `group`).
+      for (const d of dustPool) disposeDust(d);
+      for (const a of activeDust) disposeDust(a.group);
+      dustPool.length = 0;
+      activeDust.length = 0;
       if (scene) scene.remove(group);
       // Live + fadeout clones were disposed via release(); free the template last.
       for (const m of materialList(materialTemplate)) m.dispose();

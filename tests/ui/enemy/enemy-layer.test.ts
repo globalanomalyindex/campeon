@@ -199,3 +199,185 @@ describe('enemy-layer poses (live motion)', () => {
     layer.dispose();
   });
 });
+
+// ── P3-4: death / escape as real 3D transform motion, downstream of classifyHit / the lifecycle ──
+// A clean kill (classifyHit→kill) topples + sinks + fades and emits a pooled dust-puff; a live quarry
+// CLEARED without a kill (remove(id)/clear()) sprints laterally and fades instead of being instantly
+// cut. Both are handed to the fade-out set so a fresh spawn cannot snap them off mid-motion. These
+// read only cosmetic transform/opacity; the scored sphere/path is never touched. Reduced motion
+// collapses to an instant static fade (no lingering motion). Everything is pooled - no per-event alloc.
+describe('enemy-layer death / escape (P3-4)', () => {
+  const DIST = 20;
+  const RADIUS = 1.5;
+  const SPAWN_MS = (8 / 14) * 1000;
+  const DEATH_MS = (8 / 16) * 1000; // death: 8 frames @ 16fps
+  const ESCAPE_MS = (8 / 12) * 1000; // escape: 8 frames @ 12fps
+
+  /** Live quarry groups currently parented under the layer container (excludes pooled dust by name). */
+  function quarriesIn(scene: Scene): Group[] {
+    const layerGroup = scene.getObjectByName('enemy-layer') as Group;
+    return layerGroup.children.filter((c) => (c as Group).isGroup && c.name === 'quarry') as Group[];
+  }
+  /** Pooled dust-puff groups currently SHOWN (visible) under the layer container. */
+  function dustIn(scene: Scene): Group[] {
+    const layerGroup = scene.getObjectByName('enemy-layer') as Group;
+    return layerGroup.children.filter(
+      (c) => (c as Group).isGroup && c.name === 'quarry-dust' && c.visible,
+    ) as Group[];
+  }
+
+  it('a KILL topples (yaw + sink) and fades the quarry, and it plays on past a clear+respawn', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    const obj = targetAt(0, 0, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0);
+
+    // Settle to idle, then a centered shot (view==bearing) is a kill.
+    const idleMs = SPAWN_MS + 100;
+    layer.update(idleMs);
+    const handle = handleAt('t0', [0, 0], RADIUS);
+    layer.fire(idleMs, [0, 0], [handle]);
+
+    const quarry = quarriesIn(scene)[0]!;
+
+    // Mid-death: a topple yaw + a downward sink + a fade below full opacity.
+    layer.update(idleMs + DEATH_MS * 0.5);
+    expect(Math.abs(quarry.rotation.y)).toBeGreaterThan(0.2); // toppling over
+    expect(quarry.position.y).toBeLessThan(0); // sinking below the hitbox center
+    const ws = quarry.getObjectByName(WEAKSPOT_NAME) as Mesh;
+    expect((ws.material as { opacity: number }).opacity).toBeLessThan(1);
+    expect((ws.material as { opacity: number }).opacity).toBeGreaterThan(0);
+
+    // The instrument now clears + respawns (range free-play). The death plays on in the fade-out set:
+    // the dying quarry is NOT the freshly-spawned live one.
+    layer.clear();
+    const obj2 = targetAt(0, 0, -DIST);
+    layer.spawn('t1', obj2, RADIUS, idleMs + DEATH_MS * 0.5);
+    // Still present mid-death (handed off), plus the new live quarry → at least 2 quarry groups.
+    expect(quarriesIn(scene).length).toBeGreaterThanOrEqual(2);
+
+    // After the death duration the dying quarry is retired (gone), leaving only the live respawn.
+    layer.update(idleMs + DEATH_MS + 200);
+    expect(quarriesIn(scene)).not.toContain(quarry);
+    layer.dispose();
+  });
+
+  it('a KILL emits a pooled dust-puff that fades and is REUSED (no per-event allocation)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+
+    const kill = (id: string, t: number): void => {
+      const obj = targetAt(0, 0, -DIST);
+      layer.spawn(id, obj, RADIUS, t);
+      layer.update(t + SPAWN_MS + 100);
+      layer.fire(t + SPAWN_MS + 100, [0, 0], [handleAt(id, [0, 0], RADIUS)]);
+      layer.update(t + SPAWN_MS + 110);
+    };
+
+    kill('a', 0);
+    const afterFirst = dustIn(scene).length;
+    expect(afterFirst).toBeGreaterThanOrEqual(1); // a puff appeared
+
+    // Let the puff finish so it returns to the pool, then kill again - the pool is reused.
+    layer.update(10_000);
+    expect(dustIn(scene).length).toBe(0); // faded puff parked back in the pool (not shown)
+
+    kill('b', 10_000);
+    layer.update(20_000);
+    // Two kills must not have grown an unbounded set of dust geometries: the pool capacity is small.
+    // (We assert it never balloons with kills - a strict pool, not a per-event allocation.)
+    const total = (scene.getObjectByName('enemy-layer') as Group).children.filter(
+      (c) => c.name === 'quarry-dust',
+    ).length;
+    expect(total).toBeLessThanOrEqual(4);
+    layer.dispose();
+  });
+
+  it('clearing a LIVE quarry WITHOUT a kill sprints it laterally and fades it (escape), not an instant cut', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    const obj = targetAt(0, 0, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0);
+    const idleMs = SPAWN_MS + 100;
+    layer.update(idleMs);
+
+    const quarry = quarriesIn(scene)[0]!;
+    const x0 = quarry.position.x;
+
+    // No kill - the instrument simply cleared the trial. The quarry must run + fade, not vanish.
+    layer.remove!('t0');
+    // It is still on screen (handed to fade-outs), now in escape.
+    expect(quarriesIn(scene)).toContain(quarry);
+
+    layer.update(idleMs + ESCAPE_MS * 0.5);
+    expect(Math.abs(quarry.position.x - x0)).toBeGreaterThan(0.05); // lateral sprint off the spot
+    const ws = quarry.getObjectByName(WEAKSPOT_NAME) as Mesh;
+    expect((ws.material as { opacity: number }).opacity).toBeLessThan(1); // fading
+    expect((ws.material as { opacity: number }).opacity).toBeGreaterThan(0);
+
+    // A fresh spawn must NOT cut the escaping quarry short.
+    layer.spawn('t1', targetAt(2, 0, -DIST), RADIUS, idleMs + ESCAPE_MS * 0.5);
+    expect(quarriesIn(scene)).toContain(quarry);
+
+    // After the escape duration it is retired.
+    layer.update(idleMs + ESCAPE_MS + 200);
+    expect(quarriesIn(scene)).not.toContain(quarry);
+    layer.dispose();
+  });
+
+  it('clear() sends every live quarry into an escape fade-out (not an instant wipe)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    const idleMs = SPAWN_MS + 100;
+    layer.update(idleMs);
+    const quarry = quarriesIn(scene)[0]!;
+
+    layer.clear();
+    // Still present, escaping (not wiped instantly).
+    expect(quarriesIn(scene)).toContain(quarry);
+    layer.update(idleMs + ESCAPE_MS * 0.5);
+    const ws = quarry.getObjectByName(WEAKSPOT_NAME) as Mesh;
+    expect((ws.material as { opacity: number }).opacity).toBeLessThan(1);
+
+    layer.update(idleMs + ESCAPE_MS + 200);
+    expect(quarriesIn(scene)).not.toContain(quarry);
+    layer.dispose();
+  });
+
+  it('reduced motion: clear()/remove() is an INSTANT static fade - no lingering escape motion', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: true });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    layer.update(0);
+    expect(quarriesIn(scene).length).toBe(1);
+
+    // Under reduced motion the quarry is removed at once (no sprint-and-fade frames to play out).
+    layer.remove!('t0');
+    expect(quarriesIn(scene).length).toBe(0);
+
+    // And no dust-puff motion lingers either.
+    layer.update(50);
+    expect(dustIn(scene).length).toBe(0);
+    layer.dispose();
+  });
+
+  it('reduced motion: a kill is an instant fade with no dust-puff (no time-driven motion)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: true });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    layer.update(0);
+    // fire() is a no-op under reduced motion (no hit reactions), so a kill is handled via remove().
+    layer.remove!('t0');
+    layer.update(50);
+    expect(quarriesIn(scene).length).toBe(0);
+    expect(dustIn(scene).length).toBe(0);
+    layer.dispose();
+  });
+});

@@ -34,6 +34,9 @@ import type { InstrumentId } from '../../types';
 /** Name of the emissive weak-spot child, so the layer/tests can find + tween it. */
 export const WEAKSPOT_NAME = 'quarry-weakspot';
 
+/** Name of a pooled dust-puff group (the kick-up that punctuates a clean kill). */
+export const DUST_NAME = 'quarry-dust';
+
 /** Quarry height = K × the hitbox diameter, so the visible quarry ≈ the hittable disc. */
 export const ENEMY_SIZE_K = 1.7;
 /** Floor on quarry height (metres) so tiny-width targets stay visible. */
@@ -227,4 +230,49 @@ const BUILDERS: Record<InstrumentId, (m: QuarryMaterials) => QuarryMesh> = {
  */
 export function quarryMesh(id: InstrumentId, materials: QuarryMaterials = createQuarryMaterials()): QuarryMesh {
   return BUILDERS[id](materials);
+}
+
+/** Number of motes in one pooled dust-puff. Small + fixed - the puff is a punctuation, not a cloud. */
+const DUST_MOTES = 5;
+
+/**
+ * Build ONE pooled dust-puff group: a small cluster of faceted cream motes around the local origin.
+ * It carries its OWN material (so its opacity tween never stomps a quarry) and is reused across kills
+ * by the layer's pool - call this only `pool size` times, never per kill. Cosmetic only: no scored API,
+ * pure THREE, safe to unit-test. The layer positions it at the fallen quarry's feet and fades it out.
+ */
+export function dustPuff(): Group {
+  const mat = new MeshStandardMaterial({
+    color: parseHex(hex.cream),
+    roughness: 0.95,
+    metalness: 0,
+    flatShading: true,
+    transparent: true,
+    opacity: 0,
+  });
+  const g = new Group();
+  g.name = DUST_NAME;
+  for (let i = 0; i < DUST_MOTES; i++) {
+    const a = (i / DUST_MOTES) * Math.PI * 2;
+    const r = 0.12 + 0.05 * (i % 2);
+    const mote = new Mesh(new IcosahedronGeometry(0.06 + 0.02 * (i % 3), 0), mat);
+    mote.position.set(Math.cos(a) * r, -0.05 + 0.02 * i, Math.sin(a) * r);
+    g.add(mote);
+  }
+  g.visible = false;
+  return g;
+}
+
+/** The single shared material of a dust-puff group (for opacity tweens + disposal). */
+export function dustMaterial(g: Group): MeshStandardMaterial {
+  return ((g.children[0] as Mesh).material as MeshStandardMaterial);
+}
+
+/** Dispose a dust-puff's geometry + its shared material (called once per pooled puff on teardown). */
+export function disposeDust(g: Group): void {
+  g.traverse((o) => {
+    const mesh = o as Mesh;
+    if (mesh.isMesh) mesh.geometry.dispose();
+  });
+  dustMaterial(g).dispose();
 }
