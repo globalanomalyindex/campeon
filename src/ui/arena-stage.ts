@@ -1,6 +1,7 @@
 import { WebGLRenderer } from 'three';
 import { Arena, type InputSource } from '../engine/arena';
-import { createPsxPass } from '../engine/psx-pass';
+import { createPsxPass, type PostProcessor } from '../engine/psx-pass';
+import { createFilmPass } from '../engine/film-pass';
 import { createPointerLock } from '../input/pointer-lock';
 import { mulberry32 } from '../stats/rng';
 import { createViewmodel3D, asViewmodelLayer } from './viewmodel/viewmodel-3d';
@@ -35,9 +36,18 @@ export interface ArenaStage {
  */
 export function createArenaStage(
   host: HTMLElement,
-  opts: { canvas: HTMLCanvasElement; cm360: number; dpi: number; reducedMotion: boolean; rngSeed?: number },
+  opts: {
+    canvas: HTMLCanvasElement;
+    cm360: number;
+    dpi: number;
+    reducedMotion: boolean;
+    rngSeed?: number;
+    /** Post-FX look: 'film' (cinematic, default) or 'retro' (the PS1 PSX pass). */
+    postMode?: 'film' | 'retro';
+  },
 ): ArenaStage {
   const { canvas, cm360, dpi, reducedMotion } = opts;
+  const postMode = opts.postMode ?? 'film';
   let alive = true;
   let enemies: EnemyLayerHandle | null = null;
 
@@ -46,10 +56,16 @@ export function createArenaStage(
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const size = (): [number, number] => [window.innerWidth, window.innerHeight];
-  const psx = createPsxPass(renderer, size); // PS1 abyss: low-res + dither + posterize + scanlines
+  // Default: the cinematic film pass (warm ACES-ish tone-map + grain + vignette, gold #FFC400
+  // preserved). 'retro' keeps the PS1 PSX look selectable behind the same PostProcessor seam.
+  // reducedMotion is threaded through so the film grain freezes when the user opts out of motion.
+  const post: PostProcessor =
+    postMode === 'retro'
+      ? createPsxPass(renderer, size)
+      : createFilmPass(renderer, size, { reducedMotion });
   const pointer = createPointerLock(canvas);
   const input: InputSource = { onSample: (cb) => pointer.onSample(cb), onFire: (cb) => pointer.onFire(cb) };
-  const arena = new Arena({ renderer, input, size, cm360, dpi, rng: mulberry32(opts.rngSeed ?? 7), postProcessor: psx });
+  const arena = new Arena({ renderer, input, size, cm360, dpi, rng: mulberry32(opts.rngSeed ?? 7), postProcessor: post });
 
   // The in-scene 3D revolver attaches through the arena's viewmodel seam (mirrors attachEnemies):
   // the arena drives its look/fire/tick from the rig camera + fire events, so its recoil/sway springs

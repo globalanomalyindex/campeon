@@ -1,6 +1,7 @@
 import { WebGLRenderer } from 'three';
 import { Arena } from '../engine/arena';
 import { createPsxPass } from '../engine/psx-pass';
+import { createFilmPass } from '../engine/film-pass';
 import type { InputSource } from '../engine/arena';
 import { degreesPerCount } from '../engine/camera-rig';
 import { createPointerLock } from '../input/pointer-lock';
@@ -85,7 +86,16 @@ export function mountArenaHarness(root: HTMLElement): void {
     for (const cb of manualFire) cb();
   };
 
-  const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7), postProcessor: createPsxPass(renderer, size) });
+  // Post-FX look: the cinematic film pass is the default; append ?post=retro to the URL to A/B
+  // the PS1 PSX look behind the same PostProcessor seam (the human verifies both in Chromium).
+  const reducedMotion =
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const postMode = new URLSearchParams(location.search).get('post') === 'retro' ? 'retro' : 'film';
+  const post =
+    postMode === 'retro'
+      ? createPsxPass(renderer, size)
+      : createFilmPass(renderer, size, { reducedMotion });
+  const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7), postProcessor: post });
 
   const feedback = createShotFeedback(root); // miss tick - fire aimed off-target to see it
   let enemyLayer: EnemyLayerHandle | null = null;
