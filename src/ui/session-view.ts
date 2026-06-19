@@ -135,6 +135,11 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       };
 
       const runSegment = async (maxTrials: number, ciStopWidth: number | undefined): Promise<void> => {
+        if (running) return; // re-entry guard at the source: a second concurrent launch (a stacked
+        // begin double-click inside the async lock window, or any future caller) must never interleave
+        // the SHARED stateful (1+lambda)-ES engine + allTrials buffer. `running` is set synchronously
+        // below before the first await, so the second microtask sees it true and bails. cm/360 is never
+        // at risk (the gold sphere owns it); this protects the search lineage + live plot consistency.
         running = true;
         const { report, trials } = await runSession({
           dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
@@ -217,7 +222,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       beginBtn.addEventListener('click', () => {
         prelock.hidden = true;
         void stage.requestLock().then(begin).catch(begin);
-      });
+      }, { once: true }); // start is a one-shot; with the runSegment re-entry guard this closes the double-click vector
 
       cleanup = () => {
         alive = false;

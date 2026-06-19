@@ -132,6 +132,21 @@ describe('session-view: pre-lock begin state (P4-2)', () => {
     expect(begin.tagName).toBe('BUTTON');
     screen.unmount();
   });
+
+  it('begin is a one-shot: a stacked double-click launches exactly ONE segment (no interleaved ES lineage)', async () => {
+    // Two queued clicks inside the async lock window must not start two concurrent segments that
+    // share the stateful (1+lambda)-ES engine + trial buffer. The { once:true } listener plus the
+    // runSegment re-entry guard together collapse a double-click to a single launch. cm/360 is never
+    // at risk regardless (the gold sphere owns it); this protects the search lineage + live plot.
+    const { root, screen, requestLock, runSegment } = mountWithRunningSegment();
+    const begin = root.querySelector('[data-prelock="begin"]') as HTMLButtonElement;
+    begin.click();
+    begin.click(); // stacked double-click
+    await flush();
+    expect(requestLock).toHaveBeenCalledTimes(1);
+    expect(runSegment).toHaveBeenCalledTimes(1); // exactly one segment runner invoked
+    screen.unmount();
+  });
 });
 
 describe('session-view: abort scrim (P4-2)', () => {
