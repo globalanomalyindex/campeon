@@ -6,7 +6,7 @@ import type { InputSource } from '../engine/arena';
 import { degreesPerCount } from '../engine/camera-rig';
 import { createPointerLock } from '../input/pointer-lock';
 import { createEnemyLayer, type EnemyLayerHandle } from '../ui/enemy/enemy-layer';
-import { createViewmodel, type Viewmodel } from '../ui/viewmodel/viewmodel';
+import { createViewmodel3D, asViewmodelLayer } from '../ui/viewmodel/viewmodel-3d';
 import { createShotFeedback } from '../ui/feedback';
 import { AccelMeter, accelVerdict } from '../input/accel-check';
 import { mulberry32 } from '../stats/bootstrap';
@@ -108,26 +108,20 @@ export function mountArenaHarness(root: HTMLElement): void {
   };
   spawnTrio(); // gold spheres until the merc skin finishes loading
   // Cosmetic merc-prey skin: attach then respawn so targets are skinned. [q/w/e/r] swap environment.
-  void createEnemyLayer({ onShot: (r) => { if (r === 'miss') feedback.miss(); } }).then((layer) => {
+  void createEnemyLayer({ reducedMotion, onShot: (r) => { if (r === 'miss') feedback.miss(); } }).then((layer) => {
     enemyLayer = layer;
     arena.attachEnemies(layer);
     layer.setEnvironment('flick');
     spawnTrio();
   });
 
-  // Desert Eagle viewmodel - dithered/posterized at load to match the PSX arena (verify the composite).
-  let gun: Viewmodel | null = null;
-  void createViewmodel({}).then((vm) => {
-    gun = vm;
-    root.appendChild(vm.el);
-    vm.play('smoking'); // show the cig idle (the fixed loop) for verification
-  });
+  // In-scene 3D single-action revolver, attached through the arena's viewmodel seam (the arena owns
+  // its look/fire/tick/dispose, mirroring attachEnemies). Replaces the old 2D Deagle overlay here so
+  // the dev harness verifies the stack that actually ships.
+  arena.attachViewmodel(asViewmodelLayer(createViewmodel3D({ reducedMotion })));
 
   let view: [number, number] = [0, 0];
-  let prevAim: [number, number] | null = null;
   arena.onAim((_s, v) => {
-    if (prevAim) gun?.look(v[0] - prevAim[0], v[1] - prevAim[1]); // feed look deltas → weapon sway
-    prevAim = v;
     view = v;
   });
 
@@ -184,7 +178,6 @@ export function mountArenaHarness(root: HTMLElement): void {
     last = ts;
     arena.tick(dt);
     arena.render();
-    gun?.tick(ts);
     refreshHud();
     raf = window.requestAnimationFrame(loop);
   };
@@ -249,7 +242,6 @@ export function mountArenaHarness(root: HTMLElement): void {
       window.cancelAnimationFrame(raf);
       offMeter();
       feedback.dispose();
-      gun?.dispose();
       pointer.dispose();
       arena.dispose();
       delete window.__arenaDebug;

@@ -62,9 +62,12 @@ const mkMat = (color: number, opts: { metalness: number; roughness: number }): M
 /** Build a fresh, group-owned set of palette materials. Dispose all via `revolverMaterialList()`. */
 export function createRevolverMaterials(): RevolverMaterials {
   return {
-    steel: mkMat(parseHex(hex.gunmetal), { metalness: 0.85, roughness: 0.45 }),
+    // Low metalness on the steel/brass so they read as lit form under direct light WITHOUT an
+    // environment map (a high-metalness PBR surface with nothing to reflect renders near-black). This
+    // is the stylized low-poly read, not photoreal chrome.
+    steel: mkMat(parseHex(hex.gunmetal), { metalness: 0.35, roughness: 0.5 }),
     wood: mkMat(parseHex(hex.wood), { metalness: 0.0, roughness: 0.7 }),
-    brass: mkMat(parseHex(hex.brass), { metalness: 0.9, roughness: 0.35 }),
+    brass: mkMat(parseHex(hex.brass), { metalness: 0.45, roughness: 0.4 }),
   };
 }
 

@@ -20,6 +20,8 @@ export interface FilmOptions {
   grain?: number;
   /** Mild edge chromatic offset in low-res texels at the frame corners (default 0.6; 0 disables). */
   chroma?: number;
+  /** Pre-tone-map exposure multiplier (default 1.32): lifts subjects out of the near-black backdrop. */
+  exposure?: number;
   /**
    * Freeze the grain clock for prefers-reduced-motion. When true the time uniform
    * never advances, so the grain renders as a single static frozen layer.
@@ -51,6 +53,7 @@ uniform float uTime;
 uniform float uVig;
 uniform float uGrain;
 uniform float uChroma;
+uniform float uExposure;
 uniform vec3 uGold;
 
 // ACES filmic approximation (Narkowicz 2015) - cheap, single-instruction-friendly.
@@ -81,8 +84,9 @@ void main() {
   c.g = texture2D(tDiffuse, vUv).g;
   c.b = texture2D(tDiffuse, vUv - off).b;
 
-  // tone-map to a filmic curve
-  c = aces(c);
+  // exposure lift then tone-map to a filmic curve - the lift pulls the low-poly subjects out of the
+  // near-black backdrop while ACES keeps the highlights (and the gold anchor) from clipping.
+  c = aces(c * uExposure);
 
   // warm film tint: lift toward the aged-cream highlights / warm-shadow stock, but blend by
   // luma so the saturated gold anchor stays legible (the crosshair/weak-spot must not crush).
@@ -141,6 +145,7 @@ export function createFilmPass(
     uVig: { value: opts.vignette ?? 0.34 },
     uGrain: { value: opts.grain ?? 0.06 },
     uChroma: { value: opts.chroma ?? 0.6 },
+    uExposure: { value: opts.exposure ?? 1.32 },
     uGold: { value: gold },
   };
   const material = new ShaderMaterial({

@@ -83,7 +83,7 @@ function parseHex(h: string): number {
 /** Build a fresh, layer-owned set of palette materials. Dispose all via `materialList()`. */
 export function createQuarryMaterials(): QuarryMaterials {
   return {
-    hide: mkBody(parseHex(hex.ink)),
+    hide: mkBody(parseHex(hex.hide)),
     accent: mkBody(parseHex(hex.cream), 0.7),
     mark: mkBody(parseHex(hex.blood), 0.6),
     weakspot: new MeshStandardMaterial({

@@ -123,13 +123,20 @@ export class Arena implements ArenaScene {
   private buildEnvironment(): void {
     this.scene.background = new Color('#0c0b09'); // warm cinema-ink, matches the app-wide film stock
     // Warm film-stock lighting: a cream sky over a warm ground, so lit surfaces read warm not blue-grey.
-    const hemi = new HemisphereLight(0xe7dcc4, 0x191510, 1.0);
-    const dir = new DirectionalLight(0xfff3e2, 0.6); // faintly warm key light
-    dir.position.set(3, 10, 4);
+    // Tuned so the low-poly 3D quarry + revolver (low-metalness, no environment map) read as lit FORM
+    // against the near-black backdrop without washing out the moody spaghetti-western mood.
+    const hemi = new HemisphereLight(0xe7dcc4, 0x191510, 1.35);
+    const key = new DirectionalLight(0xfff3e2, 1.1); // warm key, high front-right
+    key.position.set(3, 10, 4);
+    // Warm rim/back light (the spaghetti-western low sun). It sits BEYOND the forward targets (negative
+    // z, past them) so its rays strike their far faces and halo the silhouette edges against the dark
+    // arena - true rim separation, not a front fill. Strong + saturated-warm for a dramatic edge.
+    const rim = new DirectionalLight(0xffac5a, 1.5);
+    rim.position.set(6, 7, -24);
     // Floor grid: warm cream-tinted hairlines over the cinema-ink, not the old cool blue-grey.
     const grid = new GridHelper(200, 80, 0x3a342a, 0x16130e);
     grid.position.y = -3;
-    this.scene.add(hemi, dir, grid);
+    this.scene.add(hemi, key, rim, grid);
     this.envDisposables.push(grid); // GridHelper owns a BufferGeometry + LineBasicMaterial
   }
 
