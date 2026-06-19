@@ -1,13 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { Group, Mesh, Object3D, Scene, Vector3 } from 'three';
+import { Group, Mesh, MeshStandardMaterial, Object3D, Scene, Vector3 } from 'three';
 import { createEnemyLayer } from '../../../src/ui/enemy/enemy-layer';
 import { quarryWorldHeight, WEAKSPOT_NAME } from '../../../src/ui/enemy/meshes';
+import type { Degrees, TargetHandle } from '../../../src/types';
 
 /** A bare arena target stand-in: an Object3D at a world position, hidden when the skin attaches. */
 function targetAt(x: number, y: number, z: number): Object3D {
   const o = new Object3D();
   o.position.set(x, y, z);
   return o;
+}
+
+/** A bearings-only TargetHandle stand-in for fire() (cosmetic classifyHit reads bearing/radius). */
+function handleAt(id: string, bearing: [Degrees, Degrees], radiusDeg: Degrees): TargetHandle {
+  return { id, bearing: () => bearing, radiusDeg: () => radiusDeg };
+}
+
+/** The weak-spot's per-instance emissive intensity (a per-record clone, so safe to read directly). */
+function emissiveOf(quarry: Group): number {
+  const ws = quarry.getObjectByName(WEAKSPOT_NAME) as Mesh;
+  return (ws.material as MeshStandardMaterial).emissiveIntensity;
 }
 
 /** Find the single quarry group the layer added to the scene under its container. */
@@ -89,6 +101,101 @@ describe('enemy-layer (3D quarry)', () => {
     // Static idle: opacity fully on (no fade-in), full-scale (no 0.4→1 spawn growth).
     const ws = quarry.getObjectByName(WEAKSPOT_NAME) as Mesh;
     expect((ws.material as { opacity: number }).opacity).toBe(1);
+    layer.dispose();
+  });
+});
+
+// ── poseFor() under live (non-reduced) motion: controller states drive transform/opacity/emissive ──
+// These pin the heart of P3-2 - the spawn ramp, idle breathing bound, and flinch recoil/settle - so a
+// regression that broke the fade-in, the easeOut curve, or the graze reaction fails the suite. They
+// read only cosmetic transform/opacity/emissive; the scored sphere/path is never touched here.
+describe('enemy-layer poses (live motion)', () => {
+  const DIST = 20;
+  const RADIUS = 1.5;
+  const SPAWN_MS = (8 / 14) * 1000; // spawn: 8 frames @ 14fps
+  const FLINCH_MS = (8 / 16) * 1000; // flinch: 8 frames @ 16fps
+
+  it('spawn ramps opacity 0→1 and scale 0.4→1 across the spawn duration (easeOut, no bounce)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    const obj = targetAt(0, 0, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0); // controller starts on 'spawn', follow-up 'idle'
+
+    const base = quarryWorldHeight(DIST, RADIUS);
+    const quarry = quarryGroupIn(scene);
+
+    // t=0: bottom of the ramp - faded out and shrunk to the 0.4 floor.
+    layer.update(0);
+    const ws0 = quarry.getObjectByName(WEAKSPOT_NAME) as Mesh;
+    expect((ws0.material as { opacity: number }).opacity).toBeCloseTo(0, 6);
+    expect(quarry.scale.x).toBeCloseTo(0.4 * base, 6);
+
+    // Mid-spawn: strictly between the endpoints (the ramp is moving), still below full.
+    layer.update(SPAWN_MS * 0.5);
+    expect((ws0.material as { opacity: number }).opacity).toBeGreaterThan(0);
+    expect((ws0.material as { opacity: number }).opacity).toBeLessThan(1);
+    expect(quarry.scale.x).toBeGreaterThan(0.4 * base);
+    expect(quarry.scale.x).toBeLessThan(base);
+
+    // End of spawn: settled to full opacity + full scale, never overshooting (no bounce).
+    layer.update(SPAWN_MS - 1);
+    expect((ws0.material as { opacity: number }).opacity).toBeGreaterThan(0.95);
+    expect((ws0.material as { opacity: number }).opacity).toBeLessThanOrEqual(1);
+    expect(quarry.scale.x).toBeLessThanOrEqual(base + 1e-9);
+    layer.dispose();
+  });
+
+  it('idle breathing stays within ±2% of base scale (bounded, no growth, no bounce)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    const obj = targetAt(0, 0, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0);
+    const base = quarryWorldHeight(DIST, RADIUS);
+    const quarry = quarryGroupIn(scene);
+
+    // Sample across a full idle cycle, well past the spawn ramp - scale must hold inside the band.
+    for (let t = SPAWN_MS + 50; t < SPAWN_MS + 2000; t += 73) {
+      layer.update(t);
+      expect(quarry.scale.x).toBeGreaterThanOrEqual(base * 0.98 - 1e-6);
+      expect(quarry.scale.x).toBeLessThanOrEqual(base * 1.02 + 1e-6);
+    }
+    layer.dispose();
+  });
+
+  it('a graze drives flinch: a yaw/scale deviation that settles back, and a weak-spot emissive flare', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    const obj = targetAt(0, 0, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0);
+    const quarry = quarryGroupIn(scene);
+
+    // Let the spawn finish so the controller is idling (flinch only plays out of a live state).
+    const idleMs = SPAWN_MS + 100;
+    layer.update(idleMs);
+    const idleEmissive = emissiveOf(quarry);
+
+    // A graze: separation between RADIUS and 2.5×RADIUS. bearing [0,0], view [3,0] → sep 3° (1.5<3<3.75).
+    const handle = handleAt('t0', [0, 0], RADIUS);
+    layer.fire(idleMs, [3, 0], [handle]);
+
+    // Register the flinch transition (resets the tween clock to its start) before sampling mid-state.
+    layer.update(idleMs);
+
+    // Mid-flinch: a visible yaw recoil + scale dip, and the weak-spot emissive flares above idle.
+    const midMs = idleMs + FLINCH_MS * 0.5;
+    layer.update(midMs);
+    const base = quarryWorldHeight(DIST, RADIUS);
+    expect(Math.abs(quarry.rotation.y)).toBeGreaterThan(0.05); // yaw kicked off zero
+    expect(quarry.scale.x).toBeLessThan(base); // recoil dip below full
+    expect(emissiveOf(quarry)).toBeGreaterThan(idleEmissive); // flare
+
+    // After flinch completes it auto-returns to idle: yaw settles near zero, scale back in the band.
+    layer.update(idleMs + FLINCH_MS + 60);
+    expect(Math.abs(quarry.rotation.y)).toBeLessThan(0.12); // within the idle yaw envelope
+    expect(quarry.scale.x).toBeGreaterThanOrEqual(base * 0.98 - 1e-6);
     layer.dispose();
   });
 });

@@ -5,17 +5,25 @@ import { ANIMATIONS, type EnemyState } from './atlas';
 import { EnemyController } from './controller';
 import { classifyHit, type HitClass } from './hit';
 import {
+  cloneQuarryMaterials,
   createQuarryMaterials,
   materialList,
   quarryMesh,
   quarryWorldHeight,
   WEAKSPOT_NAME,
+  type QuarryMaterials,
   type QuarryMesh,
 } from './meshes';
 
 interface EnemyRecord {
-  /** The cosmetic quarry group (children share QUARRY_MATERIALS - never disposed per-record). */
+  /** The cosmetic quarry group. Its children reference THIS record's own cloned material set. */
   mesh: QuarryMesh;
+  /**
+   * Per-instance clone of the layer's material template. Owned by the record so opacity/emissive
+   * tweens write only to THIS quarry (no last-writer-wins between coexisting quarries); disposed in
+   * release(). Geometries are likewise per-group.
+   */
+  materials: QuarryMaterials;
   /** Emissive weak-spot at the group origin, pulsed/flared by the state tweens. */
   weakspot: Mesh;
   ctrl: EnemyController;
@@ -98,11 +106,11 @@ function applyPose(rec: EnemyRecord, pose: Pose): void {
   rec.mesh.position.y += rec.baseScale * pose.lift;
   rec.mesh.rotation.y = pose.yaw;
   (rec.weakspot.material as MeshStandardMaterial).emissiveIntensity = pose.emissive;
-  // Opacity: fade the whole skin via material transparency (shared materials, so set per-frame).
+  // Opacity: fade the whole skin via material transparency (per-record clones, so no cross-stomp).
   setOpacity(rec.mesh, pose.opacity);
 }
 
-/** Set transparency on every mesh material in the group (shared materials - last writer wins). */
+/** Set transparency on every mesh material in the group (per-record clones - no cross-stomp). */
 function setOpacity(g: Group, opacity: number): void {
   g.traverse((o) => {
     const mesh = o as Mesh;
@@ -138,8 +146,9 @@ export async function createEnemyLayer(
 
   const group = new Group();
   group.name = 'enemy-layer';
-  // One layer-owned material set shared across this layer's spawns + disposed on teardown.
-  const materials = createQuarryMaterials();
+  // Layer-owned material TEMPLATE: never attached to a rendered mesh - each spawn clones it so its
+  // opacity/emissive tweens stay per-instance. Disposed on teardown alongside any live clones.
+  const materialTemplate = createQuarryMaterials();
   const enemies = new Map<string, EnemyRecord>();
   const fadeouts: EnemyRecord[] = []; // dying quarry handed off here so a new spawn/clear can't cut them short
   let activeEnv: InstrumentId = 'flick';
@@ -161,11 +170,13 @@ export async function createEnemyLayer(
 
   const release = (rec: EnemyRecord): void => {
     group.remove(rec.mesh);
-    // Geometries are per-group (cheap primitives); materials are SHARED and disposed once on dispose().
+    // Geometries AND materials are per-record (the materials are this rec's own clone of the
+    // template), so both are disposed here - nothing shared leaks or is freed twice.
     rec.mesh.traverse((o) => {
       const mesh = o as Mesh;
       if (mesh.isMesh) mesh.geometry.dispose();
     });
+    for (const m of materialList(rec.materials)) m.dispose();
   };
   const retire = (id: string, rec: EnemyRecord): void => {
     release(rec);
@@ -183,7 +194,10 @@ export async function createEnemyLayer(
     },
 
     spawn(id: string, object: Object3D, radiusDeg: number, nowMs: Ms): void {
-      const mesh = quarryMesh(activeEnv, materials);
+      // Each quarry gets its OWN material clone so a dying quarry fading out and a fresh spawn
+      // ramping in (both rendered in the same update pass) tween independently - no shared stomping.
+      const recMaterials = cloneQuarryMaterials(materialTemplate);
+      const mesh = quarryMesh(activeEnv, recMaterials);
       const weakspot = mesh.getObjectByName(WEAKSPOT_NAME) as Mesh;
       // Size to the hitbox: world height = K × the hitbox diameter (worldRadius = dist·tan(radiusDeg)),
       // EXACTLY as the sprite billboard. Aiming at the quarry lands in the hitbox; a small-width flick
@@ -195,6 +209,7 @@ export async function createEnemyLayer(
       const ctrl = new EnemyController(reduced ? 'idle' : 'spawn', nowMs, reduced ? null : 'idle');
       const rec: EnemyRecord = {
         mesh,
+        materials: recMaterials,
         weakspot,
         ctrl,
         object,
@@ -266,7 +281,8 @@ export async function createEnemyLayer(
       for (const rec of fadeouts) release(rec);
       fadeouts.length = 0;
       if (scene) scene.remove(group);
-      for (const m of materialList(materials)) m.dispose();
+      // Live + fadeout clones were disposed via release(); free the template last.
+      for (const m of materialList(materialTemplate)) m.dispose();
     },
   };
 }

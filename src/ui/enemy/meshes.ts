@@ -94,6 +94,20 @@ export function createQuarryMaterials(): QuarryMaterials {
   };
 }
 
+/**
+ * Clone a material set so each spawned quarry tweens its OWN opacity/emissive without stomping a
+ * sibling that shares the layer's template. Geometries are already per-group; this makes the
+ * animated channels per-instance too. The clone is owned by the record and disposed on release.
+ */
+export function cloneQuarryMaterials(m: QuarryMaterials): QuarryMaterials {
+  return {
+    hide: m.hide.clone(),
+    accent: m.accent.clone(),
+    mark: m.mark.clone(),
+    weakspot: m.weakspot.clone(),
+  };
+}
+
 /** Every material in a set, for disposal. */
 export function materialList(m: QuarryMaterials): readonly MeshStandardMaterial[] {
   return [m.hide, m.accent, m.mark, m.weakspot];
