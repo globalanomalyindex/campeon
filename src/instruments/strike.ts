@@ -33,15 +33,21 @@ export function analyzeStrike(shots: readonly StrikeShot[], ctx: TrialContext): 
   const score = Math.pow(speedTerm, w) * Math.pow(Math.max(0, hitRate), 1 - w);
 
   // P1-1 reliability: combine the measured speed SE and the measured accuracy SE into a score SE via
-  // the delta method. score = speedTerm^w · hitRate^(1−w), so the speed term contributes its RELATIVE
-  // SE d(ttk)/ttk with weight w. The accuracy term is the SE of the endpoint scatter, σ_θ/√n (degrees,
-  // per ISO the natural reliability of the endpoint estimate); we express it relative to a 1° reference
-  // with weight (1−w), so a larger scatter (a noisier, less-trustworthy trial) widens the nugget.
-  // Both relative SEs add in quadrature. 0 spread → no SE (flat-nugget fallback); never fabricated.
+  // the delta method. score = speedTerm^w · hitRate^(1−w), so each factor contributes its RELATIVE
+  // SE with its exponent as the weight, and the two add in quadrature.
+  //  - Speed term: d(ttk)/ttk from the measured per-shot TTK spread.
+  //  - Accuracy term: the score's accuracy factor is the hit rate H, a binomial proportion over n
+  //    shots, so its relative SE follows mechanically from the score's own functional form:
+  //    SE(H)/H with SE(H) = √(H(1−H)/n). Plain plug-in estimator on purpose - a Wilson/Jeffreys
+  //    prior would smuggle an unmeasured scale back into the nugget. σ_θ (endpoint scatter) is NOT
+  //    the score's accuracy factor; it stays in `raw` as a diagnostic only.
+  //  Edges follow the never-fabricate rules: H = 0 → score is 0 and the guard below already emits
+  //  no SE; H = 1 → the plug-in spread is honestly 0, so no accuracy SE is emitted. H = 1 sessions
+  //  therefore emit fewer nuggets - only the measured speed term remains, or no scoreSE at all when
+  //  the TTK spread is also 0 (those observations fall back to the flat nugget).
   const ttkSE = sampleStd(shots.map((s) => (s.tR + s.tS) / 1000)) / Math.sqrt(n); // SE of TTK (s)
   const relSpeed = ttkSE / ttkSec; // d(speedTerm)/speedTerm = d(ttk)/ttk
-  const ACC_REF_DEG = 1; // reference angular scale: σ_θ/√n read as a fraction of one degree
-  const relAcc = sigmaTheta / Math.sqrt(n) / ACC_REF_DEG; // grows with measured scatter
+  const relAcc = hitRate > 0 && hitRate < 1 ? Math.sqrt((hitRate * (1 - hitRate)) / n) / hitRate : 0;
   const relScore = Math.hypot(w * relSpeed, (1 - w) * relAcc);
   const scoreSE = Number.isFinite(score) && score > 0 && relScore > 0 ? score * relScore : undefined;
 
