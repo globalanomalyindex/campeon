@@ -17,7 +17,7 @@ import {
 } from '../scoring/fitts';
 import { mean } from '../scoring/stats';
 import { segment } from '../scoring/submovement';
-import { speedTrace, type Frame } from './recording';
+import { missComponents, speedTrace, type Frame } from './recording';
 import { separation } from '../engine/targets';
 
 const ID: InstrumentId = 'flick';
@@ -133,12 +133,14 @@ export const flick = {
     let idx = 0;
     let handle: TargetHandle | null = null;
     let presentedAt = 0;
+    let presentAim: [Degrees, Degrees] = [0, 0]; // aim at present time - the start of the reach
     let reachFrames: Frame[] = [];
 
     return new Promise<TrialResult>((resolve) => {
       const present = (now: Ms): void => {
         const c = order[idx]!;
         const view = scene.view();
+        presentAim = view;
         const dir = ctx.rng() * Math.PI * 2;
         const yaw = view[0] + c.amplitude * Math.cos(dir);
         const pitch = Math.max(-40, Math.min(40, view[1] + c.amplitude * Math.sin(dir)));
@@ -160,8 +162,11 @@ export const flick = {
         const aim = scene.view();
         const tgt = handle.bearing();
         const radial = separation(aim, tgt);
-        // Sequential flick: the endpoint error along the approach axis is the signed radial miss.
-        const errAlong = radial * (aim[0] >= tgt[0] ? 1 : -1);
+        // ISO 9241-9 along-axis endpoint error: the miss (landing - target) PROJECTED onto the
+        // start->target unit axis, + = overshoot. (The old proxy signed the TOTAL radial miss by
+        // yaw order, so on near-vertical reaches the sign tracked the horizontal wobble - inflating
+        // We and cancelling real bias out of Ae.)
+        const errAlong = missComponents(presentAim, tgt, aim).radial;
         let nCorr = 0;
         try {
           nCorr = segment(speedTrace(reachFrames), { onsetThresh: 20 }).nCorr;
