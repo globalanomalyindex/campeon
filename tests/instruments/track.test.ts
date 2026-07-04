@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { analyzeTrack, bestLag, track } from '../../src/instruments/track';
+import { describe, it, expect, vi } from 'vitest';
+import { analyzeTrack, bestLag, lagEstimator, track } from '../../src/instruments/track';
 import type { Frame } from '../../src/instruments/recording';
 import type { TrialContext } from '../../src/types';
 import { mulberry32 } from '../../src/stats/bootstrap';
@@ -33,9 +33,16 @@ describe('analyzeTrack', () => {
     expect(good.score).toBeGreaterThan(laggy.score);
   });
 
-  it('emits NO scoreSE - a single continuous recording falls back to the flat nugget (P1-1)', () => {
+  // UPDATED for A3: this test previously pinned the P1-1 decision that track emits NO scoreSE
+  // (single continuous recording, no within-trial replicates). A3 deliberately revisits that
+  // decision: the recording is split into disjoint time blocks and the block-to-block spread of
+  // the SAME composite score is a real, measured within-trial SE. A long trial with genuine
+  // frame-to-frame variation must now carry one.
+  it('emits a MEASURED batch-means scoreSE on a long trial with real block-to-block spread (A3)', () => {
     const r = analyzeTrack({ frames: tracking(0), fires: [] }, ctx());
-    expect(r.scoreSE).toBeUndefined();
+    expect(r.scoreSE).toBeDefined();
+    expect(r.scoreSE!).toBeGreaterThan(0);
+    expect(Number.isFinite(r.scoreSE!)).toBe(true);
   });
 
   it('flags reactive lag with a negative predictive index', () => {
@@ -77,6 +84,74 @@ describe('analyzeTrack', () => {
     expect(r.instrument).toBe('track');
     expect(Number.isFinite(r.score)).toBe(true);
     expect(r.cm360).toBe(34);
+  });
+});
+
+describe('batch-means scoreSE (A3)', () => {
+  // A noisy tracker: aim = target + seeded uniform noise, so disjoint time blocks genuinely differ.
+  function noisyTracking(seed: number, n = 240): Frame[] {
+    const rng = mulberry32(seed);
+    const frames: Frame[] = [];
+    const targetAt = (i: number): [number, number] => [
+      10 * Math.sin(i * 0.05),
+      3 * Math.sin(i * 0.04),
+    ];
+    for (let i = 0; i < n; i++) {
+      const tgt = targetAt(i);
+      frames.push({
+        t: i * 16,
+        aim: [tgt[0] + (rng() - 0.5) * 2, tgt[1] + (rng() - 0.5) * 2],
+        target: tgt,
+        targetRadius: 2.5,
+      });
+    }
+    return frames;
+  }
+
+  // A frozen trial: aim pinned exactly on a stationary target. Every block computes the identical
+  // composite score, so the block spread is exactly 0.
+  function frozen(n = 240): Frame[] {
+    const frames: Frame[] = [];
+    for (let i = 0; i < n; i++)
+      frames.push({ t: i * 16, aim: [0, 0], target: [0, 0], targetRadius: 2.5 });
+    return frames;
+  }
+
+  it('zero block-to-block spread emits NO scoreSE (never fabricate)', () => {
+    const r = analyzeTrack({ frames: frozen(), fires: [] }, ctx());
+    expect(r.scoreSE).toBeUndefined();
+  });
+
+  it('a noisy-across-blocks trial yields a positive finite scoreSE', () => {
+    const r = analyzeTrack({ frames: noisyTracking(11), fires: [] }, ctx());
+    expect(r.scoreSE).toBeDefined();
+    expect(r.scoreSE!).toBeGreaterThan(0);
+    expect(Number.isFinite(r.scoreSE!)).toBe(true);
+  });
+
+  it('a trial too short to split into >= 2 blocks emits NO scoreSE (degenerate fallback)', () => {
+    const r = analyzeTrack({ frames: noisyTracking(11, 40), fires: [] }, ctx());
+    expect(r.scoreSE).toBeUndefined();
+  });
+
+  it('holds the whole-trial latency L FIXED across blocks: bestLag runs exactly once', () => {
+    // Recomputing bestLag on short blocks would inject the lag ESTIMATOR's own sampling noise into
+    // the block spread and report it as player variability - fabricated signal. The block SE must
+    // reuse the one whole-trial L, so the lag estimator is invoked exactly once per analysis.
+    const spy = vi.spyOn(lagEstimator, 'bestLag');
+    try {
+      const r = analyzeTrack({ frames: noisyTracking(11), fires: [] }, ctx());
+      expect(r.scoreSE).toBeDefined(); // the block machinery genuinely ran...
+      expect(spy).toHaveBeenCalledTimes(1); // ...on the single whole-trial lag
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('the scoreSE is deterministic for identical recordings', () => {
+    const a = analyzeTrack({ frames: noisyTracking(3), fires: [] }, ctx());
+    const b = analyzeTrack({ frames: noisyTracking(3), fires: [] }, ctx());
+    expect(a.scoreSE).toBe(b.scoreSE);
   });
 });
 

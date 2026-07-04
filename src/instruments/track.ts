@@ -1,12 +1,30 @@
 import type { ArenaScene, Degrees, InstrumentId, TrialContext, TrialResult } from '../types';
 import { KalmanCV } from '../scoring/kalman';
-import { timeOnTarget, TrialRecorder, type Recording } from './recording';
+import { timeOnTarget, TrialRecorder, type Frame, type Recording } from './recording';
 import { separation } from '../engine/targets';
 
 const ID: InstrumentId = 'track';
 const DURATION_MS = 6000;
 const FC_HZ = 4; // jitter cutoff: task motion below, tremor above
 const MAX_LEAD_SEC = 0.3; // clamp band for the measured tracking latency (a sane human range)
+
+// DESIGNED scalarization (disclosed, A3): the track score folds four MEASURED but unit-
+// incommensurate components - tot (fraction on target), predErr (deg), jitter (deg/s),
+// slipRms (deg/s) - into one preference number with these three weights. The weights are
+// design choices tuned by feel, NOT measured quantities: they carry no uncertainty claim
+// and no CI may ever be attached to them. What IS measured is each component, and (below)
+// the block-to-block spread of the whole composite.
+const W_PRED = 0.02;
+const W_JITTER = 0.01;
+const W_SLIP = 0.01;
+
+// A3 batch-means blocking: target up to BLOCK_TARGET_K disjoint contiguous time blocks
+// (spec target 4..6), each at least MIN_BLOCK_FRAMES frames (~0.5 s at 60 Hz) so a per-block
+// composite is not itself dominated by estimator noise; every term additionally needs
+// MIN_TERM_SAMPLES real samples in every block or we emit nothing.
+const BLOCK_TARGET_K = 6;
+const MIN_BLOCK_FRAMES = 30;
+const MIN_TERM_SAMPLES = 8;
 
 function rms(xs: readonly number[]): number {
   if (xs.length === 0) return 0;
@@ -89,6 +107,65 @@ export function bestLag(
   return best;
 }
 
+/** Indirection seam over the lag estimator so tests can assert it runs EXACTLY ONCE per analysis
+ *  (the A3 block SE must reuse the single whole-trial L, never re-estimate it on short blocks). */
+export const lagEstimator = { bestLag };
+
+/**
+ * A3: MEASURED within-trial standard error of the composite track score via batch means.
+ *
+ * The trial's frames are split into k disjoint contiguous time blocks and the SAME designed
+ * composite (tot - W_PRED*rms(pred) - W_JITTER*rms(jit) - W_SLIP*rms(slip)) is computed per block;
+ * scoreSE = sd(blockScores)/sqrt(k). Every whole-trial estimator is held FIXED across blocks: the
+ * latency L (so `predResidAt` is the whole-trial lag-compensated residual, merely partitioned),
+ * the Kalman target-velocity track behind `slip`, and the jitter low-pass state. Re-estimating any
+ * of them on a short block would inject that ESTIMATOR's own small-sample noise into the block
+ * spread and report it as player variability - fabricated signal.
+ *
+ * Known bias, disclosed: batch means over an AUTOCORRELATED series underestimates the long-run
+ * variance (positive correlation leaks across block boundaries), so this SE is biased LOW. That
+ * bias is bounded downstream: objective.ts clamps the mapped per-point nugget to at least
+ * floorFrac*noiseVar, so an underestimated SE can never claim more trust than that floor allows.
+ *
+ * Never fabricate: emits undefined (flat-nugget fallback) when the trial is too short for >= 2
+ * adequate blocks, when any block lacks real samples of a term, or when the block spread is 0.
+ */
+function batchMeansScoreSE(
+  frames: readonly Frame[],
+  predResidAt: readonly (number | null)[],
+  jitterResid: readonly number[], // entry i-1 belongs to frame i
+  slip: readonly number[], // entry i-1 belongs to frame i
+): number | undefined {
+  const n = frames.length;
+  const k = Math.min(BLOCK_TARGET_K, Math.floor(n / MIN_BLOCK_FRAMES));
+  if (k < 2) return undefined;
+  const blockScores: number[] = [];
+  for (let b = 0; b < k; b++) {
+    const lo = Math.floor((b * n) / k);
+    const hi = Math.floor(((b + 1) * n) / k);
+    const pred: number[] = [];
+    const jit: number[] = [];
+    const sl: number[] = [];
+    for (let i = lo; i < hi; i++) {
+      const p = predResidAt[i];
+      if (p !== null && p !== undefined) pred.push(p);
+      if (i >= 1) {
+        jit.push(jitterResid[i - 1]!);
+        sl.push(slip[i - 1]!);
+      }
+    }
+    if (pred.length < MIN_TERM_SAMPLES || jit.length < MIN_TERM_SAMPLES) return undefined;
+    const tot = timeOnTarget(frames.slice(lo, hi));
+    blockScores.push(tot - W_PRED * rms(pred) - W_JITTER * rms(jit) - W_SLIP * rms(sl));
+  }
+  const mu = mean(blockScores);
+  let sq = 0;
+  for (const s of blockScores) sq += (s - mu) * (s - mu);
+  const sd = Math.sqrt(sq / (k - 1)); // sample sd over the k block replicates
+  const se = sd / Math.sqrt(k);
+  return Number.isFinite(se) && se > 0 ? se : undefined;
+}
+
 /** Bilinearly interpolate a [yaw,pitch] series at a fractional index; null if out of range. */
 function sampleAt(series: readonly [Degrees, Degrees][], idx: number): [Degrees, Degrees] | null {
   if (idx < 0 || idx > series.length - 1) return null;
@@ -126,7 +203,12 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
  *
  * NOTE the Kalman *innovation* (ν = z − Hx̂⁻) is the filter's one-step prediction error about the
  * TARGET - a function of the target's motion and the filter, NOT of the player - so it is deliberately
- * not the score. The player-dependent quantity is the lag-compensated residual above.
+ * not the score. The lag-compensated residual is the player-dependent MEASURED component; the score
+ * itself is a designed composite OF such measured components (tot, predErr, jitter, slipRms) folded
+ * together by the feel-tuned W_* weights above - a scalarization choice, not itself a measurement.
+ *
+ * A3: the trial also carries a MEASURED `scoreSE` - the batch-means SE of that same composite over
+ * disjoint time blocks (see batchMeansScoreSE) - or none at all when the trial cannot support one.
  */
 export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
   const frames = rec.frames.filter((f) => f.target !== null);
@@ -170,17 +252,26 @@ export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
   // The player's tracking latency L: lag of the peak aim↔target cross-correlation, in seconds.
   // Fused across yaw AND pitch via a single combined (amplitude-weighted) covariance so the weave's
   // ±5° pitch reinforces the estimate and a low-SNR axis cannot dominate it.
-  const lag = bestLag(aimYaw, tgtYaw, aimPitch, tgtPitch, Math.min(20, frames.length - 1));
+  const lag = lagEstimator.bestLag(aimYaw, tgtYaw, aimPitch, tgtPitch, Math.min(20, frames.length - 1));
   const pi = -lag;
   const latencySec = clamp(lag * (dts.length ? median(dts) : 0.016), 0, MAX_LEAD_SEC);
 
   // Lag-compensated predictive residual: aim(t) vs the target the player is actually tracking,
   // `lag` frames away (interpolated, since lag is sub-sample). Pure latency cancels; the
-  // sensitivity-dependent tremor + gain over/undershoot remain.
+  // sensitivity-dependent tremor + gain over/undershoot remain. Kept frame-ALIGNED (null where the
+  // shifted sample falls outside the recording) so the A3 block SE can partition the SAME residual
+  // series - computed once, under the one whole-trial L - instead of recomputing it per block.
+  const predResidAt: (number | null)[] = [];
   const predResid: number[] = [];
   for (let i = 0; i < frames.length; i++) {
     const t = sampleAt(tgt, i - lag);
-    if (t) predResid.push(separation(aim[i]!, t));
+    if (t) {
+      const d = separation(aim[i]!, t);
+      predResidAt.push(d);
+      predResid.push(d);
+    } else {
+      predResidAt.push(null);
+    }
   }
   const predErr = rms(predResid);
 
@@ -194,13 +285,18 @@ export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
   const jitter = rms(jitterResid);
   const slipRms = rms(slip);
 
-  // Within-trial score (higher = better); Phase 4 normalizes across the cm/360 sweep.
-  const score = tot - 0.02 * predErr - 0.01 * jitter - 0.01 * slipRms;
+  // Within-trial score (higher = better); Phase 4 normalizes across the cm/360 sweep. This is the
+  // DESIGNED W_* scalarization disclosed at the top of the file, over measured components.
+  const score = tot - W_PRED * predErr - W_JITTER * jitter - W_SLIP * slipRms;
+
+  // A3: measured batch-means SE of that same composite (undefined -> flat-nugget fallback).
+  const scoreSE = batchMeansScoreSE(frames, predResidAt, jitterResid, slip);
 
   return {
     instrument: ID,
     cm360: ctx.cm360,
     score,
+    ...(scoreSE !== undefined && scoreSE > 0 ? { scoreSE } : {}),
     raw: { tot, predErr, pi, jitter, slip: slipRms, latencySec },
     at: frames.length > 0 ? frames[frames.length - 1]!.t : 0,
   };

@@ -60,8 +60,8 @@ export interface TrialResult {
   /** Optional MEASURED standard error of `score` on its own native scale (Phase 1 heteroscedastic
    *  nugget). When finite > 0 the optimizer maps it through the affine z-score into a per-point GP
    *  noise term so a noisy trial is trusted less; a missing/zero/NaN SE falls back to the flat
-   *  `noiseVar`. NEVER fabricated - an instrument with no honest within-trial spread (e.g. track's
-   *  single continuous recording) emits none. */
+   *  `noiseVar`. NEVER fabricated - a trial with no honest within-trial spread (e.g. a track
+   *  recording too short to split into batch-means blocks, or with zero block spread) emits none. */
   scoreSE?: number;
 }
 export interface Instrument {
