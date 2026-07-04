@@ -64,3 +64,44 @@ describe('missComponents', () => {
     expect(missComponents([0, 0], [3, 4], [3, 4]).reach).toBeCloseTo(5, 6);
   });
 });
+
+describe('missComponents - ±180 yaw seam (arena angles arrive wrapped)', () => {
+  // The real arena wraps view yaw to [-180, 180) (applyLook) and target bearings are
+  // atan2-normalized (bearingOf), so the reach and the miss can straddle the seam. Yaw deltas
+  // must be shortest signed arcs, or a plain difference picks up a ±360 discontinuity.
+  const wrap = (d: number): number => ((((d + 180) % 360) + 360) % 360) - 180;
+
+  it('overshoot across the seam keeps its sign (+0.4 reads +0.4, not -0.4)', () => {
+    // Reach 170 → -172 (188 wrapped): an 18° rightward reach; landing 0.4° beyond the target.
+    const m = missComponents([170, 0], [-172, 0], [-171.6, 0]);
+    expect(m.reach).toBeCloseTo(18, 6);
+    expect(m.radial).toBeCloseTo(0.4, 6);
+    expect(m.tangential).toBeCloseTo(0, 6);
+  });
+
+  it('landing back across the seam is the true small miss, never a ~360 outlier', () => {
+    // Target at -179.8 (180.2 wrapped); a 0.3° undershoot lands at 179.9 on the OTHER side of
+    // the seam. A plain difference would read my = 359.7 - a fabricated catastrophic outlier.
+    const m = missComponents([170, 0], [-179.8, 0], [179.9, 0]);
+    expect(m.reach).toBeCloseTo(10.2, 6);
+    expect(m.radial).toBeCloseTo(-0.3, 6);
+    expect(Math.abs(m.radial)).toBeLessThan(1); // never jumps by ~360
+    expect(Math.abs(m.tangential)).toBeLessThan(1);
+  });
+
+  it('mixed yaw+pitch reach across the seam recovers the constructed (radial, tangential) pair', () => {
+    const start: [number, number] = [174, 2];
+    const target: [number, number] = [-179.5, 5]; // 180.5 wrapped: true reach dy = 6.5, dp = 3
+    const reach = Math.hypot(6.5, 3);
+    const uy = 6.5 / reach;
+    const up = 3 / reach;
+    const a = -0.5; // along-axis undershoot
+    const b = 0.2; // tangential
+    const landing: [number, number] = [wrap(target[0] + a * uy - b * up), target[1] + a * up + b * uy];
+    expect(landing[0]).toBeGreaterThan(0); // fixture sanity: the landing wrapped back across the seam
+    const m = missComponents(start, target, landing);
+    expect(m.reach).toBeCloseTo(reach, 6);
+    expect(m.radial).toBeCloseTo(a, 6);
+    expect(m.tangential).toBeCloseTo(b, 6);
+  });
+});

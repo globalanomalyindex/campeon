@@ -3,6 +3,7 @@ import { analyzeFlick, flick, FLICK_CONDITIONS, type FlickTap } from '../../src/
 import type { FittsCondition, TrialContext } from '../../src/types';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { sampleStd } from '../../src/scoring/stats';
+import { separation } from '../../src/engine/targets';
 import { FakeScene } from './fake-scene';
 
 const ctx = (): TrialContext => ({
@@ -233,6 +234,84 @@ describe('flick.run - A2 ISO along-axis projection', () => {
       ); // real overshoot bias cancelled out of Ae
     }
     expect(analyzeFlick(oldTaps, ctx()).raw.throughput).toBeLessThan(expected.raw.throughput);
+  });
+});
+
+describe('flick.run - A2 seam safety across the ±180 yaw wrap', () => {
+  // The real arena wraps view yaw to [-180, 180) (applyLook) and target bearings are
+  // atan2-normalized (bearingOf); FakeScene does neither, so this fixture feeds flick.run
+  // pre-wrapped views and re-wraps each spawned target's bearing exactly as the arena would.
+  // A reach or landing that straddles the seam makes PLAIN yaw differences pick up a ±360
+  // discontinuity: a true +0.4 overshoot reads as -0.4 (sign flipped), or a small miss reads
+  // as a ~360 fabricated outlier. missComponents must take shortest signed arcs instead.
+  it('reaches and landings crossing the seam recover the true along-axis miss - no sign flip, no ~360 outlier', async () => {
+    const wrap = (d: number): number => ((((d + 180) % 360) + 360) % 360) - 180;
+    // Scripted rng: 14 Fisher-Yates draws of 0 (deterministic order), then dir alternates
+    // 0 / π so each reach flips right/left by the condition amplitude, straddling the seam.
+    const makeScripted = (): (() => number) => {
+      let n = 0;
+      return () => {
+        n += 1;
+        return n <= 14 ? 0 : n % 2 === 1 ? 0 : 0.5;
+      };
+    };
+    const scene = new FakeScene();
+    scene.view_ = [175, 0]; // free-aim near the seam before the trial begins - reachable in the arena
+    const c: TrialContext = { ...ctx(), rng: makeScripted() };
+    const order = presentationOrder(() => 0); // shuffle draws are all 0 → same order as inside run
+    const p = flick.run(c, scene);
+    const trueTaps: FlickTap[] = [];
+    const naiveTaps: FlickTap[] = [];
+    const counts = new Map<string, number>();
+    let prevAim: [number, number] = [175, 0];
+    let seamSpawns = 0;
+    let naiveCorrupted = 0;
+    for (let i = 0; i < order.length; i++) {
+      const spec = scene.spawned[i]!;
+      const rawYaw = spec.yaw ?? 0; // run writes view + amplitude*cos(dir), unwrapped
+      if (rawYaw >= 180 || rawYaw < -180) seamSpawns += 1;
+      const tgt: [number, number] = [wrap(rawYaw), spec.pitch ?? 0];
+      scene.moveTarget(tgt); // arena handles report the atan2-normalized (wrapped) bearing
+      const dy = wrap(tgt[0] - prevAim[0]); // true reach: shortest signed arc
+      const dp = tgt[1] - prevAim[1];
+      const reach = Math.hypot(dy, dp);
+      expect(reach).toBeGreaterThan(1); // fixture sanity: a real reach every time
+      const uy = dy / reach;
+      const up = dp / reach;
+      const cond = order[i]!;
+      const condKey = `${cond.amplitude}|${cond.width}`;
+      const k = counts.get(condKey) ?? 0;
+      counts.set(condKey, k + 1);
+      const a = k % 2 === 0 ? 0.4 : 0.6; // true along-axis miss: consistent overshoot
+      const b = k % 2 === 0 ? 0.3 : -0.3; // alternating tangential wobble
+      const aim: [number, number] = [wrap(tgt[0] + a * uy - b * up), tgt[1] + a * up + b * uy];
+      // What a PLAIN-difference projection (the pre-fix missComponents) reports for this triple:
+      const ndy = tgt[0] - prevAim[0];
+      const ndp = tgt[1] - prevAim[1];
+      const nr = Math.hypot(ndy, ndp);
+      const naive = (aim[0] - tgt[0]) * (ndy / nr) + (aim[1] - tgt[1]) * (ndp / nr);
+      if (Math.abs(naive - a) > 0.5) naiveCorrupted += 1;
+      expect(Math.abs(naive)).toBeLessThan(300); // this fixture's corruption class is the SIGN FLIP…
+      scene.tick(120, [wrap(prevAim[0] + dy * 0.4), prevAim[1] + dp * 0.4]);
+      scene.tick(120, [wrap(prevAim[0] + dy * 0.9), prevAim[1] + dp * 0.9]);
+      scene.tick(120, aim);
+      scene.fire(aim);
+      const hit = separation(aim, tgt) <= 2; // exactly flick.run's hit test (FakeTarget radius 2)
+      trueTaps.push({ amplitude: cond.amplitude, width: cond.width, mt: 360, errAlong: a, nCorr: 0, hit });
+      naiveTaps.push({ amplitude: cond.amplitude, width: cond.width, mt: 360, errAlong: naive, nCorr: 0, hit });
+      prevAim = aim;
+    }
+    const r = await p;
+    expect(seamSpawns).toBeGreaterThanOrEqual(8); // fixture sanity: the seam is exercised repeatedly
+    expect(naiveCorrupted).toBeGreaterThanOrEqual(8); // …and it flips the sign of most reaches
+    // The run must recover analyzeFlick(true along-axis errors) EXACTLY despite the wrapping.
+    const expected = analyzeFlick(trueTaps, ctx());
+    expect(r.score).toBeCloseTo(expected.score, 6);
+    expect(r.raw.throughput).toBeCloseTo(expected.raw.throughput, 6);
+    expect(r.raw.ballisticTP).toBeCloseTo(expected.raw.ballisticTP, 6);
+    expect(r.raw.precisionTP).toBeCloseTo(expected.raw.precisionTP, 6);
+    // A seam-broken projection turns the pure overshoot into mixed-sign spread → a different number.
+    expect(Math.abs(analyzeFlick(naiveTaps, ctx()).raw.throughput - expected.raw.throughput)).toBeGreaterThan(1e-3);
   });
 });
 

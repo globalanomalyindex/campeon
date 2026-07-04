@@ -1,5 +1,6 @@
 import type { ArenaScene, Degrees, Ms, TargetHandle } from '../types';
 import { separation } from '../engine/targets';
+import { wrapYaw } from '../engine/camera-rig';
 
 export interface Frame {
   t: Ms;
@@ -70,19 +71,26 @@ export function speedTrace(frames: readonly Frame[]): Array<{ t: Ms; speed: numb
  * plane, split into radial (along the approach, + = overshoot) and signed tangential
  * (perpendicular). `reach` is the planar approach amplitude. Planar approximation - valid
  * at aim-drill angles; the systematic-bias signal it feeds is dominated by the mean.
+ *
+ * Seam safety: the arena wraps view yaw to [-180, 180) (applyLook) and target bearings are
+ * atan2-normalized (bearingOf), so a reach or a landing that crosses the ±180 seam makes the
+ * PLAIN yaw difference of wrapped angles pick up a ±360 discontinuity (a true +0.4 overshoot
+ * at the seam would read as -0.4; a -0.3 undershoot as -359.7 - a fabricated outlier). Yaw
+ * deltas are therefore taken as the SHORTEST SIGNED ARC via wrapYaw. Pitch is clamped, never
+ * wrapped, so its plain difference is already correct.
  */
 export function missComponents(
   start: [Degrees, Degrees],
   target: [Degrees, Degrees],
   landing: [Degrees, Degrees],
 ): { radial: Degrees; tangential: Degrees; reach: Degrees } {
-  const dy = target[0] - start[0];
+  const dy = wrapYaw(target[0] - start[0]);
   const dp = target[1] - start[1];
   const reach = Math.hypot(dy, dp);
   if (reach === 0) return { radial: 0, tangential: 0, reach: 0 };
   const uy = dy / reach;
   const up = dp / reach;
-  const my = landing[0] - target[0];
+  const my = wrapYaw(landing[0] - target[0]);
   const mp = landing[1] - target[1];
   return {
     radial: my * uy + mp * up,
