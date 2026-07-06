@@ -75,6 +75,16 @@ describe('buildResult', () => {
     const r = buildResult(report, trials, 800);
     expect(r.speedAccuracy).toBeUndefined();
   });
+
+  it('carries the measured session-drift readout (driftZ) verbatim from the Report (A4)', () => {
+    const r = buildResult({ ...report, driftZ: 0.42 }, trials, 800);
+    expect(r.driftZ).toBe(0.42);
+  });
+
+  it('omits driftZ when the Report has none (fell back / old report → dashed, never padded)', () => {
+    const r = buildResult(report, trials, 800);
+    expect(r.driftZ).toBeUndefined();
+  });
 });
 
 describe('ciConcord', () => {

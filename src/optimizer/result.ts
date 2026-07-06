@@ -58,5 +58,8 @@ export function buildResult(
     // instrumentWeights.strike (=1). Carry it so the result screen can label the strike rows. Omit it
     // without a profile so old/headless callers stay number-only.
     ...(profile && Number.isFinite(profile.speedAccuracy) ? { speedAccuracy: profile.speedAccuracy } : {}),
+    // A4: the measured session-drift readout, copied VERBATIM from the Report. Absent when the
+    // extended fit fell back (or for old reports) so the result screen dashes it - never padded.
+    ...(report.driftZ !== undefined ? { driftZ: report.driftZ } : {}),
   };
 }

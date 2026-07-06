@@ -87,6 +87,74 @@ describe('finalizeReport', () => {
     expect(endW).toBeGreaterThan(centralW);
   });
 
+  describe('detrendDrift (A4 ANCOVA session-drift adjustment, finalize-only)', () => {
+    // Explore sweep then exploitation near cm=30 with an injected linear drift b3·tau (tau = the
+    // standardized trial-order index, exactly what trialsToObservations emits). The drift loads onto
+    // the x-curve and biases the plain peak; the extended fit partials it out.
+    const peakX = Math.log(35);
+    const cms = [18, 22, 26, 30, 35, 40, 46, 52, 58, 30, 29, 32, 31, 28];
+    const ks = cms.map((_, k) => k);
+    const muK = ks.reduce((s, v) => s + v, 0) / ks.length;
+    const sdK = Math.sqrt(ks.reduce((s, v) => s + (v - muK) ** 2, 0) / (ks.length - 1));
+    const driftObs = (b3: number, noise = 0, seed = 5): Observation[] => {
+      const rng = mulberry32(seed);
+      return cms.map((cm, k) => {
+        const x = Math.log(cm);
+        const tau = (k - muK) / sdK;
+        return { x, tau, y: -2 * (x - peakX) ** 2 + 5 + b3 * tau + (rng() * 2 - 1) * noise };
+      });
+    };
+
+    it('recovers a peak closer to truth than the plain fit and reports the drift readout', () => {
+      const obs = driftObs(0.8);
+      const plain = finalizeReport(obs, bounds, mulberry32(1), { bootstrapIters: 200 });
+      const ext = finalizeReport(obs, bounds, mulberry32(1), { bootstrapIters: 200, detrendDrift: true });
+      expect(Math.abs(ext.optimalCm360 - 35)).toBeLessThan(Math.abs(plain.optimalCm360 - 35));
+      expect(ext.optimalCm360).toBeCloseTo(35, 1);
+      expect(ext.driftZ).toBeCloseTo(0.8, 4);
+      expect(plain.driftZ).toBeUndefined(); // drift is opt-in at finalize, never ambient
+    });
+
+    it('zero-drift byte-identity: input with NO tau signal takes the plain path unchanged (b3 dropped)', () => {
+      const noTau = concave(34, 0.05); // no tau anywhere → the b3 column must be DROPPED, not fit-near-zero
+      const plain = finalizeReport(noTau, bounds, mulberry32(4), { bootstrapIters: 200 });
+      const ext = finalizeReport(noTau, bounds, mulberry32(4), { bootstrapIters: 200, detrendDrift: true });
+      expect(ext).toEqual(plain); // peak, CI and curve all byte-identical
+      expect(ext.driftZ).toBeUndefined(); // the drift readout is dashed, never padded
+    });
+
+    it('collinear tau/x falls back to the plain path byte-identically and dashes the readout', () => {
+      // geometric sweep → x linear in trial order → tau an exact function of x → b3 unidentifiable
+      const geo = Array.from({ length: 14 }, (_, k) => 18 * Math.pow(58 / 18, k / 13));
+      const rng = mulberry32(9);
+      const collinear: Observation[] = geo.map((cm, k) => {
+        const x = Math.log(cm);
+        const tau = (k - muK) / sdK;
+        return { x, tau, y: -2 * (x - peakX) ** 2 + 5 + (rng() * 2 - 1) * 0.05 };
+      });
+      const plain = finalizeReport(collinear, bounds, mulberry32(6), { bootstrapIters: 200 });
+      const ext = finalizeReport(collinear, bounds, mulberry32(6), { bootstrapIters: 200, detrendDrift: true });
+      expect(ext).toEqual(plain);
+      expect(ext.driftZ).toBeUndefined();
+    });
+
+    it('the extended-fit CI is never narrower than the plain-fit CI on the same seed', () => {
+      const obs = driftObs(0.8, 0.3, 11); // genuine residual spread for the bootstrap
+      const plain = finalizeReport(obs, bounds, mulberry32(31), { bootstrapIters: 400 });
+      const ext = finalizeReport(obs, bounds, mulberry32(31), { bootstrapIters: 400, detrendDrift: true });
+      expect(ext.ci90[0]).toBeLessThanOrEqual(plain.ci90[0] + 1e-9);
+      expect(ext.ci90[1]).toBeGreaterThanOrEqual(plain.ci90[1] - 1e-9);
+    });
+
+    it('too few observations (n < 10) fall back to the plain path and dash the readout', () => {
+      const obs = driftObs(0.8).slice(0, 9);
+      const plain = finalizeReport(obs, bounds, mulberry32(2), { bootstrapIters: 200 });
+      const ext = finalizeReport(obs, bounds, mulberry32(2), { bootstrapIters: 200, detrendDrift: true });
+      expect(ext).toEqual(plain);
+      expect(ext.driftZ).toBeUndefined();
+    });
+  });
+
   it('the fallback curve is the observed points as {x, mean}, sorted by x', () => {
     // Convex (a valley) → no interior maximum → fitPeak throws → fallback path. cm order shuffled
     // to also exercise the sort.
@@ -245,6 +313,41 @@ describe('runSession - convergence on synthetic players', () => {
     expect(fittedSeen?.signalVar).toBe(baseGp.signalVar); // signalVar pinned to base by the fit
     expect(suggestParams.every((p) => p === baseGp)).toBe(true); // every suggest saw base, not fitted
     expect(report.ci90[1]).toBeGreaterThanOrEqual(SENTINEL - 1e-9); // fitted peak reached the report
+  });
+
+  it('detrends session drift at FINALIZE ONLY: the final report carries driftZ, interims never do', async () => {
+    // A synthetic player whose score genuinely improves with every trial (within-session practice
+    // drift) on top of a latent peak at 40. The final report must fit the extended model (driftZ
+    // present, positive); every interim report stays on the plain path (finalize-only invariant).
+    const c = Math.log(40);
+    let k = 0;
+    const drifting: Instrument = {
+      id: 'flick',
+      run(ctx) {
+        const x = Math.log(ctx.cm360);
+        const noise = (ctx.rng() * 2 - 1) * 0.04;
+        const score = -(x - c) * (x - c) + 0.08 * k++ + noise;
+        return Promise.resolve<TrialResult>({ instrument: 'flick', cm360: ctx.cm360, score, raw: {}, at: 0 });
+      },
+    };
+    const interimDrifts: (number | undefined)[] = [];
+    const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
+    const { report } = await runSession({
+      dpi: 800,
+      profile: profile({ flick: 1 }),
+      bounds: sessionBounds,
+      engine: bo,
+      instruments: instruments({ flick: drifting }),
+      scene: new FakeScene(),
+      schedule: ['flick'],
+      maxTrials: 22,
+      rng: mulberry32(123),
+      bootstrapIters: 300,
+      onTrial: (_t, _trials, interim) => interimDrifts.push(interim.driftZ),
+    });
+    expect(report.driftZ).toBeDefined();
+    expect(report.driftZ as number).toBeGreaterThan(0); // the injected practice trend, in blended σ
+    expect(interimDrifts.every((d) => d === undefined)).toBe(true); // finalize-only
   });
 
   it('stops early once the CI is tight enough', async () => {

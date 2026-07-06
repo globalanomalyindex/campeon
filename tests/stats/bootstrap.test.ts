@@ -111,4 +111,58 @@ describe('bootstrap CI', () => {
       expect(hetero[1]).toBeGreaterThanOrEqual(pooled[1] - 1e-9);
     });
   });
+
+  describe('drift-aware (A4 extended ANCOVA resampling)', () => {
+    // Same session shape as the peak-fit drift tests: explore sweep then exploitation near cm=30,
+    // linear drift b3·tau injected, PLUS genuine residual noise so the bootstrap has spread to resample.
+    const peakX = Math.log(35);
+    const cms = [18, 22, 26, 30, 35, 40, 46, 52, 58, 30, 29, 32, 31, 28];
+    const ks = cms.map((_, k) => k);
+    const muK = ks.reduce((s, v) => s + v, 0) / ks.length;
+    const sdK = Math.sqrt(ks.reduce((s, v) => s + (v - muK) ** 2, 0) / (ks.length - 1));
+    const drifted = (b3: number, seed: number): Observation[] => {
+      const rng = mulberry32(seed);
+      return cms.map((cm, k) => {
+        const x = Math.log(cm);
+        const tau = (k - muK) / sdK;
+        return { x, tau, y: -2 * (x - peakX) ** 2 + 5 + b3 * tau + (rng() - 0.5) * 0.6 };
+      });
+    };
+
+    it('is byte-identical to the plain CI when the input carries no tau (b3 column dropped)', () => {
+      const base = dataset(0.6, mulberry32(13)); // no tau anywhere → no tau signal
+      const plain = bootstrapCi([...base], 400, mulberry32(41));
+      const withOpt = bootstrapCi([...base], 400, mulberry32(41), { drift: true });
+      expect(withOpt).toEqual(plain);
+    });
+
+    it('is byte-identical to the plain CI when tau is collinear with x (guard falls back)', () => {
+      // geometric sweep → x linear in trial index → tau an exact function of x → unidentifiable
+      const geo = Array.from({ length: 14 }, (_, k) => 18 * Math.pow(58 / 18, k / 13));
+      const rng = mulberry32(3);
+      const collinear: Observation[] = geo.map((cm, k) => {
+        const x = Math.log(cm);
+        const tau = (k - muK) / sdK;
+        return { x, tau, y: -2 * (x - peakX) ** 2 + 5 + (rng() - 0.5) * 0.6 };
+      });
+      const plain = bootstrapCi(collinear.map((o) => ({ ...o })), 400, mulberry32(41));
+      const withOpt = bootstrapCi(collinear.map((o) => ({ ...o })), 400, mulberry32(41), { drift: true });
+      expect(withOpt).toEqual(plain);
+    });
+
+    it('the extended-fit CI is never narrower than the plain-fit CI on the same seed (widen-only)', () => {
+      const obs = drifted(0.8, 21);
+      const plain = bootstrapCi(obs.map((o) => ({ ...o })), 500, mulberry32(77));
+      const ext = bootstrapCi(obs.map((o) => ({ ...o })), 500, mulberry32(77), { drift: true });
+      expect(ext[0]).toBeLessThanOrEqual(plain[0] + 1e-9);
+      expect(ext[1]).toBeGreaterThanOrEqual(plain[1] - 1e-9);
+    });
+
+    it('is deterministic under the seeded RNG with the drift option on', () => {
+      const obs = drifted(0.8, 21);
+      const a = bootstrapCi(obs.map((o) => ({ ...o })), 400, mulberry32(55), { drift: true });
+      const b = bootstrapCi(obs.map((o) => ({ ...o })), 400, mulberry32(55), { drift: true });
+      expect(a).toEqual(b);
+    });
+  });
 });

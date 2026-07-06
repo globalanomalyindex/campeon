@@ -76,7 +76,17 @@ export interface Shot { error: [Degrees, Degrees]; required: Degrees; }
 
 // ── optimizer (optimizer/) ─────────────────────────────────────────────
 import type { GpParams } from './optimizer/gp';
-export interface Observation { x: number; y: number; noise?: number; }  // x = ln(cm360)
+export interface Observation {
+  x: number;                     // ln(cm360)
+  y: number;                     // blended z-score
+  noise?: number;                // per-point GP nugget (P1-1, measured - never fabricated)
+  /** Standardized within-instrument trial-order index (A4 drift covariate), set by
+   *  `trialsToObservations` consistent with the per-instrument z-scoring: order index 0..n-1 within
+   *  the instrument, centered and scaled to unit sample sd. Optional so hand-built/legacy observation
+   *  sets carry NO tau signal - the finalize-only ANCOVA detrend then DROPS the b3 column entirely
+   *  (plain quadratic path, byte-identical report), never fits a fabricated near-zero drift. */
+  tau?: number;
+}
 export interface SearchEngine {
   suggest(history: Observation[], bounds: [Cm360, Cm360]): Cm360;
   // A self-contained budget signal for engine-driven callers. The Phase-4 session controller owns
@@ -100,6 +110,12 @@ export interface Report {
   optimalCm360: Cm360;
   ci90: [Cm360, Cm360];
   curve: { x: number; mean: number }[];
+  /** MEASURED session-drift coefficient b3 from the finalize-only ANCOVA detrend (A4): blended-σ of
+   *  score per 1 sd of within-instrument trial order, partialled OUT of the reported optimum. The
+   *  data cannot distinguish practice from fatigue, so copy built on this must name both and never
+   *  assert one cause. Present ONLY when the extended fit was identifiable (n ≥ 10, tau carried, tau
+   *  not collinear with the quadratic design); absent → the readout renders dashed, never padded. */
+  driftZ?: number;
 }
 
 // ── session & result ───────────────────────────────────────────────────
@@ -137,6 +153,12 @@ export interface Result {
    *  OLD saved Results (which lack it) render number-only; carried unchanged through `adoptResult` (the lean
    *  is the user's stated taste, not a measurement). */
   speedAccuracy?: number;
+  /** The measured session-drift readout, copied verbatim from `Report.driftZ` (A4). A first-class
+   *  honesty disclosure: the within-session trend - practice or fatigue, the data cannot say which -
+   *  that was REMOVED from the reported number. Optional so OLD saved Results (and sessions where the
+   *  extended fit fell back) render the readout dashed; the result screen gates it behind `!tuned`
+   *  (a hand-picked value makes no drift-removal claim). */
+  driftZ?: number;
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────

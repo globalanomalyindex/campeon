@@ -23,6 +23,12 @@ import { mean, sampleStd } from '../scoring/stats';
  * silenced. A missing/zero/NaN scoreSE leaves `noise` undefined, so existing flat-path observations
  * (and their y/x values) stay byte-identical - reliability enters ONLY via the nugget, never by
  * rescaling y, so no instrument's own optimum can move.
+ *
+ * A4 drift covariate: each observation also carries `tau`, the STANDARDIZED within-instrument
+ * trial-order index (order 0..n-1 within the instrument, centered, unit sample sd) - consistent with
+ * the per-instrument z-scoring, so "trial k of track" and "trial k of flick" carry the same tau. It is
+ * pure additional information for the finalize-only ANCOVA detrend: x, y and noise are computed
+ * exactly as before (a covariate, never a rescale), and the fit/GP/bootstrap plain paths ignore it.
  */
 export interface ObjectiveOptions {
   /** Default GP nugget σ_n² the per-point noise is clamped against (default 0.1, matching the GP). */
@@ -53,8 +59,20 @@ export function trialsToObservations(
   const stats = new Map<InstrumentId, { mu: number; sd: number }>();
   for (const [id, scores] of byId) stats.set(id, { mu: mean(scores), sd: sampleStd(scores) });
 
+  // A4: per-instrument standardization of the trial-ORDER index (chronological input order). An
+  // instrument's whole trial set is either emitted or skipped, so its emitted taus keep an exact
+  // zero mean - the detrended curve at tau=0 is the session-average level, never an endpoint's.
+  const tauStats = new Map<InstrumentId, { mu: number; sd: number }>();
+  for (const [id, scores] of byId) {
+    const idx = scores.map((_, i) => i);
+    tauStats.set(id, { mu: mean(idx), sd: sampleStd(idx) });
+  }
+
   const out: Observation[] = [];
+  const seen = new Map<InstrumentId, number>(); // running within-instrument order index
   for (const t of trials) {
+    const k = seen.get(t.instrument) ?? 0;
+    seen.set(t.instrument, k + 1);
     const w = profile.instrumentWeights[t.instrument];
     if (!w) continue; // weight 0 or missing → no contribution
     const s = stats.get(t.instrument);
@@ -64,6 +82,8 @@ export function trialsToObservations(
       const stdSE = (w * t.scoreSE) / s.sd; // standardized SE on the affine y scale
       obs.noise = Math.min(Math.max(stdSE * stdSE, floor), ceil);
     }
+    const ts = tauStats.get(t.instrument);
+    if (ts !== undefined && ts.sd > 0) obs.tau = (k - ts.mu) / ts.sd; // ≥2 trials → real order spread
     out.push(obs);
   }
   return out.sort((a, b) => a.x - b.x);

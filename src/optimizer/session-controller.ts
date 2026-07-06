@@ -10,7 +10,7 @@ import type {
   SearchEngine,
   TrialResult,
 } from '../types';
-import { fitPeak } from '../stats/peak-fit';
+import { fitPeak, fitPeakDrift, type PeakFit } from '../stats/peak-fit';
 import { bootstrapCi } from '../stats/bootstrap';
 import { mulberry32 } from '../stats/rng';
 import { trialsToObservations } from './objective';
@@ -25,6 +25,13 @@ export interface FinalizeOptions {
   gpPeakCm360?: number;
   /** Log-space disagreement threshold for the GP/curve widen (default 0.15 ≈ 16% relative). */
   disagreeLogThreshold?: number;
+  /** A4: fit the extended ANCOVA model y = b0 + b1·x + b2·x² + b3·τ and report the peak of the
+   *  DETRENDED quadratic, disclosing b3 as `Report.driftZ`. Opt-in and set by `runSession` at
+   *  FINALIZE ONLY (never for interim/early-stop reports, which would perturb the deterministic
+   *  mid-session RNG stream). When any honesty guard falls back (n < 10, no tau signal, τ collinear
+   *  with the quadratic design, singular/non-concave extended fit) the b3 column is DROPPED and this
+   *  is byte-identical to the plain report - driftZ absent, readout dashed, never padded. */
+  detrendDrift?: boolean;
 }
 
 /**
@@ -59,14 +66,22 @@ export function finalizeReport(
   const iters = opts.bootstrapIters ?? 400;
   if (obs.length < 3) return fallbackReport(obs, lo, hi); // a quadratic fit needs ≥3 points
 
-  let fit: ReturnType<typeof fitPeak>;
-  try {
-    fit = fitPeak([...obs]);
-  } catch (err) {
-    // Expected: "not concave" (no interior peak) or "singular matrix" (degenerate design) → the
-    // data cannot locate a peak, so report honestly. Anything else is a real bug - re-throw it.
-    if (!(err instanceof Error) || !/not concave|singular/.test(err.message)) throw err;
-    return fallbackReport(obs, lo, hi);
+  // A4 (finalize-only, opt-in): the guarded extended ANCOVA fit. Non-null ONLY when every honesty
+  // guard passes (see FinalizeOptions.detrendDrift); null falls through to the plain path with the
+  // b3 column dropped, so a no-tau-signal input is byte-identical to a drift-unaware call.
+  const drifted = opts.detrendDrift === true ? fitPeakDrift([...obs]) : null;
+  let fit: PeakFit;
+  if (drifted !== null) {
+    fit = drifted;
+  } else {
+    try {
+      fit = fitPeak([...obs]);
+    } catch (err) {
+      // Expected: "not concave" (no interior peak) or "singular matrix" (degenerate design) → the
+      // data cannot locate a peak, so report honestly. Anything else is a real bug - re-throw it.
+      if (!(err instanceof Error) || !/not concave|singular/.test(err.message)) throw err;
+      return fallbackReport(obs, lo, hi);
+    }
   }
 
   const peak = clamp(fit.optimalCm360, lo, hi);
@@ -75,7 +90,10 @@ export function finalizeReport(
     // The obs carry their per-point `noise` (the P1-1 heteroscedastic nugget) all the way through, so
     // bootstrapCi resamples residuals reliability-aware (P1-3): a loud facet widens the CI, a quiet
     // facet is not contaminated, and the band can only ever widen past the conservative pooled bound.
-    const raw = bootstrapCi([...obs], iters, rng);
+    // With detrendDrift the bootstrap ALSO resamples extended-fit residuals and refits the extended
+    // model, unioned with the plain band on the same seeded draws (widen-only; it runs the SAME
+    // guarded fitDrift, so peak and CI can never disagree on which model ran).
+    const raw = bootstrapCi([...obs], iters, rng, opts.detrendDrift === true ? { drift: true } : {});
     ci = [clamp(Math.min(raw[0], raw[1]), lo, hi), clamp(Math.max(raw[0], raw[1]), lo, hi)];
   } catch {
     ci = [lo, hi]; // bootstrap could not bound it → honest wide range
@@ -87,7 +105,14 @@ export function finalizeReport(
       ci = [Math.min(ci[0], gp, peak), Math.max(ci[1], gp, peak)];
     }
   }
-  return { optimalCm360: peak, ci90: ci, curve: fit.curve };
+  // driftZ is the measured b3 the detrend REMOVED from the number - practice or fatigue, the data
+  // cannot say which. Present only when the extended fit actually ran; never padded on fallback.
+  return {
+    optimalCm360: peak,
+    ci90: ci,
+    curve: fit.curve,
+    ...(drifted !== null ? { driftZ: drifted.driftZ } : {}),
+  };
 }
 
 export interface SessionConfig {
@@ -204,6 +229,10 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
   }
   const report = finalizeReport(finalObs, bounds, rng, {
     bootstrapIters: iters,
+    // A4: detrend within-session drift (practice or fatigue) at FINALIZE ONLY - interim/early-stop
+    // reports above never set this, so the deterministic mid-session RNG stream is untouched and the
+    // trial sequence is byte-identical with or without the drift feature.
+    detrendDrift: true,
     ...(gpPeak !== undefined ? { gpPeakCm360: gpPeak } : {}),
   });
   return { report, trials };

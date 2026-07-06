@@ -246,6 +246,43 @@ describe('result screen', () => {
     expect(host.querySelector('[data-result="concord"]')).toBeNull();
   });
 
+  it('shows the session-drift readout with NEUTRAL copy - practice or fatigue, never one cause (A4)', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult!.result = { ...RESULT, driftZ: 0.42 };
+    resultScreen(host, ctx).mount();
+    const v = host.querySelector('[data-result="driftZ"]')!;
+    expect(v).toBeTruthy();
+    expect(v.textContent).toContain('0.42');
+    const txt = host.textContent!.toLowerCase();
+    // neutral copy: names BOTH practice and fatigue and says it was removed from the number
+    expect(txt).toContain('practice');
+    expect(txt).toContain('fatigue');
+    expect(txt).toContain('removed from the number');
+    // never asserts the single cause the data cannot distinguish
+    expect(txt).not.toMatch(/practice gain|fatigue loss|because of practice|because of fatigue/);
+  });
+
+  it('dashes the drift readout when the extended fit fell back (no removal claim)', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount(); // RESULT has no driftZ - fell back / old result
+    const v = host.querySelector('[data-result="driftZ"]')!;
+    expect(v).toBeTruthy();
+    expect(v.textContent).toBe('-');
+    const txt = host.textContent!.toLowerCase();
+    // a dashed readout must NOT claim anything was removed from the number
+    expect(txt).not.toContain('removed from the number');
+    expect(txt).toContain('nothing removed');
+  });
+
+  it('gates the drift readout behind !tuned (a hand-picked value makes no drift-removal claim)', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, driftZ: 0.42, tuned: true } };
+    resultScreen(host, ctx).mount();
+    expect(host.querySelector('[data-result="driftZ"]')).toBeNull();
+  });
+
   it('labels the strike rows with the speed/accuracy lean sourced from the profile (your call)', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();

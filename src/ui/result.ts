@@ -28,6 +28,14 @@ const strikeLean = (sa: number): string => {
 const fmtZ = (v: number | undefined): string =>
   v !== undefined && Number.isFinite(v) ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}σ` : '-';
 
+// Session-drift copy (A4). The measured trend is per-session learning OR fatigue - the data cannot
+// distinguish the two, so the copy names BOTH and never asserts one cause (honesty invariant). When
+// the extended fit fell back the value is dashed and the copy must make NO removal claim.
+const driftNote = (v: number | undefined): string =>
+  v !== undefined && Number.isFinite(v)
+    ? 'session drift - practice or fatigue, the data cannot say which - removed from the number.'
+    : 'session drift was not separable this run - nothing removed; the number is the plain fit.';
+
 // A single screen-reader summary sentence rendered ONCE near the number (not a live region - the
 // result is static). The CI range is spelled " to " so no en-dash glyph is ever voiced; a tuned-by-feel
 // value carries NO measured-CI claim (honesty), so it is announced as tuned without a band.
@@ -87,7 +95,11 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
             <p class="result__tier-head mono">where the number comes from</p>
             <div class="result__breakdown">
               <div><span class="result__bk-label">bias-zero <em>archerfish</em></span><span class="mono" data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
+              ${!tuned
+                ? `<div><span class="result__bk-label">session drift <em>practice or fatigue</em></span><span class="mono" data-result="driftZ">${fmtZ(r.driftZ)}</span></div>`
+                : ''}
             </div>
+            ${!tuned ? `<p class="result__drift-note mono">${driftNote(r.driftZ)}</p>` : ''}
             ${hasFacets
               ? `<figure class="result__facets"><svg data-facets aria-hidden="true"></svg>
                   <figcaption class="mono">track + flick - the two intercept probes, marked where they pull on the blend
