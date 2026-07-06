@@ -1,6 +1,7 @@
 import type { Cm360, Dpi, GameId, Profile, Report, Result, TrialResult } from '../types';
 import { perGameSens } from '../convert/schools';
-import { computeBreakdown } from './breakdown';
+import { computeBreakdown, facetConcordance } from './breakdown';
+import { mulberry32 } from '../stats/rng';
 
 export type CiConcord = 'tight' | 'moderate' | 'wide';
 
@@ -61,5 +62,9 @@ export function buildResult(
     // A4: the measured session-drift readout, copied VERBATIM from the Report. Absent when the
     // extended fit fell back (or for old reports) so the result screen dashes it - never padded.
     ...(report.driftZ !== undefined ? { driftZ: report.driftZ } : {}),
+    // A5: the per-facet peaks + concordance tier - the "one latent cm/360" thesis tested as a claim.
+    // Seeded on the trial count (a decoupled stream, like the live-plot interim RNG) so this readout
+    // is deterministic and never perturbs the scored sequence. Dropped for tuned results by adoptResult.
+    facetConcordance: facetConcordance(trials, mulberry32(0xface ^ trials.length)),
   };
 }

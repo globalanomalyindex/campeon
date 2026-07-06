@@ -118,6 +118,31 @@ export interface Report {
   driftZ?: number;
 }
 
+// ── facet concordance (A5: is "one latent cm/360" true, or four numbers we averaged?) ──────────
+/** How well the fittable facets' OWN peaks agree - a geometric observation over measured peaks, never
+ *  a cause. `concordant` = the views converge on one answer; `divergent` = they genuinely disagree
+ *  (shown as honest doubt, the thesis being tested rather than assumed). Undefined tier = inconclusive. */
+export type Concordance = 'concordant' | 'some-spread' | 'divergent';
+export interface FacetPeak {
+  instrument: InstrumentId;
+  /** The facet's OWN concave-fit peak (cm/360) from its own trials, or undefined when they cannot
+   *  support one (< the minimum points, non-concave, or an unstable bootstrap) - dashed, never faked. */
+  peakCm360?: Cm360;
+  /** Half-width of a reduced-iter residual bootstrap in ln space - a SPREAD, deliberately NOT reported
+   *  as a 90% CI (a ~6-point facet fit cannot earn that coverage claim), floored so small-sample
+   *  optimism cannot manufacture a false disagreement. Undefined exactly when `peakCm360` is. */
+  spreadLn?: number;
+  /** strike's peak is speed↔accuracy TASTE-conditioned (it blends by `profile.speedAccuracy`), so it is
+   *  not a fourth estimate of the same latent constant: shown as a labeled marker, EXCLUDED from the tier. */
+  laneConditioned: boolean;
+}
+export interface FacetConcordance {
+  facets: FacetPeak[];
+  /** The agreement tier over the fittable NON-strike facets, or undefined when fewer than two are
+   *  fittable (inconclusive) - never a fabricated verdict. */
+  tier?: Concordance;
+}
+
 // ── session & result ───────────────────────────────────────────────────
 export interface Profile { speedAccuracy: number; instrumentWeights: Record<InstrumentId, number>; }
 export type SessionStatus = 'setup' | 'validating' | 'running' | 'complete';
@@ -159,6 +184,12 @@ export interface Result {
    *  extended fit fell back) render the readout dashed; the result screen gates it behind `!tuned`
    *  (a hand-picked value makes no drift-removal claim). */
   driftZ?: number;
+  /** A5: the per-facet peaks + concordance tier - the "one latent cm/360" thesis tested as a claim.
+   *  Each facet's own concave-fit peak (dashed when unfittable) + a conservative tier over the fittable
+   *  non-strike facets, so the result screen can SHOW four markers triangulating (or honestly disagreeing
+   *  on) one answer. Optional so OLD saved Results render without it; dropped on `tuned` (a hand-picked
+   *  value has no measured concordance) and gated behind `!tuned` at the screen. */
+  facetConcordance?: FacetConcordance;
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────
