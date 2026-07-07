@@ -22,6 +22,24 @@ describe('case-study content', () => {
     expect(blob('calibrate')).toContain('MSE');
     expect(blob('strike')).toContain('10,400');
   });
+  it('the colophon folds in the graphics-craft + payoff-arc story (Phases B/C), held to the measurement standard', () => {
+    const colophon = SECTIONS.find((s) => s.id === 'colophon')!;
+    const blob = JSON.stringify(colophon).toLowerCase();
+    // Phase B: sculpted procedurally in-repo, and the read-never-write / byte-identical honesty parallel
+    expect(blob).toContain('procedural'); // no external DCC pipeline - sculpted in-repo
+    expect(blob).toContain('byte-identical'); // the scored stream is unmoved by the skin
+    expect(blob).toContain('write nothing back'); // cosmetic layers read, never write
+    // Phase C: the payoff arc as the experiential expression of the same rigor
+    expect(blob).toContain('remembered'); // calibration remembered, not re-asked
+    expect(blob).toContain('stages the reveal'); // the payoff is staged, not dumped
+    expect(blob).toContain('range to feel'); // the range as the feel-it beat
+    // the closing thesis stays: measurement and craft are one discipline
+    expect(blob).toContain('same discipline');
+  });
+  it('the honesty act shows (not just states) the tested thesis - four marks on one axis', () => {
+    const honesty = SECTIONS.find((s) => s.id === 'honesty')!;
+    expect(JSON.stringify(honesty).toLowerCase()).toContain('draws them on the one axis');
+  });
   it('names no company (implicit angle) but keeps the portfolio-theme credit', () => {
     const all = JSON.stringify({ SECTIONS, CITATIONS, CREDIT }).toLowerCase();
     expect(all).not.toContain('anthropic');
