@@ -29,7 +29,7 @@ const normalize = ([x, y, z]: Vec3): Vec3 => {
 export const SUN_DIR: Vec3 = normalize([6, 7, -24]);
 
 /** Attenuation applied to `scene.environment` via `scene.environmentIntensity` (tuning knob). */
-export const ENV_INTENSITY = 0.5;
+export const ENV_INTENSITY = 0.85;
 
 /** Fog start distance in world units (tuning knob). */
 export const FOG_NEAR = 12;

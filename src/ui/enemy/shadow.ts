@@ -1,6 +1,7 @@
 import { CircleGeometry, DataTexture, Mesh, MeshBasicMaterial, RGBAFormat } from 'three';
 import { hex } from '../../palette';
 import { ARENA_GROUND_Y } from '../../engine/arena';
+import { SUN_DIR } from '../../engine/environment';
 
 /**
  * PURE procedural contact-shadow blob for the cosmetic "quarry" targets - sphere-aware grounding,
@@ -24,12 +25,41 @@ import { ARENA_GROUND_Y } from '../../engine/arena';
 export const SHADOW_NAME = 'quarry-shadow';
 
 /** Darkest a contact shadow ever reads, right at the plane (0 = invisible, 1 = opaque). */
-export const SHADOW_MAX_OPACITY = 0.5;
+export const SHADOW_MAX_OPACITY = 0.6;
 /** Height (metres) over which shadow opacity falls off - bigger = a longer, softer fade with altitude. */
-export const SHADOW_FALLOFF_H = 4;
+export const SHADOW_FALLOFF_H = 8;
 /** Height (metres) above the plane below which a quarry casts no shadow at all (also the tiny lift the
  *  blob itself sits at, so it never z-fights the grid). */
 export const SHADOW_EPS = 0.01;
+
+// ── The long dusk shadow ─────────────────────────────────────────────────────
+// A first-person eye sits ~3m above the floor looking at targets ~20m out, so a flat disc under a
+// quarry foreshortens to a sliver and never reads. The DIEGETIC fix doubles as the legibility fix:
+// the arena's one low western sun (SUN_DIR - the same direction the env map and the rim light use)
+// would throw a LONG shadow away from itself, and "away from a low sun behind the targets" points
+// TOWARD the camera - the exact axis that fights the foreshortening. So the blob is an ellipse
+// stretched SHADOW_STRETCH x along the anti-sun ground direction, its near edge anchored at the
+// quarry's base, spilling toward the viewer like every dusk photograph you have ever seen.
+
+/** Long-axis stretch of the shadow ellipse along the throw direction. */
+export const SHADOW_STRETCH = 2.6;
+/** Cross-axis widening so the pool still hugs the quarry's stance. */
+export const SHADOW_WIDE = 1.15;
+
+const throwLen = Math.hypot(SUN_DIR[0], SUN_DIR[2]) || 1;
+/**
+ * Unit ground direction [x, z] the shadow is thrown along: the horizontal projection of the
+ * ANTI-sun vector (shadows point away from the light). Derived from SUN_DIR so the env map, the
+ * rim light, and every shadow on the floor all agree about where the low sun hangs.
+ */
+export const SHADOW_THROW: readonly [number, number] = [-SUN_DIR[0] / throwLen, -SUN_DIR[2] / throwLen];
+
+/**
+ * In-plane spin (rotation.z, composed after the flat rotation.x = -PI/2) that aligns the ellipse's
+ * long (local Y) axis with SHADOW_THROW on the ground. Derivation: with Euler XYZ, local +Y maps to
+ * world (-sin z, 0, -cos z); solving that parallel to (throwX, throwZ) gives z = atan2(tx, tz).
+ */
+export const SHADOW_SPIN = Math.atan2(SHADOW_THROW[0], SHADOW_THROW[1]);
 
 const SHADOW_TEX_SIZE = 64;
 
@@ -81,7 +111,8 @@ export function createShadowBlob(alpha: DataTexture): Mesh {
     opacity: 0,
   });
   const mesh = new Mesh(geometry, material);
-  mesh.rotation.x = -Math.PI / 2; // flat, facing up at the grid plane
+  // Flat on the grid plane, long axis spun onto the anti-sun throw (see SHADOW_SPIN's derivation).
+  mesh.rotation.set(-Math.PI / 2, 0, SHADOW_SPIN);
   mesh.name = SHADOW_NAME;
   mesh.renderOrder = 1; // draw after the grid; paired with depthWrite:false avoids z-fighting
   mesh.visible = false;
@@ -104,17 +135,25 @@ export interface ShadowPose {
  * - h = pos.y - ARENA_GROUND_Y; h <= SHADOW_EPS (at or below the plane) -> null, no blob.
  * - y is pinned to ARENA_GROUND_Y + SHADOW_EPS regardless of quarry height (a flat pool on the real
  *   floor, lifted just enough to avoid z-fighting the grid).
+ * - x/z sit at the quarry's ground point, then slide along SHADOW_THROW so the ellipse's near edge
+ *   stays anchored at the stance while the long tail spills away from the sun (toward the viewer).
  * - scale grows gently with height: a higher quarry casts a broader, softer-edged pool.
  * - opacity falls off with height: contact reads strong near the plane, fades toward nothing aloft.
+ *
+ * The consumer applies the anisotropy: scale.set(scale * SHADOW_WIDE, scale * SHADOW_STRETCH, 1)
+ * on the (already spun) blob - `scale` here is the SHORT-axis world footprint.
  */
 export function shadowPose(pos: { x: number; y: number; z: number }, baseScale: number): ShadowPose | null {
   const h = pos.y - ARENA_GROUND_Y;
   if (h <= SHADOW_EPS) return null;
+  const scale = baseScale * (0.9 + 0.1 * h);
+  // Near edge at the stance: center = base point + throw * (long semi-axis - short semi-axis).
+  const slide = (scale * SHADOW_STRETCH - scale) / 2;
   return {
-    x: pos.x,
+    x: pos.x + SHADOW_THROW[0] * slide,
     y: ARENA_GROUND_Y + SHADOW_EPS,
-    z: pos.z,
-    scale: baseScale * (0.9 + 0.1 * h),
+    z: pos.z + SHADOW_THROW[1] * slide,
+    scale,
     opacity: SHADOW_MAX_OPACITY / (1 + h / SHADOW_FALLOFF_H),
   };
 }

@@ -3,7 +3,7 @@ import { Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Scene, 
 import { ARENA_GROUND_Y } from '../../../src/engine/arena';
 import { createEnemyLayer } from '../../../src/ui/enemy/enemy-layer';
 import { quarryWorldHeight, WEAKSPOT_NAME } from '../../../src/ui/enemy/meshes';
-import { SHADOW_EPS, SHADOW_NAME, shadowPose } from '../../../src/ui/enemy/shadow';
+import { SHADOW_EPS, SHADOW_NAME, SHADOW_STRETCH, shadowPose } from '../../../src/ui/enemy/shadow';
 import { SPARK_MS, SPARK_NAME } from '../../../src/ui/enemy/sparks';
 import type { Degrees, TargetHandle } from '../../../src/types';
 
@@ -400,7 +400,13 @@ describe('enemy-layer contact shadows (Phase B)', () => {
     return layerGroup.children.filter((c) => c.name === SHADOW_NAME) as Mesh[];
   }
 
-  it('a spawn creates a blob pinned to the grid plane directly beneath the target', async () => {
+  /** Expected blob center for a quarry ground point: base + the dusk slide along SHADOW_THROW. */
+  function expectedBlobXZ(x: number, y: number, z: number, baseScale: number): [number, number] {
+    const pose = shadowPose({ x, y, z }, baseScale)!;
+    return [pose.x, pose.z];
+  }
+
+  it('a spawn creates a blob on the grid plane at the pure shadowPose spot beneath the target', async () => {
     const layer = await createEnemyLayer({ reducedMotion: false });
     const scene = new Scene();
     layer.attach(scene);
@@ -409,9 +415,17 @@ describe('enemy-layer contact shadows (Phase B)', () => {
     const blob = shadowsIn(scene)[0]!;
     expect(blob).toBeTruthy();
     expect(blob.visible).toBe(true);
-    expect(blob.position.x).toBeCloseTo(3, 6);
-    expect(blob.position.z).toBeCloseTo(-DIST, 6);
+    // The idle pose bobs the quarry a hair, so compare against shadowPose of the POSED position.
+    // baseScale uses the target's TRUE distance from the eye (|(3,0,-20)|), exactly as the layer does.
+    const quarry = quarryGroupIn(scene);
+    const dist = new Vector3(3, 0, -DIST).length();
+    const [ex, ez] = expectedBlobXZ(quarry.position.x, quarry.position.y, quarry.position.z, quarryWorldHeight(dist, RADIUS));
+    expect(blob.position.x).toBeCloseTo(ex, 6);
+    expect(blob.position.z).toBeCloseTo(ez, 6);
     expect(blob.position.y).toBeCloseTo(ARENA_GROUND_Y + SHADOW_EPS, 10);
+    // The ellipse is stretched along the throw: long axis (local y scale) > short axis (local x).
+    expect(blob.scale.y).toBeGreaterThan(blob.scale.x);
+    expect(blob.scale.y / blob.scale.x).toBeCloseTo(SHADOW_STRETCH / 1.15, 2);
     layer.dispose();
   });
 
@@ -423,10 +437,14 @@ describe('enemy-layer contact shadows (Phase B)', () => {
     layer.spawn('t0', obj, RADIUS, 0);
     layer.update(SPAWN_MS + 100);
     const blob = shadowsIn(scene)[0]!;
-    obj.position.set(5, 1, -DIST + 2); // the arena moves the scored sphere; the layer only follows
+    const x0 = blob.position.x;
+    const z0 = blob.position.z;
+    obj.position.set(5, 0, -DIST + 2); // the arena moves the scored sphere; the layer only follows
     layer.update(SPAWN_MS + 150);
-    expect(blob.position.x).toBeCloseTo(5, 6);
-    expect(blob.position.z).toBeCloseTo(-DIST + 2, 6);
+    // It moved WITH the target (same height, so the throw slide is unchanged up to idle-bob noise).
+    expect(blob.position.x - x0).toBeCloseTo(5, 1);
+    expect(blob.position.z - z0).toBeCloseTo(2, 1);
+    // ...and never left the plane.
     expect(blob.position.y).toBeCloseTo(ARENA_GROUND_Y + SHADOW_EPS, 10);
     layer.dispose();
   });
@@ -476,9 +494,11 @@ describe('enemy-layer contact shadows (Phase B)', () => {
     // (pose.opacity is 1 in the reduced static idle).
     const expected = shadowPose(obj.position, quarryWorldHeight(DIST, RADIUS))!;
     expect((blob.material as MeshBasicMaterial).opacity).toBeCloseTo(expected.opacity, 6);
+    const x0 = blob.position.x;
     obj.position.x = 4;
     layer.update(50);
-    expect(blob.position.x).toBeCloseTo(4, 6);
+    // Follows by the same world delta (the constant throw slide cancels in the difference).
+    expect(blob.position.x - x0).toBeCloseTo(4, 6);
     layer.dispose();
   });
 });

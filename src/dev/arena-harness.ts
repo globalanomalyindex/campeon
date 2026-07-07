@@ -21,6 +21,8 @@ interface ArenaDebug {
   view(): [number, number];
   mode(): PointerLockMode | null;
   fire(): void;
+  /** Dev probe: current muzzle-flash + gun-pose state (reads only), for headless verification. */
+  vmFlash(): { visible: boolean; opacity: number; scale: number; petals: number; gunX?: number; gunRotZ?: number };
   runInstrument(id: InstrumentId): Promise<TrialResult>;
   runSession(): Promise<Report>;
   cleanup(): void;
@@ -106,6 +108,12 @@ export function mountArenaHarness(root: HTMLElement): void {
     arena.spawnTarget({ kind: 'static' });
     arena.spawnTarget({ kind: 'moving', motion: { yawAmp: 14, baseFreq: 0.45 } });
   };
+  // [v] showcase: ONE close static target so the active quarry fills the frame - the sculpting /
+  // secondary-motion inspection view (dev-only; the scored path is the same spawnTarget call).
+  const spawnShowcase = (): void => {
+    arena.clearTargets();
+    arena.spawnTarget({ kind: 'static', yaw: 0, pitch: 0, distance: 4, worldRadius: 0.6 });
+  };
   spawnTrio(); // gold spheres until the merc skin finishes loading
   // Cosmetic merc-prey skin: attach then respawn so targets are skinned. [q/w/e/r] swap environment.
   void createEnemyLayer({ reducedMotion, onShot: (r) => { if (r === 'miss') feedback.miss(); } }).then((layer) => {
@@ -117,8 +125,10 @@ export function mountArenaHarness(root: HTMLElement): void {
 
   // In-scene 3D single-action revolver, attached through the arena's viewmodel seam (the arena owns
   // its look/fire/tick/dispose, mirroring attachEnemies). Replaces the old 2D Deagle overlay here so
-  // the dev harness verifies the stack that actually ships.
-  arena.attachViewmodel(asViewmodelLayer(createViewmodel3D({ reducedMotion })));
+  // the dev harness verifies the stack that actually ships. The vm handle is kept for the dev-only
+  // flash probe below (reads state, writes nothing).
+  const vm = createViewmodel3D({ reducedMotion });
+  arena.attachViewmodel(asViewmodelLayer(vm));
 
   let view: [number, number] = [0, 0];
   arena.onAim((_s, v) => {
@@ -168,6 +178,7 @@ export function mountArenaHarness(root: HTMLElement): void {
       enemyLayer.setEnvironment(env);
       spawnTrio();
     }
+    if (e.key === 'v' && enemyLayer) spawnShowcase();
   });
   window.addEventListener('resize', () => arena.resize());
 
@@ -193,6 +204,23 @@ export function mountArenaHarness(root: HTMLElement): void {
     mode: () => pointer.mode(),
     fire() {
       pushFire();
+    },
+    vmFlash() {
+      const f = vm.group.getObjectByName('revolver-flash');
+      if (!f) return { visible: false, opacity: -1, scale: -1, petals: 0 };
+      const first = f.children[0] as import('three').Mesh | undefined;
+      const mat = first?.material as import('three').MeshBasicMaterial | undefined;
+      return {
+        visible: f.visible,
+        opacity: mat?.opacity ?? -1,
+        scale: f.scale.x,
+        petals: f.children.length,
+        // Gun pose channels the springs write every tick - static values mean tick isn't running.
+        gunX: vm.group.position.x,
+        gunRotZ: vm.group.rotation.z,
+        gunY: vm.group.position.y,
+        gunScale: vm.group.scale.x,
+      } as ReturnType<ArenaDebug['vmFlash']>;
     },
     async runInstrument(id: InstrumentId): Promise<TrialResult> {
       const { getInstrument } = await import('../instruments/registry');

@@ -5,6 +5,9 @@ import {
   SHADOW_MAX_OPACITY,
   SHADOW_FALLOFF_H,
   SHADOW_EPS,
+  SHADOW_SPIN,
+  SHADOW_STRETCH,
+  SHADOW_THROW,
   createShadowTexture,
   createShadowBlob,
   shadowPose,
@@ -13,6 +16,7 @@ import {
 } from '../../../src/ui/enemy/shadow';
 import { hex } from '../../../src/palette';
 import { ARENA_GROUND_Y } from '../../../src/engine/arena';
+import { SUN_DIR } from '../../../src/engine/environment';
 
 describe('createShadowTexture', () => {
   it('is a 64x64 DataTexture with needsUpdate set', () => {
@@ -65,11 +69,12 @@ describe('createShadowTexture', () => {
 describe('createShadowBlob', () => {
   const tex = createShadowTexture();
 
-  it('is named, flat, and built from the shared texture', () => {
+  it('is named, flat, spun onto the anti-sun throw, and built from the shared texture', () => {
     const blob = createShadowBlob(tex);
     expect(blob).toBeInstanceOf(Mesh);
     expect(blob.name).toBe(SHADOW_NAME);
     expect(blob.rotation.x).toBeCloseTo(-Math.PI / 2, 12);
+    expect(blob.rotation.z).toBeCloseTo(SHADOW_SPIN, 12);
     expect(blob.geometry).toBeInstanceOf(CircleGeometry);
   });
 
@@ -123,9 +128,20 @@ describe('shadowPose', () => {
       const pose = shadowPose({ x: 1, y: ARENA_GROUND_Y + h, z: 2 }, baseScale) as ShadowPose;
       expect(pose).not.toBeNull();
       expect(pose.y).toBeCloseTo(ARENA_GROUND_Y + SHADOW_EPS, 12);
-      expect(pose.x).toBe(1);
-      expect(pose.z).toBe(2);
+      // x/z sit at the ground point PLUS the dusk slide along the throw (near edge at the stance).
+      const slide = (pose.scale * SHADOW_STRETCH - pose.scale) / 2;
+      expect(pose.x).toBeCloseTo(1 + SHADOW_THROW[0] * slide, 12);
+      expect(pose.z).toBeCloseTo(2 + SHADOW_THROW[1] * slide, 12);
     }
+  });
+
+  it('SHADOW_THROW is the unit horizontal ANTI-sun direction (env map, rim, and floor agree)', () => {
+    expect(Math.hypot(SHADOW_THROW[0], SHADOW_THROW[1])).toBeCloseTo(1, 12);
+    // Anti-parallel to the sun's ground projection: negative dot, and exactly opposite direction.
+    const sunGround = [SUN_DIR[0], SUN_DIR[2]];
+    const dot = SHADOW_THROW[0] * sunGround[0] + SHADOW_THROW[1] * sunGround[1];
+    expect(dot).toBeLessThan(0);
+    expect(SHADOW_THROW[0] * sunGround[1] - SHADOW_THROW[1] * sunGround[0]).toBeCloseTo(0, 12); // parallel
   });
 
   it('opacity is strictly decreasing in height and never exceeds SHADOW_MAX_OPACITY', () => {

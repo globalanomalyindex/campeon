@@ -4,8 +4,11 @@ import {
   Fog,
   GridHelper,
   HemisphereLight,
+  Mesh,
+  MeshStandardMaterial,
   type Object3D,
   type PerspectiveCamera,
+  PlaneGeometry,
   Scene,
 } from 'three';
 import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, Ms, TargetHandle, TargetSpec } from '../types';
@@ -138,7 +141,7 @@ export class Arena implements ArenaScene {
     // Warm film-stock lighting: a cream sky over a warm ground, so lit surfaces read warm not blue-grey.
     // Tuned so the low-poly 3D quarry + revolver (low-metalness, no environment map) read as lit FORM
     // against the near-black backdrop without washing out the moody spaghetti-western mood.
-    const hemi = new HemisphereLight(0xe7dcc4, 0x191510, 1.35);
+    const hemi = new HemisphereLight(0xe7dcc4, 0x2a2218, 1.6);
     const key = new DirectionalLight(0xfff3e2, 1.1); // warm key, high front-right
     key.position.set(3, 10, 4);
     // Warm rim/back light (the spaghetti-western low sun). It sits BEYOND the forward targets (negative
@@ -146,11 +149,28 @@ export class Arena implements ArenaScene {
     // arena - true rim separation, not a front fill. Strong + saturated-warm for a dramatic edge.
     const rim = new DirectionalLight(0xffac5a, 1.5);
     rim.position.set(6, 7, -24);
-    // Floor grid: warm cream-tinted hairlines over the cinema-ink, not the old cool blue-grey.
-    const grid = new GridHelper(200, 80, 0x3a342a, 0x16130e);
+    // Dim warm FILL from the camera side, low and left (opposite the key's high right): vertical
+    // faces otherwise starve (the key + hemisphere favor upward faces), leaving the quarry's front
+    // a black cutout. Deliberately weak - it lifts the shadow side a stop, it does not flatten the
+    // rim drama.
+    const fill = new DirectionalLight(0xe7c9a4, 0.45);
+    fill.position.set(-5, 1.5, 9);
+    // The stage floor: a big LIT plane under the grid, so the ground actually READS - the warm
+    // hemisphere grades it, the fog swallows it toward the horizon (the depth cue), and the
+    // per-target contact shadows have a surface to sit on. Dark warm leather, never pure black.
+    const floor = new Mesh(
+      new PlaneGeometry(400, 400),
+      new MeshStandardMaterial({ color: 0x221b14, roughness: 0.95, metalness: 0 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = ARENA_GROUND_Y - 0.02; // just under the grid hairlines
+    // Floor grid: warm cream-tinted hairlines over the lit floor, fading into the fog. The FIELD
+    // lines (4th arg) carry the read; the center cross sits a step brighter as the axis anchor.
+    const grid = new GridHelper(200, 80, 0x8a7a5f, 0x453b2d);
     grid.position.y = ARENA_GROUND_Y;
-    this.scene.add(hemi, key, rim, grid);
+    this.scene.add(hemi, key, rim, fill, floor, grid);
     this.envDisposables.push(grid); // GridHelper owns a BufferGeometry + LineBasicMaterial
+    this.envDisposables.push(floor.geometry, floor.material as MeshStandardMaterial);
 
     // Warm procedural equirect env map (SUN_DIR normalizes this SAME rim-light position, so the IBL
     // specular ping on metallic props agrees with the analytic rim halo above). three r161+'s

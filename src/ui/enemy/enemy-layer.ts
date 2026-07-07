@@ -18,7 +18,14 @@ import {
   type QuarryMesh,
 } from './meshes';
 import { applySecondary } from './secondary';
-import { createShadowBlob, createShadowTexture, disposeShadowBlob, shadowPose } from './shadow';
+import {
+  createShadowBlob,
+  createShadowTexture,
+  disposeShadowBlob,
+  SHADOW_STRETCH,
+  SHADOW_WIDE,
+  shadowPose,
+} from './shadow';
 import { applySpark, disposeSpark, sparkBurst } from './sparks';
 
 interface EnemyRecord {
@@ -309,7 +316,9 @@ export async function createEnemyLayer(
     if (sp) {
       rec.shadow.visible = true;
       rec.shadow.position.set(sp.x, sp.y, sp.z);
-      rec.shadow.scale.setScalar(sp.scale);
+      // Anisotropic: short axis = the stance footprint, long (local Y, spun onto the anti-sun
+      // throw) = the dusk stretch. See shadow.ts's SHADOW_SPIN/SHADOW_THROW derivation.
+      rec.shadow.scale.set(sp.scale * SHADOW_WIDE, sp.scale * SHADOW_STRETCH, 1);
       (rec.shadow.material as MeshBasicMaterial).opacity = sp.opacity * pose.opacity;
     } else {
       rec.shadow.visible = false;

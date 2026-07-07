@@ -78,8 +78,22 @@ export interface QuarryMaterials {
   weakspot: MeshStandardMaterial;
 }
 
-const mkBody = (color: number, roughness = 0.85): MeshStandardMaterial =>
-  new MeshStandardMaterial({ color, roughness, metalness: 0.05, flatShading: true });
+/**
+ * Body material with a faint SELF-emissive value floor: each surface smolders in its OWN palette
+ * color at low intensity, so a quarry 20m out against the ink horizon never drops below a readable
+ * value (dusk forms hold a value above true black on film) while lit faces still carry the form.
+ * The emissive COLOR stays the literal palette color (the no-hardcoded-hex rule is testable);
+ * intensity is the tuning knob.
+ */
+const mkBody = (color: number, roughness = 0.85, emissiveIntensity = 0.18): MeshStandardMaterial =>
+  new MeshStandardMaterial({
+    color,
+    roughness,
+    metalness: 0.05,
+    flatShading: true,
+    emissive: color,
+    emissiveIntensity,
+  });
 
 function parseHex(h: string): number {
   return parseInt(h.replace('#', ''), 16);
@@ -89,8 +103,8 @@ function parseHex(h: string): number {
 export function createQuarryMaterials(): QuarryMaterials {
   return {
     hide: mkBody(parseHex(hex.hide)),
-    accent: mkBody(parseHex(hex.cream), 0.7),
-    mark: mkBody(parseHex(hex.blood), 0.6),
+    accent: mkBody(parseHex(hex.cream), 0.7, 0.1), // cream needs less floor - it catches real light
+    mark: mkBody(parseHex(hex.blood), 0.6, 0.3), // the threat mark SMOLDERS at range
     weakspot: new MeshStandardMaterial({
       color: parseHex(hex.gold),
       emissive: parseHex(hex.gold),
@@ -167,96 +181,154 @@ function assemble(m: QuarryMaterials, parts: Object3D[]): QuarryMesh {
 }
 
 // ── Per-strategy silhouettes ─────────────────────────────────────────────────
-// First-pass FUNCTIONAL geometry: correct strategy reads, on-palette, origin-anchored.
-// The human iterates the aesthetics in Chromium afterward. Dimensions are in the group's
-// unit space (~1.0 tall overall); the layer scales the whole group to the hitbox.
+// SCULPTED low-poly forms (still pure primitives, flat-shaded, on-palette, origin-anchored).
+// Design language: every quarry FACES +x (the camera mostly sees targets in PROFILE, and a profile
+// is where a silhouette is most legible), carries one continuous GESTURE line (coil-to-hood arc,
+// dart streak, bench line, wedge hump), and zones its materials so the cream accent catches the
+// rim light while the blood mark flags the threat. Dimensions in group-unit space (~1.0 tall);
+// the layer scales the whole group to the hitbox.
 
-/** track → slender airborne DARTING form: swept fuselage body + thin back-swept wings. */
+/** track → slender airborne DARTING form: a swift - swept fuselage, long back-swept wings. */
 function buildTrack(m: QuarryMaterials): QuarryMesh {
-  const body = part(new CapsuleGeometry(0.16, 0.5, 4, 8), m.hide, (o) => {
+  const body = part(new CapsuleGeometry(0.11, 0.5, 4, 8), m.hide, (o) => {
     o.rotation.z = Math.PI / 2; // lie along X - a darting horizontal streak
+    o.rotation.y = 0.06; // a hair of bank, so it never reads as a static extrusion
   });
   body.name = 'part-body';
-  const wingL = part(new ConeGeometry(0.1, 0.55, 4), m.accent, (o) => {
+  const nose = part(new ConeGeometry(0.09, 0.22, 6), m.accent, (o) => {
+    o.rotation.z = -Math.PI / 2; // apex forward - the dart's point
+    o.position.set(0.42, 0, 0);
+  });
+  // Wings: long, thin, swept HARD back with a slight dihedral - the swift's sickle in profile.
+  // HIDE, not accent: the dart stays a dark streak with ONE bright anchor (the nose), so the
+  // contrast hierarchy reads at 20m instead of washing the whole form silver.
+  const wingL = part(new ConeGeometry(0.055, 0.62, 4), m.hide, (o) => {
     o.rotation.z = Math.PI / 2;
-    o.rotation.y = -0.5;
-    o.position.set(-0.05, 0.02, 0.28);
+    o.rotation.y = -0.95; // swept back
+    o.rotation.x = -0.12; // dihedral lift
+    o.position.set(-0.02, 0.05, 0.24);
   });
   wingL.name = 'part-wing-l';
-  const wingR = part(new ConeGeometry(0.1, 0.55, 4), m.accent, (o) => {
+  const wingR = part(new ConeGeometry(0.055, 0.62, 4), m.hide, (o) => {
     o.rotation.z = Math.PI / 2;
-    o.rotation.y = 0.5;
-    o.position.set(-0.05, 0.02, -0.28);
+    o.rotation.y = 0.95;
+    o.rotation.x = 0.12;
+    o.position.set(-0.02, 0.05, -0.24);
   });
   wingR.name = 'part-wing-r';
-  const tail = part(new ConeGeometry(0.08, 0.3, 4), m.mark, (o) => {
+  // Forked tail: one flattened blood cone, wide and shallow - the kite silhouette that flags it.
+  const tail = part(new ConeGeometry(0.11, 0.3, 3), m.mark, (o) => {
     o.rotation.z = -Math.PI / 2;
-    o.position.set(-0.42, 0, 0);
+    o.rotation.x = Math.PI / 2; // flatten the 3-gon horizontal
+    o.scale.set(1, 1, 0.35);
+    o.position.set(-0.44, 0.01, 0);
   });
   tail.name = 'part-tail';
-  return assemble(m, [body, wingL, wingR, tail]);
+  return assemble(m, [body, nose, wingL, wingR, tail]);
 }
 
-/** flick → coiled AMBUSH form, poised-to-snap: a drawn-back hood reared over a low coil. */
+/** flick → coiled AMBUSH form: a cobra - stepped coil, reared S-neck, flared hood, bared fang. */
 function buildFlick(m: QuarryMaterials): QuarryMesh {
-  const coil = part(new CylinderGeometry(0.26, 0.3, 0.22, 10), m.hide, (o) => {
-    o.position.set(0, -0.18, 0);
+  // Stepped coil: two offset rings, wider below - the loaded spring the strike leaves from.
+  const coilBase = part(new CylinderGeometry(0.3, 0.34, 0.14, 10), m.hide, (o) => {
+    o.position.set(-0.02, -0.4, 0);
+  });
+  const coil = part(new CylinderGeometry(0.2, 0.26, 0.13, 10), m.hide, (o) => {
+    o.position.set(0.03, -0.28, 0.02); // offset ring breaks the symmetry - a real coil, not a stack
   });
   coil.name = 'part-coil';
-  const neck = part(new CapsuleGeometry(0.09, 0.34, 4, 8), m.hide, (o) => {
-    o.rotation.x = -0.35; // reared back, ready to strike forward
+  // Reared S-neck in two segments: lower leans back (drawn), upper cranes forward (aimed).
+  const neckLow = part(new CapsuleGeometry(0.075, 0.28, 4, 8), m.hide, (o) => {
+    o.rotation.z = 0.35; // lean back off vertical (away from +x)
+    o.position.set(-0.06, -0.08, 0);
+  });
+  const neck = part(new CapsuleGeometry(0.065, 0.26, 4, 8), m.hide, (o) => {
+    o.rotation.z = -0.5; // crane forward over the weak-spot
     o.position.set(0.04, 0.18, 0);
   });
   neck.name = 'part-neck';
-  const hood = part(new ConeGeometry(0.22, 0.18, 5), m.mark, (o) => {
-    o.rotation.x = Math.PI; // flared hood crowning the strike point
-    o.position.set(0.06, 0.36, 0);
+  // Flared hood: a wide shallow cone aimed along +x, mouth toward the viewer's threat axis.
+  const hood = part(new ConeGeometry(0.24, 0.22, 6), m.mark, (o) => {
+    o.rotation.z = -Math.PI / 2; // apex forward (+x), flare behind
+    o.scale.set(1, 1, 0.55); // flatten side-to-side: a hood, not a funnel
+    o.position.set(0.2, 0.34, 0);
   });
   hood.name = 'part-hood';
-  const fang = part(new ConeGeometry(0.05, 0.16, 4), m.accent, (o) => {
-    o.position.set(0.12, 0.22, 0);
-    o.rotation.z = -0.4;
+  // Bared fang under the hood's chin - small, cream, catching the rim.
+  const fang = part(new ConeGeometry(0.035, 0.12, 4), m.accent, (o) => {
+    o.rotation.z = Math.PI - 0.35; // apex down-forward
+    o.position.set(0.26, 0.22, 0);
   });
   fang.name = 'part-fang';
-  return assemble(m, [coil, neck, hood, fang]);
+  return assemble(m, [coilBase, coil, neckLow, neck, hood, fang]);
 }
 
-/** calibrate → low, steady BENCH-REST form: a broad planted stance under a level back. */
+/** calibrate → low, steady BENCH-REST form: a planted quadruped, level spine, sighting head. */
 function buildCalibrate(m: QuarryMaterials): QuarryMesh {
-  const back = part(new BoxGeometry(0.62, 0.2, 0.32), m.hide, (o) => {
-    o.position.set(0, 0.04, 0);
+  const back = part(new BoxGeometry(0.66, 0.16, 0.3), m.hide, (o) => {
+    o.position.set(0, 0.06, 0);
   });
   back.name = 'part-back';
-  const head = part(new BoxGeometry(0.2, 0.16, 0.22), m.accent, (o) => {
-    o.position.set(0.36, 0.02, 0);
+  // Under-mass: a second, lower slab - the settled belly that says "this thing does not move".
+  const belly = part(new BoxGeometry(0.46, 0.16, 0.24), m.hide, (o) => {
+    o.position.set(0.02, -0.07, 0);
+  });
+  const head = part(new BoxGeometry(0.2, 0.14, 0.2), m.accent, (o) => {
+    o.position.set(0.4, 0.08, 0);
+    o.rotation.z = -0.06; // sighting down its own line, a hair below level
   });
   head.name = 'part-head';
+  const muzzle = part(new BoxGeometry(0.12, 0.07, 0.12), m.accent, (o) => {
+    o.position.set(0.52, 0.04, 0);
+  });
   // Legs stay unnamed - the bench-rest form is deliberately planted (no secondary motion on stance).
-  const legFL = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(0.22, -0.2, 0.13));
-  const legFR = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(0.22, -0.2, -0.13));
-  const legBL = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(-0.22, -0.2, 0.13));
-  const legBR = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(-0.22, -0.2, -0.13));
-  const ridge = part(new BoxGeometry(0.5, 0.06, 0.06), m.mark, (o) => o.position.set(0, 0.17, 0));
+  const legFL = part(new CylinderGeometry(0.055, 0.06, 0.36, 6), m.hide, (o) => o.position.set(0.24, -0.26, 0.15));
+  const legFR = part(new CylinderGeometry(0.055, 0.06, 0.36, 6), m.hide, (o) => o.position.set(0.24, -0.26, -0.15));
+  const legBL = part(new CylinderGeometry(0.055, 0.06, 0.36, 6), m.hide, (o) => o.position.set(-0.24, -0.26, 0.15));
+  const legBR = part(new CylinderGeometry(0.055, 0.06, 0.36, 6), m.hide, (o) => o.position.set(-0.24, -0.26, -0.15));
+  const ridge = part(new BoxGeometry(0.56, 0.05, 0.05), m.mark, (o) => o.position.set(-0.02, 0.16, 0));
   ridge.name = 'part-ridge';
-  return assemble(m, [back, head, legFL, legFR, legBL, legBR, ridge]);
+  return assemble(m, [back, belly, head, muzzle, legFL, legFR, legBL, legBR, ridge]);
 }
 
-/** strike → heavy ARMORED form: a blocky plated mass riding low, broad shoulders. */
+/** strike → heavy ARMORED form: a bison-tank - low wedge mass, shoulder hump, brow plate, horn. */
 function buildStrike(m: QuarryMaterials): QuarryMesh {
-  const core = part(new BoxGeometry(0.46, 0.46, 0.5), m.hide, (o) => {
-    o.position.set(0, -0.02, 0);
+  const core = part(new BoxGeometry(0.52, 0.36, 0.42), m.hide, (o) => {
+    o.position.set(-0.06, -0.12, 0);
   });
   core.name = 'part-core';
-  const shoulderL = part(new BoxGeometry(0.18, 0.34, 0.2), m.accent, (o) => o.position.set(0.05, 0.18, 0.32));
+  // The hump: the tall forward shoulder mass that makes the wedge silhouette.
+  const hump = part(new BoxGeometry(0.34, 0.3, 0.36), m.hide, (o) => {
+    o.position.set(0.1, 0.14, 0);
+    o.rotation.z = -0.08; // wedge line falling toward the head
+  });
+  // Pads in HIDE: the family rule is dark mass + ONE blood mark + ONE cream anchor per quarry
+  // (here: plate + horn), so no second bright surface competes with the threat read.
+  const shoulderL = part(new BoxGeometry(0.2, 0.26, 0.14), m.hide, (o) => {
+    o.position.set(0.06, 0.05, 0.27);
+    o.rotation.x = 0.12; // pads splay outward off the hump
+  });
   shoulderL.name = 'part-shoulder-l';
-  const shoulderR = part(new BoxGeometry(0.18, 0.34, 0.2), m.accent, (o) => o.position.set(0.05, 0.18, -0.32));
+  const shoulderR = part(new BoxGeometry(0.2, 0.26, 0.14), m.hide, (o) => {
+    o.position.set(0.06, 0.05, -0.27);
+    o.rotation.x = -0.12;
+  });
   shoulderR.name = 'part-shoulder-r';
-  const plate = part(new BoxGeometry(0.5, 0.14, 0.54), m.mark, (o) => o.position.set(0, 0.24, 0));
+  // Brow plate: blood armor slab raked over the face - the threat you aim past.
+  const plate = part(new BoxGeometry(0.3, 0.1, 0.4), m.mark, (o) => {
+    o.position.set(0.3, 0.16, 0);
+    o.rotation.z = -0.35; // raked down over the brow
+  });
   plate.name = 'part-plate';
+  // Horn: a short cream spike off the brow, forward-down - catches the rim at 20m.
+  const horn = part(new ConeGeometry(0.045, 0.18, 5), m.accent, (o) => {
+    o.rotation.z = -Math.PI / 2 - 0.5;
+    o.position.set(0.44, 0.06, 0);
+  });
   // Feet stay unnamed - the heavy stance is deliberately planted (no secondary motion).
-  const footL = part(new BoxGeometry(0.18, 0.16, 0.2), m.hide, (o) => o.position.set(0, -0.3, 0.18));
-  const footR = part(new BoxGeometry(0.18, 0.16, 0.2), m.hide, (o) => o.position.set(0, -0.3, -0.18));
-  return assemble(m, [core, shoulderL, shoulderR, plate, footL, footR]);
+  const footL = part(new BoxGeometry(0.16, 0.14, 0.18), m.hide, (o) => o.position.set(-0.02, -0.36, 0.17));
+  const footR = part(new BoxGeometry(0.16, 0.14, 0.18), m.hide, (o) => o.position.set(-0.02, -0.36, -0.17));
+  return assemble(m, [core, hump, shoulderL, shoulderR, plate, horn, footL, footR]);
 }
 
 const BUILDERS: Record<InstrumentId, (m: QuarryMaterials) => QuarryMesh> = {
