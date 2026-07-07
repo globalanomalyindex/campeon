@@ -1,4 +1,4 @@
-import type { Cm360, InstrumentId } from '../types';
+import type { Cm360, FacetPeak, InstrumentId } from '../types';
 
 export interface PlotSize { width: number; height: number; }
 export interface PlotMark { cm360: Cm360; score: number; instrument: InstrumentId; }
@@ -8,10 +8,25 @@ export interface PlotInput {
   curve?: readonly { x: number; mean: number }[]; // x = ln(cm/360)
   ci90?: [Cm360, Cm360];
   peak?: Cm360;
+  /**
+   * A5's per-facet peaks, drawn as markers along the top of the plot: each probe's OWN best
+   * sensitivity, so the eye can SEE the one-number thesis being tested against the blended peak
+   * line. Entries without a fittable peak are skipped (dashed in copy, never faked in geometry).
+   */
+  facetPeaks?: readonly FacetPeak[];
   size: PlotSize;
   pad?: number;
 }
 export interface PlotMarkPx extends PlotMark { px: number; py: number; }
+export interface FacetPeakPx {
+  instrument: InstrumentId;
+  px: number;
+  /** The facet's bootstrap SPREAD (not a CI - see FacetPeak.spreadLn) as a horizontal whisker,
+   *  clamped to the plot extent; null when the spread is missing. */
+  whisker: { x0: number; x1: number } | null;
+  /** strike: taste-conditioned, excluded from the tier - rendered hollow/dashed. */
+  laneConditioned: boolean;
+}
 export interface PlotGeometry {
   size: PlotSize;
   pad: number;
@@ -21,6 +36,7 @@ export interface PlotGeometry {
   curvePath: string | null;
   ciRectPx: { x: number; width: number } | null;
   peakPx: number | null;
+  facetPeaks: FacetPeakPx[];
   yRange: [number, number];
 }
 
@@ -63,7 +79,23 @@ export function plotGeometry(input: PlotInput): PlotGeometry {
 
   const peakPx = peak !== undefined ? xToPx(peak) : null;
 
-  return { size, pad, xToPx, xTicks, marks: marksPx, curvePath, ciRectPx, peakPx, yRange: [yMin, yMax] };
+  const clampX = (px: number): number => Math.max(x0, Math.min(x1, px));
+  const facetPeaks: FacetPeakPx[] = (input.facetPeaks ?? [])
+    .filter((f): f is FacetPeak & { peakCm360: number } => f.peakCm360 !== undefined && Number.isFinite(f.peakCm360))
+    .map((f) => ({
+      instrument: f.instrument,
+      px: clampX(xToPx(f.peakCm360)),
+      whisker:
+        f.spreadLn !== undefined && Number.isFinite(f.spreadLn) && f.spreadLn > 0
+          ? {
+              x0: clampX(xToPx(Math.exp(Math.log(f.peakCm360) - f.spreadLn))),
+              x1: clampX(xToPx(Math.exp(Math.log(f.peakCm360) + f.spreadLn))),
+            }
+          : null,
+      laneConditioned: f.laneConditioned,
+    }));
+
+  return { size, pad, xToPx, xTicks, marks: marksPx, curvePath, ciRectPx, peakPx, facetPeaks, yRange: [yMin, yMax] };
 }
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -75,6 +107,21 @@ const el = (name: string, attrs: Record<string, string>): SVGElement => {
 const ORGANISM_VAR: Record<InstrumentId, string> = {
   track: 'var(--c-track)', flick: 'var(--c-flick)', calibrate: 'var(--c-calibrate)', strike: 'var(--c-strike)',
 };
+
+/**
+ * The color key the plots never had: one swatch chip per probe, in the same organism color the
+ * marks use. Pure markup string (unit-testable); aria-hidden because it decodes an aria-hidden
+ * plot - the accessible story is the figcaption + live-region copy, not the colors.
+ */
+export function plotLegendHtml(ids: readonly InstrumentId[] = ['track', 'flick', 'calibrate', 'strike']): string {
+  const items = ids
+    .map(
+      (id) =>
+        `<span class="plot-legend__item" data-legend="${id}"><span class="plot-legend__swatch" style="background:${ORGANISM_VAR[id]}"></span>${id}</span>`,
+    )
+    .join('');
+  return `<span class="plot-legend mono" aria-hidden="true">${items}</span>`;
+}
 
 /** Thin renderer: clears `svg` and draws the geometry (CI band → curve → marks → peak → ticks). */
 export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?: string): void {
@@ -106,6 +153,27 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
       fill: filled ? ORGANISM_VAR[m.instrument] : 'none',
       stroke: ORGANISM_VAR[m.instrument], 'stroke-width': '1.5',
       'data-mark': m.instrument,
+    }));
+  }
+  // A5 facet-peak markers: each probe's OWN best, as a diamond on a top rail with its spread
+  // whisker - the eye compares them against the gold peak line (the thesis, tested visibly).
+  // strike (taste-conditioned, excluded from the tier) renders hollow + dashed.
+  const railY = g.pad + 7;
+  for (const f of g.facetPeaks) {
+    if (f.whisker) {
+      svg.appendChild(el('line', {
+        x1: f.whisker.x0.toFixed(2), y1: String(railY), x2: f.whisker.x1.toFixed(2), y2: String(railY),
+        stroke: ORGANISM_VAR[f.instrument], 'stroke-width': '1', 'stroke-opacity': '0.5',
+        'data-facet-whisker': f.instrument,
+      }));
+    }
+    svg.appendChild(el('rect', {
+      x: (f.px - 4).toFixed(2), y: String(railY - 4), width: '8', height: '8',
+      transform: `rotate(45 ${f.px.toFixed(2)} ${railY})`,
+      fill: f.laneConditioned ? 'none' : ORGANISM_VAR[f.instrument],
+      stroke: ORGANISM_VAR[f.instrument], 'stroke-width': '1.5',
+      ...(f.laneConditioned ? { 'stroke-dasharray': '2 2' } : {}),
+      'data-facet-peak': f.instrument,
     }));
   }
   for (const t of g.xTicks) {

@@ -329,6 +329,33 @@
 .result__plot svg[data-plot] { display: block; width: 100%; height: auto; aspect-ratio: 360 / 200; }
 .result__plot figcaption { margin-top: var(--space-1); color: var(--text-muted); font-size: .78rem; text-align: center; }
 
+/* The color key the plots decode by: one chip per probe, in the same organism colors the marks use. */
+.plot-legend { display: inline-flex; gap: .9em; margin-left: .6em; vertical-align: middle; font-size: .72rem; }
+.plot-legend__item { display: inline-flex; align-items: center; gap: .35em; color: var(--text-muted); text-transform: lowercase; }
+.plot-legend__swatch { width: .6em; height: .6em; border-radius: 1px; display: inline-block; }
+
+/* A5 thesis block: the one-number claim, tested and reported per probe. */
+.result__thesis { margin: var(--space-3) 0 0; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong); border-left: 2px solid var(--gold);
+  background: var(--surface-raised); border-radius: 2px; }
+.result__thesis[data-thesis-tier="divergent"] { border-left-color: var(--blood); }
+.result__thesis-line { margin: 0; font-size: .85rem; color: var(--text); max-width: 60ch; }
+.result__thesis-facets { margin: var(--space-1) 0 0; font-size: .74rem; color: var(--text-muted); }
+.result__thesis-note { margin: 2px 0 0; font-size: .68rem; color: var(--text-muted); font-style: italic; }
+
+/* Staged reveal: the number lands first, then the evidence around it. Opacity/transform only;
+   under reduced motion every block renders in place instantly (no stagger, no movement). */
+.result [data-reveal] { opacity: 0; transform: translateY(10px); }
+.result.is-revealed [data-reveal] {
+  opacity: 1; transform: none;
+  transition: opacity .55s ease, transform .55s ease;
+  transition-delay: calc(var(--reveal-i, 0) * 130ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .result [data-reveal] { opacity: 1; transform: none; }
+  .result.is-revealed [data-reveal] { transition: none; }
+}
+
 /* ─── Range (free-play) ────────────────────────────────────────────────────── */
 /* HUD: live cm/360 + delta, top-left, never eats clicks (the nudge keys work while locked). */
 .range__hud {

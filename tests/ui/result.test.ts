@@ -316,3 +316,119 @@ describe('result screen', () => {
     expect(host.querySelector('[data-breakdown="ttkMs"]')!.textContent).toBe('511 ms');
   });
 });
+
+// ── Phase C: the result as showpiece - A5 thesis block, facet markers, CTA hierarchy, staged reveal ──
+const FC: NonNullable<Result['facetConcordance']> = {
+  facets: [
+    { instrument: 'track', peakCm360: 31.2, spreadLn: 0.08, laneConditioned: false },
+    { instrument: 'flick', peakCm360: 33.0, spreadLn: 0.11, laneConditioned: false },
+    { instrument: 'calibrate', laneConditioned: false }, // unfittable - dashed, never faked
+    { instrument: 'strike', peakCm360: 40.1, spreadLn: 0.2, laneConditioned: true },
+  ],
+  tier: 'some-spread',
+};
+
+describe('result screen - A5 thesis block (Phase C)', () => {
+  it('renders the tier copy, each facet peak (dash when unfittable), and the strike exclusion note', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, facetConcordance: FC } };
+    resultScreen(host, ctx).mount();
+    const thesis = host.querySelector('[data-result="thesis"]')!;
+    expect(thesis).toBeTruthy();
+    expect(thesis.getAttribute('data-thesis-tier')).toBe('some-spread');
+    const txt = thesis.textContent!;
+    expect(txt).toContain('31.2');
+    expect(txt).toContain('33.0');
+    expect(thesis.querySelector('[data-thesis-facet="calibrate"]')!.textContent).toContain('-'); // dashed
+    // strike: shown but flagged as taste-conditioned + excluded from the verdict
+    expect(thesis.querySelector('[data-thesis-facet="strike"]')!.innerHTML).toContain('sup');
+    expect(txt.toLowerCase()).toContain('excluded from the verdict');
+  });
+
+  it('reports an inconclusive tier plainly - no verdict, never a hidden pass', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, facetConcordance: { facets: FC.facets } } };
+    resultScreen(host, ctx).mount();
+    const thesis = host.querySelector('[data-result="thesis"]')!;
+    expect(thesis.getAttribute('data-thesis-tier')).toBe('inconclusive');
+    expect(thesis.textContent!.toLowerCase()).toContain('no verdict');
+  });
+
+  it('divergence is shown as honest doubt, never asserting a cause', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, facetConcordance: { ...FC, tier: 'divergent' } } };
+    resultScreen(host, ctx).mount();
+    const txt = host.querySelector('[data-result="thesis"]')!.textContent!.toLowerCase();
+    expect(txt).toContain('disagree');
+    expect(txt).not.toMatch(/because|caused by/);
+  });
+
+  it('draws the facet-peak diamonds on the MAIN convergence plot (the thesis, visible)', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, facetConcordance: FC } };
+    resultScreen(host, ctx).mount();
+    const svg = host.querySelector('svg[data-plot]')!;
+    // three fittable peaks (calibrate has none - absent, not faked)
+    expect(svg.querySelectorAll('[data-facet-peak]').length).toBe(3);
+    expect(svg.querySelector('[data-facet-peak="strike"]')!.getAttribute('stroke-dasharray')).toBe('2 2');
+    expect(svg.querySelector('[data-facet-peak="calibrate"]')).toBeNull();
+  });
+
+  it('renders NO thesis block when facetConcordance is absent (old result) or the value is tuned', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount(); // RESULT carries no facetConcordance
+    expect(host.querySelector('[data-result="thesis"]')).toBeNull();
+
+    const host2 = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, facetConcordance: FC, tuned: true } };
+    resultScreen(host2, ctx).mount();
+    expect(host2.querySelector('[data-result="thesis"]')).toBeNull();
+  });
+});
+
+describe('result screen - payoff arc (Phase C)', () => {
+  it('the range CTA is the PRIMARY action and leads the row (the try-it beat of the arc)', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount();
+    const actions = host.querySelector('.result__actions')!;
+    const buttons = [...actions.querySelectorAll('button')];
+    expect(buttons[0].getAttribute('data-action')).toBe('range');
+    expect(buttons[0].className).toContain('action--primary');
+    // run again and export step back to ghost weight
+    expect(actions.querySelector('[data-action="again"]')!.className).toContain('action--ghost');
+    expect(actions.querySelector('[data-action="export"]')!.className).toContain('action--ghost');
+  });
+
+  it('adds a plot legend keying the organism colors', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount();
+    const legend = host.querySelector('.result__plot .plot-legend')!;
+    expect(legend).toBeTruthy();
+    expect(legend.querySelectorAll('[data-legend]').length).toBe(4);
+  });
+
+  it('stages the reveal: numbered data-reveal beats, number right after the lead, actions last', () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount();
+    const beats = [...host.querySelectorAll('[data-reveal]')];
+    expect(beats.length).toBeGreaterThanOrEqual(8);
+    const idx = (el: Element): number => Number((el as HTMLElement).style.getPropertyValue('--reveal-i'));
+    // the number is beat 1 (right after the lead) and the actions close the sequence
+    expect(idx(host.querySelector('.result__number')!)).toBe(1);
+    const actionsIdx = idx(host.querySelector('.result__actions')!);
+    for (const b of beats) expect(idx(b)).toBeLessThanOrEqual(actionsIdx);
+  });
+
+  it('arms the reveal class on the next frame so the CSS cascade can run', async () => {
+    const host = document.createElement('div');
+    resultScreen(host, fakeCtx()).mount();
+    const root = host.querySelector('.result')!;
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(root.classList.contains('is-revealed')).toBe(true);
+  });
+});

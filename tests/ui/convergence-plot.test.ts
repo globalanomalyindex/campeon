@@ -42,5 +42,44 @@ describe('plotGeometry', () => {
     expect(g.curvePath).toBeNull();
     expect(g.ciRectPx).toBeNull();
     expect(g.peakPx).toBeNull();
+    expect(g.facetPeaks).toEqual([]);
+  });
+
+  it('maps A5 facet peaks to the axis with spread whiskers in ln space', () => {
+    const g = plotGeometry({
+      bounds, marks: [], size,
+      facetPeaks: [
+        { instrument: 'track', peakCm360: 30, spreadLn: 0.1, laneConditioned: false },
+        { instrument: 'strike', peakCm360: 40, spreadLn: 0.2, laneConditioned: true },
+      ],
+    });
+    expect(g.facetPeaks).toHaveLength(2);
+    const track = g.facetPeaks[0];
+    expect(track.px).toBeCloseTo(g.xToPx(30), 6);
+    // whisker ends are exp(ln(peak) +/- spreadLn) mapped through the SAME log axis
+    expect(track.whisker!.x0).toBeCloseTo(g.xToPx(Math.exp(Math.log(30) - 0.1)), 6);
+    expect(track.whisker!.x1).toBeCloseTo(g.xToPx(Math.exp(Math.log(30) + 0.1)), 6);
+    expect(g.facetPeaks[1].laneConditioned).toBe(true);
+  });
+
+  it('skips unfittable facet peaks (undefined) and whiskers (no spread) - never fakes geometry', () => {
+    const g = plotGeometry({
+      bounds, marks: [], size,
+      facetPeaks: [
+        { instrument: 'calibrate', laneConditioned: false }, // no peak - dashed in copy, absent here
+        { instrument: 'flick', peakCm360: 28, laneConditioned: false }, // peak but no spread
+      ],
+    });
+    expect(g.facetPeaks).toHaveLength(1);
+    expect(g.facetPeaks[0].instrument).toBe('flick');
+    expect(g.facetPeaks[0].whisker).toBeNull();
+  });
+
+  it('clamps a facet whisker that would overflow the plot extent', () => {
+    const g = plotGeometry({
+      bounds, marks: [], size,
+      facetPeaks: [{ instrument: 'track', peakCm360: 58, spreadLn: 0.5, laneConditioned: false }],
+    });
+    expect(g.facetPeaks[0].whisker!.x1).toBeLessThanOrEqual(size.width - g.pad);
   });
 });

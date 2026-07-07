@@ -3,7 +3,7 @@ import { runSession as runSessionImpl, type SessionConfig, type SessionOutcome }
 import { buildResult } from '../optimizer/result';
 import { INSTRUMENTS } from '../instruments/registry';
 import { mulberry32 } from '../stats/rng';
-import { plotGeometry, renderConvergencePlot, type PlotMark } from './convergence-plot';
+import { plotGeometry, plotLegendHtml, renderConvergencePlot, type PlotMark } from './convergence-plot';
 import { createArenaStage } from './arena-stage';
 import type { AppContext, Screen } from './shell';
 import type { InstrumentId, Report, TrialResult } from '../types';
@@ -66,6 +66,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         <header class="session__hud mono"><span data-hud="instruction">click to begin</span>
           <span data-hud="progress"></span></header>
         <figure class="session__plot"><svg data-plot aria-hidden="true"></svg>
+          ${plotLegendHtml()}
           <span class="mono session__estimate-visual" data-hud="estimate-visual" aria-hidden="true"></span>
           <figcaption class="mono" data-hud="estimate" aria-live="polite" aria-atomic="true"></figcaption></figure>
         <div class="session__prelock" data-prelock>
