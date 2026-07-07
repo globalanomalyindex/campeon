@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { marksFromTrials, instructionFor, searchLabel, announceEstimate, sessionView, type SessionViewDeps } from '../../src/ui/session-view';
+import {
+  marksFromTrials, instructionFor, searchLabel, announceEstimate, sessionView,
+  CURTAIN_LINE, ENV_BEATS, dialedBudget, type SessionViewDeps,
+} from '../../src/ui/session-view';
 import type { AppContext } from '../../src/ui/shell';
-import type { Report, TrialResult } from '../../src/types';
+import type { InstrumentId, Report, TrialResult } from '../../src/types';
 import type { ArenaStage } from '../../src/ui/arena-stage';
 
 describe('session-view helpers', () => {
@@ -58,9 +61,9 @@ function fakeStage(): { stage: ArenaStage; requestLock: ReturnType<typeof vi.fn>
   const exitLock = vi.fn();
   const dispose = vi.fn();
   const stage = {
-    arena: {} as ArenaStage['arena'],
+    arena: { clearTargets: vi.fn() } as unknown as ArenaStage['arena'],
     requestLock, exitLock, dispose,
-    setCm360: vi.fn(), setEnemyEnvironment: vi.fn(),
+    setCm360: vi.fn(), setEnemyEnvironment: vi.fn(), isLocked: () => false,
     ready: Promise.resolve(),
   } as unknown as ArenaStage;
   return { stage, requestLock, exitLock, dispose };
@@ -202,5 +205,138 @@ describe('session-view: abort scrim (P4-2)', () => {
     // The shell's unmount→cleanup disposes ONCE (guarded). Quit must not add a second dispose.
     screen.unmount();
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Phase C: session flow beats - curtain line, first encounters, dialed-in decision support ──
+
+describe('session-view flow-beat helpers (pure)', () => {
+  it('names a first-encounter beat for every environment, matching the instruction organisms', () => {
+    for (const id of ['track', 'flick', 'calibrate', 'strike'] as InstrumentId[]) {
+      expect(ENV_BEATS[id].title.length).toBeGreaterThan(0);
+      expect(ENV_BEATS[id].sub.length).toBeGreaterThan(0);
+    }
+    expect(ENV_BEATS.flick.sub).toContain('spider');
+    expect(ENV_BEATS.strike.sub).toContain('mantis');
+  });
+
+  it('dialedBudget states the plain facts for both under-cap and at-cap', () => {
+    expect(dialedBudget(20, 30, 6)).toBe('20 of 30 trials used · refining runs up to 6 more generations');
+    // at the cap, "keep refining" actually locks in - the copy must say so, not promise more trials
+    expect(dialedBudget(30, 30, 6)).toContain('refining would lock this in');
+  });
+});
+
+/** Drive the mounted view's onTrialStart through the captured session config (the injectable seam). */
+function capturedConfig(runSegment: ReturnType<typeof vi.fn>): { onTrialStart: (id: InstrumentId, i: number, cm: number) => void } {
+  const cfg = runSegment.mock.calls[0]![0] as { onTrialStart: (id: InstrumentId, i: number, cm: number) => void };
+  expect(cfg.onTrialStart).toBeTypeOf('function');
+  return cfg;
+}
+
+describe('session-view: first-encounter beats + the seed curtain (Phase C)', () => {
+  it('shows a title card the FIRST time an environment appears, and not on repeats', async () => {
+    const { root, screen, runSegment } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    const cfg = capturedConfig(runSegment);
+    const beat = root.querySelector('[data-beat]') as HTMLElement;
+    expect(beat.hidden).toBe(true);
+
+    cfg.onTrialStart('flick', 0, 30);
+    expect(beat.hidden).toBe(false);
+    expect(root.querySelector('[data-beat-title]')!.textContent).toBe(ENV_BEATS.flick.title);
+
+    // a NEW environment re-beats with its own card...
+    cfg.onTrialStart('track', 1, 28);
+    expect(root.querySelector('[data-beat-title]')!.textContent).toBe(ENV_BEATS.track.title);
+
+    // ...but repeating an already-seen environment does not re-title the card
+    cfg.onTrialStart('flick', 2, 26);
+    expect(root.querySelector('[data-beat-title]')!.textContent).toBe(ENV_BEATS.track.title);
+    screen.unmount();
+  });
+
+  it('the beat card is aria-hidden decoration - the live region carries the words', async () => {
+    const { root, screen, runSegment } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    capturedConfig(runSegment).onTrialStart('flick', 0, 30);
+    expect((root.querySelector('[data-beat]') as HTMLElement).getAttribute('aria-hidden')).toBe('true');
+    screen.unmount();
+  });
+
+  it('drops the curtain ONCE at the first trial past Generation 0, winning the live region on a tie', async () => {
+    const { root, screen, runSegment } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    const cfg = capturedConfig(runSegment);
+    const live = root.querySelector('[data-hud="estimate"]')!;
+
+    cfg.onTrialStart('flick', 7, 30); // still Generation 0 (COLD_START = 8)
+    expect(live.textContent).not.toBe(CURTAIN_LINE);
+
+    cfg.onTrialStart('track', 8, 30); // the first evolved trial AND an instrument change - curtain wins
+    expect(live.textContent).toBe(CURTAIN_LINE);
+    expect(root.querySelector('[data-beat-title]')!.textContent).toBe('evolution begins');
+
+    cfg.onTrialStart('calibrate', 9, 30); // later beats resume normal announcements
+    expect(live.textContent).toBe(instructionFor('calibrate'));
+    screen.unmount();
+  });
+
+  it('reduced motion: no beat card ever shows (the HUD copy carries the beats)', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    try {
+      const { root, screen, runSegment } = mountWithRunningSegment();
+      (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+      await flush();
+      capturedConfig(runSegment).onTrialStart('flick', 0, 30);
+      expect((root.querySelector('[data-beat]') as HTMLElement).hidden).toBe(true);
+      screen.unmount();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('session-view: dialed-in decision support (Phase C)', () => {
+  const REPORT: Report = {
+    optimalCm360: 32.4, ci90: [32.0, 32.6], // tight
+    curve: [{ x: Math.log(20), mean: 0.1 }, { x: Math.log(40), mean: 0.4 }],
+  } as Report;
+  const TRIALS: TrialResult[] = [
+    { instrument: 'flick', cm360: 30, score: 0.4, raw: {}, at: 0 },
+    { instrument: 'track', cm360: 34, score: 0.5, raw: {}, at: 0 },
+  ];
+
+  it('the panel shows the CI-concord line (width bucket, honesty copy) and the trial budget', async () => {
+    const { root, screen, runSegment, getResolve } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    expect(runSegment).toHaveBeenCalledTimes(1);
+    getResolve()!({ report: REPORT, trials: TRIALS });
+    await flush();
+    await flush();
+
+    const panel = root.querySelector('[data-panel]') as HTMLElement;
+    expect(panel.hidden).toBe(false);
+    const concord = root.querySelector('[data-dialed="concord"]') as HTMLElement;
+    expect(concord.hidden).toBe(false);
+    expect(concord.getAttribute('data-concord')).toBe('tight');
+    expect(concord.textContent!.toLowerCase()).toContain('concur');
+    expect(root.querySelector('[data-dialed="budget"]')!.textContent).toBe(dialedBudget(TRIALS.length, 30, 6));
+    screen.unmount();
+  });
+
+  it('hides the concord line for a degenerate CI - no descriptor is fabricated', async () => {
+    const { root, screen, getResolve } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    getResolve()!({ report: { ...REPORT, ci90: [NaN, NaN] as [number, number] }, trials: TRIALS });
+    await flush();
+    await flush();
+    expect((root.querySelector('[data-dialed="concord"]') as HTMLElement).hidden).toBe(true);
+    screen.unmount();
   });
 });

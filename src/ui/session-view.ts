@@ -1,8 +1,9 @@
 import { makeEvolution } from '../optimizer/evolution';
 import { runSession as runSessionImpl, type SessionConfig, type SessionOutcome } from '../optimizer/session-controller';
-import { buildResult } from '../optimizer/result';
+import { buildResult, ciConcord } from '../optimizer/result';
 import { INSTRUMENTS } from '../instruments/registry';
 import { mulberry32 } from '../stats/rng';
+import { CONCORD_COPY } from './concord';
 import { plotGeometry, plotLegendHtml, renderConvergencePlot, type PlotMark } from './convergence-plot';
 import { createArenaStage } from './arena-stage';
 import type { AppContext, Screen } from './shell';
@@ -39,6 +40,28 @@ export function searchLabel(index: number, cm360: number, coldStart: number): st
  *  screen reader never voices a raw en-dash glyph; announced only at segment-meaningful moments. */
 export function announceEstimate(report: Pick<Report, 'optimalCm360' | 'ci90'>): string {
   return `dialed in around ${report.optimalCm360.toFixed(1)} cm/360, 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
+}
+
+/** The curtain line: announced ONCE, at the trial where the search leaves Generation 0 - the moment
+ *  the gene pool stops seeding and evolution proper begins (a segment-meaningful live-region beat). */
+export const CURTAIN_LINE = 'gene pool seeded - evolution begins';
+
+/** First-encounter title cards: the beat shown the FIRST time each environment appears. Purely
+ *  narrative framing over the schedule the optimizer already chose - it names what the probe does
+ *  and which organisms tuned it, and never claims anything the copy in COPY does not. */
+export const ENV_BEATS: Record<InstrumentId, { title: string; sub: string }> = {
+  track: { title: 'the open-air intercept', sub: 'hold your lead on the weaving prey · dragonfly + falcon' },
+  flick: { title: 'the ambush', sub: 'break-cover targets to snap and lock · spider + raptor' },
+  calibrate: { title: 'shooting through the bend', sub: 'learn the gap between aim and impact · archerfish' },
+  strike: { title: 'the strike window', sub: 'commit the instant you see it · mantis shrimp' },
+};
+
+/** The dialed-in panel's budget line: plain facts the lock/refine choice actually turns on - trials
+ *  spent against the hard cap, and what "keep refining" would really do (run more, or lock at cap). */
+export function dialedBudget(used: number, max: number, refineGens: number): string {
+  return used >= max
+    ? `${used} of ${max} trials used - the budget is spent, so refining would lock this in`
+    : `${used} of ${max} trials used · refining runs up to ${refineGens} more generations`;
 }
 
 /** Thin-shell injection seam: the production defaults build the real WebGL stage + run the real
@@ -78,10 +101,16 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
             keep refining. press <kbd>Esc</kbd> any time to pause.</p>
           <button class="action action--primary" data-prelock="begin">begin</button>
         </div>
+        <div class="session__beat" data-beat aria-hidden="true" hidden>
+          <p class="session__beat-title" data-beat-title></p>
+          <p class="mono session__beat-sub" data-beat-sub></p>
+        </div>
         <div class="session__dialed" data-panel hidden>
           <p class="mono session__dialed-label">dialed in</p>
           <p class="display session__dialed-num"><span data-dialed="num"></span><small> cm/360</small></p>
           <p class="mono session__dialed-ci">90% CI <span data-dialed="ci"></span></p>
+          <p class="session__dialed-concord" data-dialed="concord" hidden></p>
+          <p class="mono session__dialed-budget" data-dialed="budget"></p>
           <div class="session__dialed-actions">
             <button class="action action--primary" data-dialed="lock">lock it in</button>
             <button class="action action--ghost" data-dialed="refine">keep refining</button>
@@ -119,9 +148,34 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       let lockedIn = false;
       let running = false;
       // The estimate figcaption is an aria-live region; we write to it ONLY at segment-meaningful
-      // moments (an instrument switch, the dialed-in panel), never on every trial, so a screen reader
-      // is not flooded. This is read-only narration over already-pure values; it appends no score.
+      // moments (an instrument switch, the seed curtain, the dialed-in panel), never on every trial,
+      // so a screen reader is not flooded. Read-only narration over pure values; it appends no score.
       let announcedInstrument: InstrumentId | null = null;
+      let curtainDropped = false;
+      const seenEnvs = new Set<InstrumentId>();
+
+      // First-encounter / curtain title cards: a brief aria-hidden overlay beat (the live region
+      // carries the same information in copy). Purely cosmetic; reduced motion never shows one.
+      const beatEl = root.querySelector('[data-beat]') as HTMLElement;
+      const beatTitle = root.querySelector('[data-beat-title]') as HTMLElement;
+      const beatSub = root.querySelector('[data-beat-sub]') as HTMLElement;
+      const BEAT_MS = 2400;
+      let beatTimer: number | null = null;
+      const showBeat = (title: string, sub: string): void => {
+        if (reduced) return;
+        beatTitle.textContent = title;
+        beatSub.textContent = sub;
+        beatEl.hidden = false;
+        beatEl.classList.remove('is-on');
+        void beatEl.offsetWidth; // restart the fade choreography on back-to-back beats
+        beatEl.classList.add('is-on');
+        if (beatTimer !== null) clearTimeout(beatTimer);
+        beatTimer = window.setTimeout(() => {
+          beatEl.hidden = true;
+          beatEl.classList.remove('is-on');
+          beatTimer = null;
+        }, BEAT_MS);
+      };
 
       const drawPlot = (report: Report, trials: readonly TrialResult[]): void => {
         const g = plotGeometry({
@@ -153,6 +207,18 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
             hudProgress.textContent = searchLabel(i, cm360, COLD_START);
             // Announce ONLY when the instrument changes (a segment-meaningful moment), not every trial.
             if (id !== announcedInstrument) { announcedInstrument = id; hudEstimate.textContent = instructionFor(id); }
+            // First encounter of an environment: a one-time title-card beat naming the probe.
+            if (!seenEnvs.has(id)) {
+              seenEnvs.add(id);
+              showBeat(ENV_BEATS[id].title, ENV_BEATS[id].sub);
+            }
+            // The seed curtain: fires exactly once, on the first trial PAST Generation 0. Written
+            // after the instrument announce so it wins the live region on a tie (rarer beat wins).
+            if (i === COLD_START && !curtainDropped) {
+              curtainDropped = true;
+              hudEstimate.textContent = CURTAIN_LINE;
+              showBeat('evolution begins', 'the gene pool is seeded - each round now tests one mutated sensitivity');
+            }
             stage.setEnemyEnvironment(id); // skin this trial's targets with the environment's prey
             stage.arena.clearTargets();
           },
@@ -179,6 +245,18 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         hudEstimate.textContent = announceEstimate(report); // dialed-in: a meaningful moment to announce
         $d('num').textContent = report.optimalCm360.toFixed(1);
         $d('ci').textContent = `${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)} cm/360`;
+        // Decision support for lock-vs-refine: the CI-width bucket in its honesty-vetted copy (a
+        // width observation, never a single-cause claim) plus the plain trial-budget facts.
+        const concord = ciConcord(report.optimalCm360, report.ci90);
+        const concordEl = $d('concord');
+        if (concord) {
+          concordEl.textContent = CONCORD_COPY[concord];
+          concordEl.setAttribute('data-concord', concord);
+          concordEl.hidden = false;
+        } else {
+          concordEl.hidden = true;
+        }
+        $d('budget').textContent = dialedBudget(allTrials.length, MAX_TRIALS, REFINE_GENS);
         panel.hidden = false;
       };
 
@@ -228,6 +306,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       cleanup = () => {
         alive = false;
         lockedIn = true; // break any in-flight segment so it never touches a torn-down context
+        if (beatTimer !== null) clearTimeout(beatTimer);
         document.removeEventListener('pointerlockchange', syncAbort);
         stage.dispose();
       };

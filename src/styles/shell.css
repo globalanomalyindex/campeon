@@ -256,7 +256,31 @@
 .session__dialed-num { font-size: clamp(40px, 9vw, 84px); line-height: 1; margin: 0; }
 .session__dialed-num small { font-size: .3em; opacity: .7; }
 .session__dialed-ci { opacity: .75; }
+.session__dialed-concord { max-width: 46ch; font-size: .82rem; color: var(--text-muted); margin: 0; }
+.session__dialed-concord[data-concord="tight"] { color: color-mix(in oklab, var(--gold) 70%, var(--text-muted)); }
+.session__dialed-concord[hidden] { display: none; }
+.session__dialed-budget { font-size: .72rem; color: var(--text-muted); margin: 0; }
 .session__dialed-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; justify-content: center; }
+
+/* First-encounter / curtain title cards: a brief centered beat over the arena. Opacity-only
+   choreography (no layout motion); reduced motion never shows one (the HUD copy carries it). */
+.session__beat {
+  position: fixed; left: 50%; top: 26%; transform: translateX(-50%);
+  z-index: 15; text-align: center; pointer-events: none;
+  opacity: 0;
+}
+.session__beat[hidden] { display: none; }
+.session__beat.is-on { animation: session-beat 2.4s ease both; }
+.session__beat-title { margin: 0; font-size: clamp(1.4rem, 4vw, 2.2rem); color: var(--cinema-cream);
+  text-transform: lowercase; letter-spacing: .04em; text-shadow: 0 1px 12px rgb(0 0 0 / .6); }
+.session__beat-sub { margin: .3em 0 0; font-size: .8rem; color: var(--text-muted);
+  text-shadow: 0 1px 8px rgb(0 0 0 / .6); }
+@keyframes session-beat {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 /* Pre-lock "begin" overlay + the Esc abort scrim share the calibrate scrim idiom: a translucent
    full-bleed backing the arena reads through, centered copy, and ONE focusable primary action. The
