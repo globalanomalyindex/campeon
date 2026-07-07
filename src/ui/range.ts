@@ -2,6 +2,7 @@ import type { AppContext, Screen } from './shell';
 import type { InstrumentId, TargetHandle, TargetSpec } from '../types';
 import { createArenaStage } from './arena-stage';
 import { initRange, onKill, dueSpawns, bindSpawn, type RangeSlot, type RangeState } from './range-director';
+import { bindRangeLock } from './range-lock';
 import { nudgeCm360 } from './range-nudge';
 import { adoptResult } from './range-adopt';
 import { classifyHit } from './enemy/hit';
@@ -132,13 +133,19 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
         });
       };
 
-      // Lock, then wait for the cosmetic layers so mercs (not bare spheres) appear, then start.
-      canvas.addEventListener('click', () => {
-        void stage.requestLock().catch(() => {}).then(() => stage.ready).then(startFreePlay);
-      }, { once: true });
+      // Lock on click, wait for the cosmetic layers so mercs (not bare spheres) appear, then start
+      // free play ONCE. Every later unlocked click (after an Esc release) relocks - the orchestration
+      // lives in bindRangeLock, where the Esc -> click cycle is unit-tested.
+      const unbindLock = bindRangeLock(canvas, {
+        isLocked: () => stage.isLocked(),
+        requestLock: () => stage.requestLock(),
+        ready: stage.ready,
+        start: startFreePlay,
+      });
 
       cleanup = () => {
         alive = false;
+        unbindLock();
         window.removeEventListener('keydown', onKey);
         offFire?.();
         offFrame?.();
