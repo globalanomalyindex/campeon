@@ -193,9 +193,32 @@ export interface Result {
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────
+/**
+ * The remembered calibration + presentation preferences (campeon.prefs.v1): what a returning
+ * visitor should NOT have to redo. Everything here is either user-chosen (game, sens, taste) or
+ * hardware-measured once (dpi, the seeded search window) - never a scored outcome; results live in
+ * their own store and `lastSessionId` is only a POINTER into it.
+ */
+export interface PersistedPrefs {
+  dpi: Dpi;
+  currentGame: GameId;
+  currentSens: number;
+  /** The speed/accuracy taste knob (profile.speedAccuracy). */
+  speedAccuracy: number;
+  bounds: [Cm360, Cm360];
+  /** The session whose result was last shown, so a reload lands back on the number. */
+  lastSessionId?: string;
+}
+
 export interface Storage {
   saveSession(s: Session): void;
   loadSessions(): Session[];
   saveResult(sessionId: string, r: Result): void;
   exportJson(): string;
+  /** Optional (newer backends): saved results keyed by sessionId, for restoring the last result. */
+  loadResults?(): Record<string, Result>;
+  /** Optional (newer backends): remember calibration prefs. Consumers must feature-check. */
+  savePrefs?(p: PersistedPrefs): void;
+  /** Optional: the remembered prefs, or null when absent/invalid (validated on read, never thrown). */
+  loadPrefs?(): PersistedPrefs | null;
 }

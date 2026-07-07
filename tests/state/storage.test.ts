@@ -52,3 +52,42 @@ describe('LocalStorage Storage', () => {
     expect(s.loadSessions().some((x) => x.id === 'z')).toBe(true);
   });
 });
+
+describe('remembered prefs (campeon.prefs.v1, Phase C)', () => {
+  const prefs = {
+    dpi: 1600, currentGame: 'cs2' as const, currentSens: 0.5,
+    speedAccuracy: 0.7, bounds: [18, 50] as [number, number], lastSessionId: 's-12-3240',
+  };
+
+  it('round-trips prefs, preserving the last-result pointer', () => {
+    const s = createStorage(fakeKv());
+    expect(s.loadPrefs!()).toBeNull(); // first visit - nothing remembered
+    s.savePrefs!(prefs);
+    expect(s.loadPrefs!()).toEqual(prefs);
+  });
+
+  it('validates on read: malformed or nonsensical blobs degrade to null (first-visit behavior)', () => {
+    const bad: unknown[] = [
+      '{not json',
+      JSON.stringify({ ...prefs, dpi: NaN }),
+      JSON.stringify({ ...prefs, dpi: -800 }),
+      JSON.stringify({ ...prefs, speedAccuracy: 3 }),
+      JSON.stringify({ ...prefs, bounds: [60, 15] }), // inverted window
+      JSON.stringify({ ...prefs, bounds: [15] }),
+      JSON.stringify({ ...prefs, currentGame: '' }),
+      JSON.stringify(42),
+    ];
+    for (const blob of bad) {
+      const kv = fakeKv();
+      kv.setItem('campeon.prefs.v1', blob as string);
+      expect(createStorage(kv).loadPrefs!(), `blob: ${String(blob).slice(0, 40)}`).toBeNull();
+    }
+  });
+
+  it('accepts prefs without a lastSessionId (calibrated but never finished a session)', () => {
+    const s = createStorage(fakeKv());
+    const { lastSessionId: _p, ...noPointer } = prefs;
+    s.savePrefs!(noPointer);
+    expect(s.loadPrefs!()).toEqual(noPointer);
+  });
+});

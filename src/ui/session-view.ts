@@ -6,7 +6,7 @@ import { mulberry32 } from '../stats/rng';
 import { CONCORD_COPY } from './concord';
 import { plotGeometry, plotLegendHtml, renderConvergencePlot, type PlotMark } from './convergence-plot';
 import { createArenaStage } from './arena-stage';
-import type { AppContext, Screen } from './shell';
+import { rememberPrefs, type AppContext, type Screen } from './shell';
 import type { InstrumentId, Report, TrialResult } from '../types';
 
 const SCHEDULE: InstrumentId[] = ['flick', 'track', 'calibrate', 'strike'];
@@ -236,6 +236,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: 0 });
         ctx.storage.saveResult(sessionId, result);
         ctx.lastResult = { sessionId, result };
+        rememberPrefs(ctx, sessionId); // point the returning-visitor restore at this result
         ctx.navigate('result');
       };
 

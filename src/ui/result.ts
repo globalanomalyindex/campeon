@@ -1,4 +1,4 @@
-import type { AppContext, Screen } from './shell';
+import { rememberPrefs, type AppContext, type Screen } from './shell';
 import type { FacetConcordance, GameId, Result } from '../types';
 import { GAME_YAW } from '../convert/yaw-table';
 import { buildExportBundle, toJson, triggerDownload } from '../state/export';
@@ -156,6 +156,10 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       sel?.addEventListener('change', () => {
         root.querySelectorAll('tr[data-current="true"]').forEach((tr) => tr.removeAttribute('data-current'));
         root.querySelector(`tr[data-game="${sel.value}"]`)?.setAttribute('data-current', 'true');
+        // The deferred game pick previously never left this screen - now it writes the draft and is
+        // remembered, so the next visit highlights the right game without re-asking.
+        ctx.draft.currentGame = sel.value as GameId;
+        rememberPrefs(ctx);
       });
       host.appendChild(root);
 

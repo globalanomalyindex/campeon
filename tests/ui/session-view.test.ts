@@ -339,4 +339,19 @@ describe('session-view: dialed-in decision support (Phase C)', () => {
     expect((root.querySelector('[data-dialed="concord"]') as HTMLElement).hidden).toBe(true);
     screen.unmount();
   });
+
+  it('locking in points the returning-visitor restore at the finalized session (Phase C)', async () => {
+    const { root, screen, ctx, getResolve } = mountWithRunningSegment();
+    const savedPrefs: unknown[] = [];
+    ctx.storage.savePrefs = (p) => void savedPrefs.push(p);
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    getResolve()!({ report: REPORT, trials: TRIALS });
+    await flush();
+    await flush();
+    (root.querySelector('[data-dialed="lock"]') as HTMLButtonElement).click();
+    expect(savedPrefs.length).toBe(1);
+    expect((savedPrefs[0] as { lastSessionId?: string }).lastSessionId).toMatch(/^s-/);
+    screen.unmount();
+  });
 });

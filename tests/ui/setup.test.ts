@@ -66,3 +66,62 @@ describe('setup (guided calibration orchestrator)', () => {
     expect(ctx.nav).toContain('session');
   });
 });
+
+// ── Phase C: remember-my-calibration on the intro step ──
+
+import type { PersistedPrefs } from '../../src/types';
+
+const PREFS: PersistedPrefs = {
+  dpi: 1600, currentGame: 'valorant', currentSens: 0.4,
+  speedAccuracy: 0.7, bounds: [18, 50],
+};
+
+function rememberingCtx(prefs: PersistedPrefs | null): ReturnType<typeof fakeCtx> & { savedPrefs: () => PersistedPrefs | null } {
+  const ctx = fakeCtx();
+  let saved = prefs;
+  ctx.storage.loadPrefs = () => saved;
+  ctx.storage.savePrefs = (p) => { saved = p; };
+  return Object.assign(ctx, { savedPrefs: () => saved });
+}
+
+describe('setup: remembered calibration (Phase C)', () => {
+  it('offers the saved-calibration fast path as PRIMARY when prefs exist, demoting recalibration', () => {
+    const ctx = rememberingCtx(PREFS); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    const useSaved = host.querySelector('[data-action="use-saved"]') as HTMLButtonElement;
+    expect(useSaved).toBeTruthy();
+    expect(useSaved.className).toContain('action--primary');
+    expect(host.querySelector('[data-remembered]')!.textContent).toContain('1600');
+    const recal = host.querySelector('[data-action="start-guided"]')!;
+    expect(recal.className).toContain('action--ghost');
+    expect(recal.textContent!.toLowerCase()).toContain('recalibrate');
+  });
+
+  it('shows NO fast path on a first visit (or a prefs-less Storage)', () => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    expect(host.querySelector('[data-action="use-saved"]')).toBeNull();
+    expect(host.querySelector('[data-action="start-guided"]')!.className).toContain('action--primary');
+  });
+
+  it('use-saved re-applies the remembered prefs to the draft and goes straight to the hunt', () => {
+    const ctx = rememberingCtx(PREFS); const host = document.createElement('div');
+    ctx.draft.dpi = 999; // a drifted draft must not leak into the session
+    setup(host, ctx).mount();
+    (host.querySelector('[data-action="use-saved"]') as HTMLButtonElement).click();
+    expect(ctx.draft.dpi).toBe(1600);
+    expect(ctx.draft.currentGame).toBe('valorant');
+    expect(ctx.draft.bounds).toEqual([18, 50]);
+    expect(ctx.draft.profile.speedAccuracy).toBe(0.7);
+    expect(ctx.nav).toEqual(['session']);
+  });
+
+  it('the typed commit REMEMBERS the calibration for the next visit', () => {
+    const ctx = rememberingCtx(null); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
+    (host.querySelector('[data-field="dpi"]') as HTMLInputElement).value = '3200';
+    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
+    expect(ctx.savedPrefs()).toMatchObject({ dpi: 3200 });
+  });
+});

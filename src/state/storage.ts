@@ -1,4 +1,4 @@
-import type { Result, Session, Storage } from '../types';
+import type { PersistedPrefs, Result, Session, Storage } from '../types';
 
 /** Minimal key/value surface - satisfied by window.localStorage and by test fakes. */
 export interface KvBackend {
@@ -8,7 +8,35 @@ export interface KvBackend {
 
 const SESSIONS_KEY = 'campeon.sessions.v1';
 const RESULTS_KEY = 'campeon.results.v1';
+const PREFS_KEY = 'campeon.prefs.v1';
 const VERSION = '1';
+
+/**
+ * Validate remembered prefs on READ: a malformed or nonsensical blob (hand-edited localStorage, a
+ * future-version shape, NaN poisoning) degrades to null - the app then behaves like a first visit
+ * instead of seeding a search from garbage. Never throws.
+ */
+function validPrefs(p: unknown): PersistedPrefs | null {
+  if (!p || typeof p !== 'object') return null;
+  const c = p as Partial<PersistedPrefs>;
+  const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  if (!finite(c.dpi) || c.dpi <= 0) return null;
+  if (!finite(c.currentSens) || c.currentSens <= 0) return null;
+  if (!finite(c.speedAccuracy) || c.speedAccuracy < 0 || c.speedAccuracy > 1) return null;
+  if (typeof c.currentGame !== 'string' || c.currentGame.length === 0) return null;
+  if (!Array.isArray(c.bounds) || c.bounds.length !== 2) return null;
+  const [lo, hi] = c.bounds;
+  if (!finite(lo) || !finite(hi) || !(lo > 0) || !(hi > lo)) return null;
+  if (c.lastSessionId !== undefined && typeof c.lastSessionId !== 'string') return null;
+  return {
+    dpi: c.dpi,
+    currentGame: c.currentGame as PersistedPrefs['currentGame'],
+    currentSens: c.currentSens,
+    speedAccuracy: c.speedAccuracy,
+    bounds: [lo, hi],
+    ...(c.lastSessionId !== undefined ? { lastSessionId: c.lastSessionId } : {}),
+  };
+}
 
 function readJson<T>(kv: KvBackend, key: string, fallback: T): T {
   const raw = kv.getItem(key);
@@ -43,6 +71,14 @@ class LocalStorageStore implements Storage {
     const all = this.loadResults();
     all[sessionId] = r;
     this.kv.setItem(RESULTS_KEY, JSON.stringify(all));
+  }
+
+  savePrefs(p: PersistedPrefs): void {
+    this.kv.setItem(PREFS_KEY, JSON.stringify(p));
+  }
+
+  loadPrefs(): PersistedPrefs | null {
+    return validPrefs(readJson<unknown>(this.kv, PREFS_KEY, null));
   }
 
   exportJson(): string {

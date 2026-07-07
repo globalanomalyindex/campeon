@@ -1,4 +1,4 @@
-import type { Cm360, Dpi, GameId, Profile, Result, Session, Storage } from '../types';
+import type { Cm360, Dpi, GameId, PersistedPrefs, Profile, Result, Session, Storage } from '../types';
 
 export type Route = 'hero' | 'setup' | 'session' | 'result' | 'case-study' | 'options' | 'range';
 
@@ -48,6 +48,37 @@ function defaultDraft(): SessionDraft {
   };
 }
 
+/** Fold remembered prefs over the defaults - a returning visitor starts from their own calibration. */
+function draftFromPrefs(prefs: PersistedPrefs | null): SessionDraft {
+  const d = defaultDraft();
+  if (!prefs) return d;
+  return {
+    dpi: prefs.dpi,
+    currentGame: prefs.currentGame,
+    currentSens: prefs.currentSens,
+    profile: { ...d.profile, speedAccuracy: prefs.speedAccuracy },
+    bounds: prefs.bounds,
+  };
+}
+
+/**
+ * Remember the live draft as the returning-visitor prefs (feature-checked - a Storage without
+ * prefs support is a silent no-op). `lastSessionId` updates the restore pointer when given and is
+ * PRESERVED from the previous save otherwise, so remembering a game pick never forgets the result.
+ */
+export function rememberPrefs(ctx: AppContext, lastSessionId?: string): void {
+  const prev = ctx.storage.loadPrefs?.() ?? null;
+  const pointer = lastSessionId ?? prev?.lastSessionId;
+  ctx.storage.savePrefs?.({
+    dpi: ctx.draft.dpi,
+    currentGame: ctx.draft.currentGame,
+    currentSens: ctx.draft.currentSens,
+    speedAccuracy: ctx.draft.profile.speedAccuracy,
+    bounds: ctx.draft.bounds,
+    ...(pointer !== undefined ? { lastSessionId: pointer } : {}),
+  });
+}
+
 /** Screens that require prerequisites; otherwise redirect. */
 const GUARDS: Partial<Record<Route, (ctx: AppContext) => Route | null>> = {
   result: (ctx) => (ctx.lastResult ? null : 'hero'),
@@ -73,16 +104,27 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     flashEl.classList.add('is-on');
   }
 
+  const storage = deps.storage ?? inMemoryStorage();
+  const prefs = storage.loadPrefs?.() ?? null;
+
   const context: AppContext = {
     route: 'hero',
-    storage: deps.storage ?? inMemoryStorage(),
-    draft: defaultDraft(),
+    storage,
+    draft: draftFromPrefs(prefs),
     navigate(route: Route) {
       flashCut();
       location.hash = ROUTE_HASH[route];
       render(route);
     },
   };
+
+  // Restore the last shown result so #/result and #/range deep-links survive a reload: the prefs
+  // carry only a POINTER; the Result itself comes from its own store. Absent/stale pointers fall
+  // through to the route guards (which bounce to the hero) - nothing is fabricated.
+  if (prefs?.lastSessionId) {
+    const saved = storage.loadResults?.()[prefs.lastSessionId];
+    if (saved) context.lastResult = { sessionId: prefs.lastSessionId, result: saved };
+  }
 
   function routeFromHash(): Route {
     return HASH_ROUTE.get(location.hash) ?? 'hero';
@@ -116,10 +158,14 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
 function inMemoryStorage(): Storage {
   const sessions: Session[] = [];
   const results: Record<string, Result> = {};
+  let prefs: PersistedPrefs | null = null;
   return {
     saveSession(s) { const i = sessions.findIndex((x) => x.id === s.id); if (i >= 0) sessions[i] = s; else sessions.push(s); },
     loadSessions() { return [...sessions]; },
     saveResult(id, r) { results[id] = r; },
+    loadResults() { return { ...results }; },
+    savePrefs(p) { prefs = p; },
+    loadPrefs() { return prefs; },
     exportJson() { return JSON.stringify({ version: '1', sessions, results }, null, 2); },
   };
 }

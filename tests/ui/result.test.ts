@@ -82,6 +82,20 @@ describe('result screen', () => {
     expect(host.querySelectorAll('tr[data-current="true"]').length).toBe(1); // only one row current
   });
 
+  it('the game pick writes the draft and is REMEMBERED for the next visit (Phase C)', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    const saved: unknown[] = [];
+    ctx.storage.savePrefs = (p) => void saved.push(p);
+    resultScreen(host, ctx).mount();
+    const select = host.querySelector('[data-action="your-game"]') as HTMLSelectElement;
+    select.value = 'valorant';
+    select.dispatchEvent(new Event('change'));
+    expect(ctx.draft.currentGame).toBe('valorant');
+    expect(saved.length).toBe(1);
+    expect((saved[0] as { currentGame: string }).currentGame).toBe('valorant');
+  });
+
   it('+ run again navigates home', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();

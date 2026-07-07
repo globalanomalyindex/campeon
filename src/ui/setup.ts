@@ -1,7 +1,7 @@
 // Guided calibration orchestrator. Pure step machine (calibrate-flow) under a thin shell that
 // mounts the sweep + spin views and writes the session draft. The game pick is deferred to the
 // result; the speed/accuracy goal defaults to balanced. Retires the typed setup + the gate.
-import type { AppContext, Screen } from './shell';
+import { rememberPrefs, type AppContext, type Screen } from './shell';
 import type { GameId } from '../types';
 import { GAME_YAW, yawFor } from '../convert/yaw-table';
 import { cmPer360 } from '../convert/cm360';
@@ -44,6 +44,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     if (dpi !== null) ctx.draft.dpi = dpi;
     ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: 0.5 }; // balanced default; tune later on options
     ctx.draft.bounds = boundsFromSeed(seedCm360); // the spin always supplies a seed
+    rememberPrefs(ctx); // a returning visitor never redoes a calibration they already earned
     ctx.navigate('session');
   }
 
@@ -53,6 +54,7 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     ctx.draft.currentGame = game;
     ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: goal };
     ctx.draft.bounds = boundsFromSeed(cmPer360(dpi, sens, yawFor(game)));
+    rememberPrefs(ctx);
     ctx.navigate('session');
   }
 
@@ -83,9 +85,21 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
   }
 
   function stepHtml(): string {
-    if (state.step === 'intro') return `
+    if (state.step === 'intro') {
+      // A returning visitor's fast path: their calibration was hardware-measured once and remembered
+      // (campeon.prefs.v1) - offer to reuse it as the search seed rather than redo the sweep+spin.
+      // Recalibrating stays one click away (a new mouse or pad invalidates the old measurement).
+      const remembered = ctx.storage.loadPrefs?.() ?? null;
+      const rememberedBlock = remembered
+        ? `<div class="setup__remembered" data-remembered>
+            <p class="setup__lead">you've calibrated before - <span class="mono">${remembered.dpi} dpi</span>, searching ${remembered.bounds[0]}-${remembered.bounds[1]} cm/360.</p>
+            <button class="action action--primary" data-action="use-saved">start from your saved calibration</button>
+          </div>`
+        : '';
+      return `
       <div class="wrap stack setup__inner">
         <h2 class="display setup__title">+ calibrate</h2>
+        ${rememberedBlock}
         <p class="setup__lead">two quick steps, no numbers to look up - we just watch how your hand actually moves.</p>
         <ol class="cal-preview">
           <li><span class="cal-preview__n">1</span><span>the sweep - drag a card's width, so we learn your mouse.</span></li>
@@ -93,10 +107,11 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
         </ol>
         <p class="setup__lead">first, grab any card from your wallet - bank card, gym card, hotel key. they're all exactly the same size.</p>
         ${reduced ? `<p class="setup__lead mono">reduced-motion is on - you can skip the rendered turn with "i'll type my numbers instead" below.</p>` : ''}
-        <button class="action action--primary" data-action="start-guided">i've got a card - start</button>
+        <button class="action ${remembered ? 'action--ghost' : 'action--primary'}" data-action="start-guided">${remembered ? "recalibrate - i've got a card" : "i've got a card - start"}</button>
         <button class="action action--ghost" data-action="start-manual">i'll type my numbers instead</button>
         <p class="setup__lead setup__manual-note mono">we use them only as a starting point to search around - not as the answer.</p>
       </div>`;
+    }
     if (state.step === 'blocked') {
       const accel = state.blockReason === 'accel';
       return `
@@ -128,6 +143,19 @@ export function setup(host: HTMLElement, ctx: AppContext): Screen {
     const click = (sel: string, fn: () => void): void => root.querySelector(`[data-action="${sel}"]`)?.addEventListener('click', fn);
     const val = (sel: string): string => (root.querySelector(`[data-field="${sel}"]`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
     click('start-guided', () => dispatch({ type: 'start-guided' }));
+    click('use-saved', () => {
+      // Re-apply the remembered prefs to the draft (the shell already merged them at boot, but a
+      // mid-session edit may have drifted the draft) and go straight to the hunt.
+      const p = ctx.storage.loadPrefs?.();
+      if (p) {
+        ctx.draft.dpi = p.dpi;
+        ctx.draft.currentGame = p.currentGame;
+        ctx.draft.currentSens = p.currentSens;
+        ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: p.speedAccuracy };
+        ctx.draft.bounds = p.bounds;
+      }
+      ctx.navigate('session');
+    });
     click('start-manual', () => dispatch({ type: 'start-manual' }));
     click('retry', () => dispatch({ type: 'retry' }));
     click('manual', () => dispatch({ type: 'start-manual' }));
