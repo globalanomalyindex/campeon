@@ -29,6 +29,11 @@ import type { InstrumentId } from '../../types';
  * Materials are shared `MeshStandardMaterial`s tuned from `src/palette.ts` hex ONLY (no hardcoded
  * color). This module has NO scored API: it never reads view()/bearing()/radiusDeg() and never
  * writes a sample/score/Observation. It is pure THREE - safe to unit-test without a WebGL context.
+ *
+ * The strategy-specific moving parts (wings, hood, plate, etc.) carry a stable `mesh.name` and a
+ * captured `userData.rest` transform (see `PartRest`/`partRest`), so the pure cosmetic module
+ * `secondary.ts` can drive per-part idle motion purely off name + rest + time - this file never
+ * animates anything itself and never reads the scored stream either.
  */
 
 /** Name of the emissive weak-spot child, so the layer/tests can find + tween it. */
@@ -124,9 +129,30 @@ function weakspot(mat: MeshStandardMaterial): Mesh {
   return m;
 }
 
+/**
+ * A part's REST transform - the pose it was placed at in `part()`, captured once so the pure
+ * `secondary.ts` module (owned by a later package) can compute `rest + offset` every frame without
+ * ever accumulating drift. Read-only from the cosmetic layer's perspective: this module writes it
+ * once at build time and nothing here (or in secondary.ts) ever mutates it afterward.
+ */
+export interface PartRest {
+  px: number; py: number; pz: number;
+  rx: number; ry: number; rz: number;
+}
+
+/** Read a part's captured rest transform, or null if it never had one (unnamed / non-part child). */
+export function partRest(o: Object3D): PartRest | null {
+  const rest = (o.userData as { rest?: PartRest }).rest;
+  return rest ?? null;
+}
+
 function part(geom: ConstructorParameters<typeof Mesh>[0], mat: MeshStandardMaterial, place: (m: Mesh) => void): Mesh {
   const m = new Mesh(geom, mat);
   place(m);
+  m.userData.rest = {
+    px: m.position.x, py: m.position.y, pz: m.position.z,
+    rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z,
+  } satisfies PartRest;
   return m;
 }
 
@@ -150,20 +176,24 @@ function buildTrack(m: QuarryMaterials): QuarryMesh {
   const body = part(new CapsuleGeometry(0.16, 0.5, 4, 8), m.hide, (o) => {
     o.rotation.z = Math.PI / 2; // lie along X - a darting horizontal streak
   });
+  body.name = 'part-body';
   const wingL = part(new ConeGeometry(0.1, 0.55, 4), m.accent, (o) => {
     o.rotation.z = Math.PI / 2;
     o.rotation.y = -0.5;
     o.position.set(-0.05, 0.02, 0.28);
   });
+  wingL.name = 'part-wing-l';
   const wingR = part(new ConeGeometry(0.1, 0.55, 4), m.accent, (o) => {
     o.rotation.z = Math.PI / 2;
     o.rotation.y = 0.5;
     o.position.set(-0.05, 0.02, -0.28);
   });
+  wingR.name = 'part-wing-r';
   const tail = part(new ConeGeometry(0.08, 0.3, 4), m.mark, (o) => {
     o.rotation.z = -Math.PI / 2;
     o.position.set(-0.42, 0, 0);
   });
+  tail.name = 'part-tail';
   return assemble(m, [body, wingL, wingR, tail]);
 }
 
@@ -172,18 +202,22 @@ function buildFlick(m: QuarryMaterials): QuarryMesh {
   const coil = part(new CylinderGeometry(0.26, 0.3, 0.22, 10), m.hide, (o) => {
     o.position.set(0, -0.18, 0);
   });
+  coil.name = 'part-coil';
   const neck = part(new CapsuleGeometry(0.09, 0.34, 4, 8), m.hide, (o) => {
     o.rotation.x = -0.35; // reared back, ready to strike forward
     o.position.set(0.04, 0.18, 0);
   });
+  neck.name = 'part-neck';
   const hood = part(new ConeGeometry(0.22, 0.18, 5), m.mark, (o) => {
     o.rotation.x = Math.PI; // flared hood crowning the strike point
     o.position.set(0.06, 0.36, 0);
   });
+  hood.name = 'part-hood';
   const fang = part(new ConeGeometry(0.05, 0.16, 4), m.accent, (o) => {
     o.position.set(0.12, 0.22, 0);
     o.rotation.z = -0.4;
   });
+  fang.name = 'part-fang';
   return assemble(m, [coil, neck, hood, fang]);
 }
 
@@ -192,14 +226,18 @@ function buildCalibrate(m: QuarryMaterials): QuarryMesh {
   const back = part(new BoxGeometry(0.62, 0.2, 0.32), m.hide, (o) => {
     o.position.set(0, 0.04, 0);
   });
+  back.name = 'part-back';
   const head = part(new BoxGeometry(0.2, 0.16, 0.22), m.accent, (o) => {
     o.position.set(0.36, 0.02, 0);
   });
+  head.name = 'part-head';
+  // Legs stay unnamed - the bench-rest form is deliberately planted (no secondary motion on stance).
   const legFL = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(0.22, -0.2, 0.13));
   const legFR = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(0.22, -0.2, -0.13));
   const legBL = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(-0.22, -0.2, 0.13));
   const legBR = part(new CylinderGeometry(0.05, 0.05, 0.34, 6), m.hide, (o) => o.position.set(-0.22, -0.2, -0.13));
   const ridge = part(new BoxGeometry(0.5, 0.06, 0.06), m.mark, (o) => o.position.set(0, 0.17, 0));
+  ridge.name = 'part-ridge';
   return assemble(m, [back, head, legFL, legFR, legBL, legBR, ridge]);
 }
 
@@ -208,9 +246,14 @@ function buildStrike(m: QuarryMaterials): QuarryMesh {
   const core = part(new BoxGeometry(0.46, 0.46, 0.5), m.hide, (o) => {
     o.position.set(0, -0.02, 0);
   });
+  core.name = 'part-core';
   const shoulderL = part(new BoxGeometry(0.18, 0.34, 0.2), m.accent, (o) => o.position.set(0.05, 0.18, 0.32));
+  shoulderL.name = 'part-shoulder-l';
   const shoulderR = part(new BoxGeometry(0.18, 0.34, 0.2), m.accent, (o) => o.position.set(0.05, 0.18, -0.32));
+  shoulderR.name = 'part-shoulder-r';
   const plate = part(new BoxGeometry(0.5, 0.14, 0.54), m.mark, (o) => o.position.set(0, 0.24, 0));
+  plate.name = 'part-plate';
+  // Feet stay unnamed - the heavy stance is deliberately planted (no secondary motion).
   const footL = part(new BoxGeometry(0.18, 0.16, 0.2), m.hide, (o) => o.position.set(0, -0.3, 0.18));
   const footR = part(new BoxGeometry(0.18, 0.16, 0.2), m.hide, (o) => o.position.set(0, -0.3, -0.18));
   return assemble(m, [core, shoulderL, shoulderR, plate, footL, footR]);

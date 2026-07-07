@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { PerspectiveCamera, Scene } from 'three';
-import { createViewmodel3D, REST_POSE, poseFromSprings, VM3D_GAIN } from '../../../src/ui/viewmodel/viewmodel-3d';
+import { Mesh, MeshBasicMaterial, PerspectiveCamera, Scene } from 'three';
+import {
+  createViewmodel3D,
+  REST_POSE,
+  poseFromSprings,
+  VM3D_GAIN,
+  flashPose,
+  FLASH_MS,
+  FLASH_ROLL_STEP,
+} from '../../../src/ui/viewmodel/viewmodel-3d';
 import { restSway, kick, stepSway } from '../../../src/ui/viewmodel/sway';
 import { restRecoil, punch, stepRecoil } from '../../../src/ui/viewmodel/recoil';
+import { MUZZLE_FLASH_NAME } from '../../../src/ui/viewmodel/revolver-mesh';
 
 describe('viewmodel-3d pose mapping (pure)', () => {
   it('rest springs map to the canonical rest pose', () => {
@@ -91,5 +100,101 @@ describe('createViewmodel3D - attach + lifecycle', () => {
     vm.attach(scene, camera);
     vm.dispose();
     expect(vm.group.parent).toBeNull();
+  });
+});
+
+describe('flashPose (pure)', () => {
+  it('is null before the flash window starts', () => {
+    expect(flashPose(-1)).toBeNull();
+  });
+
+  it('is null at/after FLASH_MS', () => {
+    expect(flashPose(FLASH_MS)).toBeNull();
+    expect(flashPose(FLASH_MS + 50)).toBeNull();
+  });
+
+  it('scale shrinks and opacity fades monotonically across the window', () => {
+    const samples = [0, FLASH_MS * 0.25, FLASH_MS * 0.5, FLASH_MS * 0.75, FLASH_MS * 0.99];
+    const poses = samples.map((ms) => flashPose(ms));
+    for (const p of poses) expect(p).not.toBeNull();
+    for (let i = 1; i < poses.length; i++) {
+      expect(poses[i]!.scale).toBeLessThan(poses[i - 1]!.scale);
+      expect(poses[i]!.opacity).toBeLessThan(poses[i - 1]!.opacity);
+    }
+    // bounds at the start of the window
+    expect(poses[0]!.scale).toBeCloseTo(1.25, 12);
+    expect(poses[0]!.opacity).toBeCloseTo(1, 12);
+  });
+});
+
+describe('muzzle flash group (viewmodel-3d wiring)', () => {
+  function findFlash(vm: ReturnType<typeof createViewmodel3D>): Mesh {
+    const f = vm.group.getObjectByName(MUZZLE_FLASH_NAME);
+    expect(f, 'muzzle flash group present on the gun').toBeTruthy();
+    return f as unknown as Mesh;
+  }
+
+  it('a fire followed by a tick shows the flash group with opacity > 0', () => {
+    const vm = createViewmodel3D({ reducedMotion: false });
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+    vm.attach(scene, camera);
+    vm.tick(0); // establish lastMs
+    vm.fire();
+    vm.tick(10);
+    const flash = findFlash(vm);
+    expect(flash.visible).toBe(true);
+    const mat = (flash.children[0] as Mesh).material as MeshBasicMaterial;
+    expect(mat.opacity).toBeGreaterThan(0);
+    vm.dispose();
+  });
+
+  it('hides again once FLASH_MS has elapsed since the shot', () => {
+    const vm = createViewmodel3D({ reducedMotion: false });
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+    vm.attach(scene, camera);
+    vm.tick(0);
+    vm.fire();
+    vm.tick(10);
+    vm.tick(10 + FLASH_MS + 1);
+    const flash = findFlash(vm);
+    expect(flash.visible).toBe(false);
+    const mat = (flash.children[0] as Mesh).material as MeshBasicMaterial;
+    expect(mat.opacity).toBe(0);
+    vm.dispose();
+  });
+
+  it('reduced motion: fire never shows the flash', () => {
+    const vm = createViewmodel3D({ reducedMotion: true });
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+    vm.attach(scene, camera);
+    vm.fire();
+    vm.tick(10);
+    vm.tick(20);
+    const flash = findFlash(vm);
+    expect(flash.visible).toBe(false);
+    vm.dispose();
+  });
+
+  it('two consecutive shots roll the flash to different rotation.z (golden-angle step, deterministic)', () => {
+    const vm = createViewmodel3D({ reducedMotion: false });
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+    vm.attach(scene, camera);
+    vm.tick(0);
+    vm.fire();
+    vm.tick(10);
+    const flash = findFlash(vm);
+    const firstRoll = flash.rotation.z;
+
+    vm.fire();
+    vm.tick(20);
+    const secondRoll = flash.rotation.z;
+
+    expect(secondRoll).not.toBeCloseTo(firstRoll, 6);
+    expect(secondRoll - firstRoll).toBeCloseTo(FLASH_ROLL_STEP, 6);
+    vm.dispose();
   });
 });

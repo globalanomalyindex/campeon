@@ -1,9 +1,12 @@
 import {
+  AdditiveBlending,
   BoxGeometry,
   CylinderGeometry,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
+  PlaneGeometry,
   type Object3D,
 } from 'three';
 import { hex } from '../../palette';
@@ -30,7 +33,10 @@ import { hex } from '../../palette';
 /** Late draw order so the viewmodel composites on top of the whole world. */
 export const VIEWMODEL_RENDER_ORDER = 999;
 
-/** The three materials a revolver is built from - all from palette.ts. */
+/** Name of the muzzle-flash group, parented at the barrel tip (hidden until `fire()`). */
+export const MUZZLE_FLASH_NAME = 'revolver-flash';
+
+/** The four materials a revolver is built from - all from palette.ts. */
 export interface RevolverMaterials {
   /** Case-hardened steel: frame, barrel, cylinder. */
   steel: MeshStandardMaterial;
@@ -38,6 +44,13 @@ export interface RevolverMaterials {
   wood: MeshStandardMaterial;
   /** Brass accents: trigger guard, hammer. */
   brass: MeshStandardMaterial;
+  /**
+   * Muzzle-flash: additive gold, unlit (MeshBasicMaterial so it ignores the scene's lighting - a
+   * flash is a light SOURCE, not a lit surface). Opacity is tweened by viewmodel-3d's `flashPose`.
+   * Additive blending + gold color so the film pass's gold-selective bloom (built in parallel) picks
+   * it up and blooms the flash without touching anything else on screen.
+   */
+  flash: MeshBasicMaterial;
 }
 
 function parseHex(h: string): number {
@@ -59,6 +72,23 @@ const mkMat = (color: number, opts: { metalness: number; roughness: number }): M
     depthWrite: false,
   });
 
+/**
+ * The muzzle-flash material: additive gold, fully transparent at rest (viewmodel-3d's `flashPose`
+ * drives opacity up on `fire()` and back to 0 as it fades). `depthTest:false` so it is never occluded
+ * by (and never occludes) world depth, matching the rest of the viewmodel's render contract - but it
+ * is a MeshBasicMaterial (NOT MeshStandardMaterial), so it ignores scene lighting entirely: a flash is
+ * an emitted light source, not a lit surface.
+ */
+const mkFlashMat = (color: number): MeshBasicMaterial =>
+  new MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0,
+    blending: AdditiveBlending,
+    depthTest: false,
+    depthWrite: false,
+  });
+
 /** Build a fresh, group-owned set of palette materials. Dispose all via `revolverMaterialList()`. */
 export function createRevolverMaterials(): RevolverMaterials {
   return {
@@ -68,12 +98,13 @@ export function createRevolverMaterials(): RevolverMaterials {
     steel: mkMat(parseHex(hex.gunmetal), { metalness: 0.35, roughness: 0.5 }),
     wood: mkMat(parseHex(hex.wood), { metalness: 0.0, roughness: 0.7 }),
     brass: mkMat(parseHex(hex.brass), { metalness: 0.45, roughness: 0.4 }),
+    flash: mkFlashMat(parseHex(hex.gold)),
   };
 }
 
 /** Every material in a set, for disposal. */
-export function revolverMaterialList(m: RevolverMaterials): readonly MeshStandardMaterial[] {
-  return [m.steel, m.wood, m.brass];
+export function revolverMaterialList(m: RevolverMaterials): readonly (MeshStandardMaterial | MeshBasicMaterial)[] {
+  return [m.steel, m.wood, m.brass, m.flash];
 }
 
 function part(
@@ -85,6 +116,32 @@ function part(
   m.renderOrder = VIEWMODEL_RENDER_ORDER; // draw LATE - on top of the world
   place(m);
   return m;
+}
+
+/**
+ * Build the hidden muzzle-flash group: three crossed petals (fanned 0/60/120 degrees around Z) plus
+ * one small center quad, all sharing `flashMat`. Parented at the barrel tip. `renderOrder` is one past
+ * `VIEWMODEL_RENDER_ORDER` so the flash composites on top of the revolver itself, not just the world.
+ * `visible = false` at rest; viewmodel-3d flips it on for the duration of `flashPose`.
+ */
+function buildMuzzleFlash(flashMat: MeshBasicMaterial): Group {
+  const flash = new Group();
+  flash.name = MUZZLE_FLASH_NAME;
+  flash.position.set(0, 0.02, -0.37); // the barrel tip
+  flash.visible = false;
+
+  const petalAngles = [0, (60 * Math.PI) / 180, (120 * Math.PI) / 180];
+  for (const rot of petalAngles) {
+    const petal = new Mesh(new PlaneGeometry(0.06, 0.02), flashMat);
+    petal.rotation.z = rot;
+    petal.renderOrder = VIEWMODEL_RENDER_ORDER + 1;
+    flash.add(petal);
+  }
+  const center = new Mesh(new PlaneGeometry(0.02, 0.02), flashMat);
+  center.renderOrder = VIEWMODEL_RENDER_ORDER + 1;
+  flash.add(center);
+
+  return flash;
 }
 
 /**
@@ -141,5 +198,6 @@ export function revolverMesh(materials: RevolverMaterials = createRevolverMateri
   );
 
   for (const p of parts) g.add(p);
+  g.add(buildMuzzleFlash(materials.flash));
   return g;
 }

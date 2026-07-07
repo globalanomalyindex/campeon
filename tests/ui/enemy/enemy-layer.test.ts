@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { Group, Mesh, MeshStandardMaterial, Object3D, Scene, Vector3 } from 'three';
+import { Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Scene, Vector3 } from 'three';
+import { ARENA_GROUND_Y } from '../../../src/engine/arena';
 import { createEnemyLayer } from '../../../src/ui/enemy/enemy-layer';
 import { quarryWorldHeight, WEAKSPOT_NAME } from '../../../src/ui/enemy/meshes';
+import { SHADOW_EPS, SHADOW_NAME, shadowPose } from '../../../src/ui/enemy/shadow';
+import { SPARK_MS, SPARK_NAME } from '../../../src/ui/enemy/sparks';
 import type { Degrees, TargetHandle } from '../../../src/types';
 
 /** A bare arena target stand-in: an Object3D at a world position, hidden when the skin attaches. */
@@ -378,6 +381,220 @@ describe('enemy-layer death / escape (P3-4)', () => {
     layer.update(50);
     expect(quarriesIn(scene).length).toBe(0);
     expect(dustIn(scene).length).toBe(0);
+    layer.dispose();
+  });
+});
+
+// ── Phase B integration: contact shadows, per-part secondary motion, impact sparks ──
+// All three are cosmetic layers wired through the SAME lifecycle as the quarry itself: they read the
+// posed quarry / the classifyHit result the layer already computed, and write nothing scored. The
+// scored sphere (rec.object) is never touched by any of them.
+describe('enemy-layer contact shadows (Phase B)', () => {
+  const DIST = 20;
+  const RADIUS = 1.5;
+  const SPAWN_MS = (8 / 14) * 1000;
+  const DEATH_MS = (8 / 16) * 1000;
+
+  function shadowsIn(scene: Scene): Mesh[] {
+    const layerGroup = scene.getObjectByName('enemy-layer') as Group;
+    return layerGroup.children.filter((c) => c.name === SHADOW_NAME) as Mesh[];
+  }
+
+  it('a spawn creates a blob pinned to the grid plane directly beneath the target', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(3, 0, -DIST), RADIUS, 0);
+    layer.update(SPAWN_MS + 100);
+    const blob = shadowsIn(scene)[0]!;
+    expect(blob).toBeTruthy();
+    expect(blob.visible).toBe(true);
+    expect(blob.position.x).toBeCloseTo(3, 6);
+    expect(blob.position.z).toBeCloseTo(-DIST, 6);
+    expect(blob.position.y).toBeCloseTo(ARENA_GROUND_Y + SHADOW_EPS, 10);
+    layer.dispose();
+  });
+
+  it('the blob follows a moving target on x/z while y stays pinned to the plane', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    const obj = targetAt(0, 0, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0);
+    layer.update(SPAWN_MS + 100);
+    const blob = shadowsIn(scene)[0]!;
+    obj.position.set(5, 1, -DIST + 2); // the arena moves the scored sphere; the layer only follows
+    layer.update(SPAWN_MS + 150);
+    expect(blob.position.x).toBeCloseTo(5, 6);
+    expect(blob.position.z).toBeCloseTo(-DIST + 2, 6);
+    expect(blob.position.y).toBeCloseTo(ARENA_GROUND_Y + SHADOW_EPS, 10);
+    layer.dispose();
+  });
+
+  it('a target at/below the grid plane gets NO visible blob (never pokes through the floor)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, ARENA_GROUND_Y - 1, -DIST), RADIUS, 0);
+    layer.update(SPAWN_MS + 100);
+    const blob = shadowsIn(scene)[0]!;
+    expect(blob.visible).toBe(false);
+    layer.dispose();
+  });
+
+  it('a death fades the blob alongside the quarry, and release removes it', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    const idleMs = SPAWN_MS + 100;
+    layer.update(idleMs);
+    const blob = shadowsIn(scene)[0]!;
+    const idleOpacity = (blob.material as MeshBasicMaterial).opacity;
+    expect(idleOpacity).toBeGreaterThan(0);
+
+    layer.fire(idleMs, [0, 0], [handleAt('t0', [0, 0], RADIUS)]); // clean kill
+    layer.update(idleMs + DEATH_MS * 0.7);
+    const dyingOpacity = (blob.material as MeshBasicMaterial).opacity;
+    expect(dyingOpacity).toBeLessThan(idleOpacity); // fading WITH the quarry
+
+    layer.update(idleMs + DEATH_MS + 200); // death played out - record released
+    expect(shadowsIn(scene)).not.toContain(blob);
+    layer.dispose();
+  });
+
+  it('reduced motion: the blob still exists and follows at the full shadowPose opacity', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: true });
+    const scene = new Scene();
+    layer.attach(scene);
+    const obj = targetAt(0, 0, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0);
+    layer.update(0);
+    const blob = shadowsIn(scene)[0]!;
+    expect(blob.visible).toBe(true);
+    // Static grounding is not motion: reduced keeps the shadow, at the pure shadowPose opacity
+    // (pose.opacity is 1 in the reduced static idle).
+    const expected = shadowPose(obj.position, quarryWorldHeight(DIST, RADIUS))!;
+    expect((blob.material as MeshBasicMaterial).opacity).toBeCloseTo(expected.opacity, 6);
+    obj.position.x = 4;
+    layer.update(50);
+    expect(blob.position.x).toBeCloseTo(4, 6);
+    layer.dispose();
+  });
+});
+
+describe('enemy-layer per-part secondary motion (Phase B)', () => {
+  const DIST = 20;
+  const RADIUS = 1.5;
+  const SPAWN_MS = (8 / 14) * 1000;
+
+  it('a named part animates about its rest between updates under live motion', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.setEnvironment('track');
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    layer.update(SPAWN_MS + 100);
+    const quarry = quarryGroupIn(scene);
+    const wing = quarry.getObjectByName('part-wing-l') as Mesh;
+    const z0 = wing.rotation.z;
+    layer.update(SPAWN_MS + 100 + 120); // ~a quarter of the 2.2Hz flap period later
+    expect(wing.rotation.z).not.toBeCloseTo(z0, 6); // the wing is flapping
+    layer.dispose();
+  });
+
+  it('secondary motion never moves the weak-spot off the scored position', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.setEnvironment('track');
+    const obj = targetAt(2, 1, -DIST);
+    layer.spawn('t0', obj, RADIUS, 0);
+    for (const t of [SPAWN_MS + 100, SPAWN_MS + 300, SPAWN_MS + 700]) {
+      layer.update(t);
+      const quarry = quarryGroupIn(scene);
+      const ws = quarry.getObjectByName(WEAKSPOT_NAME) as Mesh;
+      const wp = new Vector3();
+      ws.getWorldPosition(wp);
+      // Idle lift is bounded (±1% of base scale on Y); x/z must match the scored sphere exactly.
+      expect(wp.x).toBeCloseTo(obj.position.x, 6);
+      expect(wp.z).toBeCloseTo(obj.position.z, 6);
+    }
+    layer.dispose();
+  });
+
+  it('reduced motion: named parts stay exactly at their captured rest across updates', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: true });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.setEnvironment('track');
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    layer.update(0);
+    const quarry = quarryGroupIn(scene);
+    const wing = quarry.getObjectByName('part-wing-l') as Mesh;
+    const z0 = wing.rotation.z;
+    layer.update(500);
+    layer.update(1500);
+    expect(wing.rotation.z).toBe(z0); // frozen at rest - no time-driven part motion
+    layer.dispose();
+  });
+});
+
+describe('enemy-layer impact sparks (Phase B)', () => {
+  const DIST = 20;
+  const RADIUS = 1.5;
+  const SPAWN_MS = (8 / 14) * 1000;
+
+  function sparksShown(scene: Scene): Group[] {
+    const layerGroup = scene.getObjectByName('enemy-layer') as Group;
+    return layerGroup.children.filter((c) => c.name === SPARK_NAME && c.visible) as Group[];
+  }
+
+  it('a KILL emits a pooled spark burst at the weak-spot that repools after SPARK_MS', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    const idleMs = SPAWN_MS + 100;
+    layer.update(idleMs);
+    layer.fire(idleMs, [0, 0], [handleAt('t0', [0, 0], RADIUS)]);
+    layer.update(idleMs + 40);
+    const shown = sparksShown(scene);
+    expect(shown.length).toBe(1);
+    expect(shown[0]!.position.z).toBeCloseTo(-DIST, 6); // at the impact point, not the feet
+
+    layer.update(idleMs + SPARK_MS + 50);
+    expect(sparksShown(scene).length).toBe(0); // hidden + parked back in the pool
+
+    // The pool never balloons with kills: total burst groups stay at the fixed pool size.
+    const total = (scene.getObjectByName('enemy-layer') as Group).children.filter(
+      (c) => c.name === SPARK_NAME,
+    ).length;
+    expect(total).toBeLessThanOrEqual(2);
+    layer.dispose();
+  });
+
+  it('a GRAZE emits no spark (the flinch is the graze read)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    const idleMs = SPAWN_MS + 100;
+    layer.update(idleMs);
+    layer.fire(idleMs, [3, 0], [handleAt('t0', [0, 0], RADIUS)]); // sep 3 deg: graze band
+    layer.update(idleMs + 40);
+    expect(sparksShown(scene).length).toBe(0);
+    layer.dispose();
+  });
+
+  it('reduced motion: no spark pool is ever allocated', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: true });
+    const scene = new Scene();
+    layer.attach(scene);
+    layer.spawn('t0', targetAt(0, 0, -DIST), RADIUS, 0);
+    layer.update(0);
+    const layerGroup = scene.getObjectByName('enemy-layer') as Group;
+    expect(layerGroup.children.filter((c) => c.name === SPARK_NAME).length).toBe(0);
     layer.dispose();
   });
 });

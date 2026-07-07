@@ -1,6 +1,7 @@
 import {
   Color,
   DirectionalLight,
+  Fog,
   GridHelper,
   HemisphereLight,
   type Object3D,
@@ -9,6 +10,7 @@ import {
 } from 'three';
 import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, Ms, TargetHandle, TargetSpec } from '../types';
 import { CameraRig } from './camera-rig';
+import { createWarmEnvTexture, ENV_INTENSITY, FOG_FAR, FOG_NEAR } from './environment';
 import { Target, MovingTarget, placeStatic, type Placement } from './targets';
 import type { PostProcessor } from './psx-pass';
 
@@ -79,6 +81,13 @@ export interface ArenaOptions {
   postProcessor?: PostProcessor;
 }
 
+/**
+ * World Y of the arena's visible floor (the grid). The single source of truth for anything that
+ * grounds itself on that plane (the grid itself, per-target contact-shadow blobs). Targets spawn on
+ * a sphere around the eye, so a target CAN sit below this plane - consumers must handle that.
+ */
+export const ARENA_GROUND_Y = -3;
+
 type AimCallback = (sample: AimSample, view: [Degrees, Degrees]) => void;
 type FrameCallback = (dtMs: Ms, nowMs: Ms) => void;
 type FireCallback = (nowMs: Ms) => void;
@@ -121,7 +130,11 @@ export class Arena implements ArenaScene {
   }
 
   private buildEnvironment(): void {
-    this.scene.background = new Color('#0c0b09'); // warm cinema-ink, matches the app-wide film stock
+    // Shared warm cinema-ink: both the backdrop AND the fog color, so depth fades into the film
+    // stock instead of a mismatched haze color revealing the far clip plane.
+    const inkColor = new Color('#0c0b09');
+    this.scene.background = inkColor; // warm cinema-ink, matches the app-wide film stock
+    this.scene.fog = new Fog(inkColor.getHex(), FOG_NEAR, FOG_FAR);
     // Warm film-stock lighting: a cream sky over a warm ground, so lit surfaces read warm not blue-grey.
     // Tuned so the low-poly 3D quarry + revolver (low-metalness, no environment map) read as lit FORM
     // against the near-black backdrop without washing out the moody spaghetti-western mood.
@@ -135,9 +148,18 @@ export class Arena implements ArenaScene {
     rim.position.set(6, 7, -24);
     // Floor grid: warm cream-tinted hairlines over the cinema-ink, not the old cool blue-grey.
     const grid = new GridHelper(200, 80, 0x3a342a, 0x16130e);
-    grid.position.y = -3;
+    grid.position.y = ARENA_GROUND_Y;
     this.scene.add(hemi, key, rim, grid);
     this.envDisposables.push(grid); // GridHelper owns a BufferGeometry + LineBasicMaterial
+
+    // Warm procedural equirect env map (SUN_DIR normalizes this SAME rim-light position, so the IBL
+    // specular ping on metallic props agrees with the analytic rim halo above). three r161+'s
+    // WebGLRenderer auto-converts an equirect `scene.environment` at render time, so the arena stays
+    // renderer-agnostic - stub renderers in tests never touch WebGL and never see this conversion.
+    const env = createWarmEnvTexture();
+    this.scene.environment = env;
+    this.scene.environmentIntensity = ENV_INTENSITY;
+    this.envDisposables.push(env);
   }
 
   private handleSample(sample: AimSample): void {

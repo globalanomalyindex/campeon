@@ -3,7 +3,13 @@ import type { Degrees } from '../../types';
 import type { ViewmodelLayer } from '../../engine/arena';
 import { restSway, kick, stepSway, type SwayState } from './sway';
 import { restRecoil, punch, stepRecoil, type RecoilState } from './recoil';
-import { createRevolverMaterials, revolverMaterialList, revolverMesh, type RevolverMaterials } from './revolver-mesh';
+import {
+  createRevolverMaterials,
+  revolverMaterialList,
+  revolverMesh,
+  MUZZLE_FLASH_NAME,
+  type RevolverMaterials,
+} from './revolver-mesh';
 
 /**
  * In-scene 3D first-person VIEWMODEL: a procedural western single-action revolver parented to the
@@ -84,6 +90,26 @@ export function poseFromSprings(sway: SwayState, recoil: RecoilState): Viewmodel
   };
 }
 
+/** Muzzle-flash lifetime (ms) - a single sharp pop, gone before the recoil spring even settles. */
+export const FLASH_MS = 90;
+
+/**
+ * Per-shot roll step (radians) applied to the flash group's rotation.z: the golden angle, so
+ * consecutive shots never repeat a petal orientation yet stay fully DETERMINISTIC (shot counter,
+ * no RNG - the same shot sequence always renders the same flashes).
+ */
+export const FLASH_ROLL_STEP = 2.399963;
+
+/**
+ * PURE muzzle-flash pose at `elapsedMs` since the shot: a sharp pop that shrinks (scale) and fades
+ * (opacity) monotonically over FLASH_MS. Null outside the window (the layer hides the group).
+ */
+export function flashPose(elapsedMs: number): { scale: number; opacity: number } | null {
+  if (elapsedMs < 0 || elapsedMs >= FLASH_MS) return null;
+  const e = elapsedMs / FLASH_MS;
+  return { scale: 1.25 - 0.45 * e, opacity: Math.pow(1 - e, 1.5) };
+}
+
 export interface Viewmodel3D {
   /** The revolver group (parented to the camera on attach). Exposed for tests + the attach seam. */
   readonly group: Group;
@@ -115,6 +141,13 @@ export function createViewmodel3D(opts: { reducedMotion?: boolean } = {}): Viewm
   let scene: Scene | null = null;
   let camera: PerspectiveCamera | null = null;
 
+  // Muzzle-flash state: the flash group lives inside the revolver mesh (hidden at rest). fire()
+  // pins the start clock to the most recent tick and bumps the shot counter (the deterministic
+  // golden-angle roll); tick() drives visibility/scale/opacity through the pure flashPose.
+  const flash = group.getObjectByName(MUZZLE_FLASH_NAME) as Group;
+  let shotCount = 0;
+  let flashStartMs = -Infinity;
+
   // Start at the static rest pose (also the only pose under reduced motion).
   applyPose(group, poseFromSprings(sway, recoil));
 
@@ -133,12 +166,26 @@ export function createViewmodel3D(opts: { reducedMotion?: boolean } = {}): Viewm
       sway = stepSway(sway, dt);
       recoil = stepRecoil(recoil, dt);
       applyPose(group, poseFromSprings(sway, recoil));
+      // Drive the muzzle flash off the pure pose: rest+offset semantics, no accumulated state.
+      const fp = flashPose(nowMs - flashStartMs);
+      if (fp) {
+        flash.visible = true;
+        flash.scale.setScalar(fp.scale);
+        flash.rotation.z = shotCount * FLASH_ROLL_STEP;
+        materials.flash.opacity = fp.opacity;
+      } else {
+        flash.visible = false;
+        materials.flash.opacity = 0;
+      }
     },
     look(dYawDeg: number, dPitchDeg: number): void {
       if (!reduced) sway = kick(sway, dYawDeg, dPitchDeg);
     },
     fire(): void {
-      if (!reduced) recoil = punch(recoil);
+      if (reduced) return; // no recoil punch and no flash under reduced motion
+      recoil = punch(recoil);
+      shotCount += 1;
+      flashStartMs = lastMs; // the flash starts on the frame of the shot
     },
     dispose(): void {
       if (camera) camera.remove(group);

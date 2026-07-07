@@ -1,4 +1,4 @@
-import { Group, Mesh, type MeshStandardMaterial, type Object3D, type Scene } from 'three';
+import { Group, Mesh, type MeshBasicMaterial, type MeshStandardMaterial, type Object3D, type Scene } from 'three';
 import type { EnemyLayer } from '../../engine/arena';
 import type { Degrees, InstrumentId, Ms, TargetHandle } from '../../types';
 import { ANIMATIONS, type EnemyState } from './atlas';
@@ -17,6 +17,9 @@ import {
   type QuarryMaterials,
   type QuarryMesh,
 } from './meshes';
+import { applySecondary } from './secondary';
+import { createShadowBlob, createShadowTexture, disposeShadowBlob, shadowPose } from './shadow';
+import { applySpark, disposeSpark, sparkBurst } from './sparks';
 
 interface EnemyRecord {
   /** The cosmetic quarry group. Its children reference THIS record's own cloned material set. */
@@ -39,6 +42,12 @@ interface EnemyRecord {
   stateStartMs: Ms;
   /** Sign (-1 | +1) of the escape sprint direction, fixed at spawn so the bolt reads consistent. */
   escapeDir: number;
+  /** Which quarry silhouette this record wears (the activeEnv at spawn) - keys its secondary motion. */
+  env: InstrumentId;
+  /** Per-instance secondary-motion phase (spawn counter x golden angle - deterministic, no RNG). */
+  phase: number;
+  /** This quarry's contact-shadow blob on the grid plane, owned by the record (shared alpha texture). */
+  shadow: Mesh;
 }
 
 export interface EnemyLayerHandle extends EnemyLayer {
@@ -48,6 +57,12 @@ export interface EnemyLayerHandle extends EnemyLayer {
 
 /** Ease-out cubic - strong settle, no bounce (matches the brand motion rule). */
 const easeOut = (t: number): number => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
+
+/**
+ * Golden-angle step (radians) between consecutive spawns' secondary-motion phases: coexisting
+ * quarry never breathe/flap in lockstep, yet the sequence is fully deterministic (no RNG).
+ */
+const PHASE_STEP = 2.399963;
 
 /** A state's nominal duration (ms) from the shared animation contract; loops report their cycle. */
 function stateDurationMs(state: EnemyState): number {
@@ -167,6 +182,11 @@ export async function createEnemyLayer(
   // Layer-owned material TEMPLATE: never attached to a rendered mesh - each spawn clones it so its
   // opacity/emissive tweens stay per-instance. Disposed on teardown alongside any live clones.
   const materialTemplate = createQuarryMaterials();
+  // ONE shared radial-falloff alpha texture for every contact-shadow blob this layer spawns (each
+  // blob owns its material for per-instance opacity, but the texture is immutable and shared).
+  const shadowTexture = createShadowTexture();
+  // Monotone spawn counter driving each record's deterministic secondary-motion phase.
+  let spawnCount = 0;
   const enemies = new Map<string, EnemyRecord>();
   const fadeouts: EnemyRecord[] = []; // dying/escaping quarry handed off here so a new spawn/clear can't cut them short
   let activeEnv: InstrumentId = 'flick';
@@ -224,6 +244,47 @@ export async function createEnemyLayer(
     }
   };
 
+  // ── Pooled impact-sparks (the gold ping at the weak-spot on a clean kill) ──
+  // EXACTLY the dust-pool discipline: a small fixed pool allocated once, reused across kills, strict
+  // (drop when exhausted, never allocate per kill). Reduced motion never emits a burst at all.
+  const SPARK_POOL = 2;
+  /** Shard throw distance as a fraction of the quarry height - a punctuation, not a firework. */
+  const SPARK_SCALE_K = 0.6;
+  interface ActiveSpark {
+    group: Group;
+    startMs: Ms;
+    scale: number;
+  }
+  const sparkPool: Group[] = [];
+  const activeSparks: ActiveSpark[] = [];
+  if (!reduced) {
+    for (let i = 0; i < SPARK_POOL; i++) {
+      const s = sparkBurst();
+      sparkPool.push(s);
+      group.add(s); // parented once; visibility toggles, never re-added/removed
+    }
+  }
+
+  /** Fire a pooled spark burst at the impact point. No-op (and no alloc) if the pool is exhausted. */
+  const emitSpark = (pos: { x: number; y: number; z: number }, baseScale: number, nowMs: Ms): void => {
+    const s = sparkPool.pop();
+    if (!s) return; // strict pool - drop the burst rather than allocate
+    s.position.set(pos.x, pos.y, pos.z);
+    applySpark(s, 0, baseScale * SPARK_SCALE_K);
+    activeSparks.push({ group: s, startMs: nowMs, scale: baseScale * SPARK_SCALE_K });
+  };
+
+  /** Advance every active burst; repool the finished ones (applySpark hides + zeroes them). */
+  const updateSparks = (nowMs: Ms): void => {
+    for (let i = activeSparks.length - 1; i >= 0; i--) {
+      const a = activeSparks[i]!;
+      if (!applySpark(a.group, nowMs - a.startMs, a.scale)) {
+        sparkPool.push(a.group);
+        activeSparks.splice(i, 1);
+      }
+    }
+  };
+
   /** Advance the controller, detect a state transition, and apply the matching tween pose. */
   const render = (rec: EnemyRecord, nowMs: Ms): void => {
     const frame = reduced ? rec.ctrl.staticFrame() : rec.ctrl.frameAt(nowMs);
@@ -235,18 +296,38 @@ export async function createEnemyLayer(
     const elapsed = nowMs - rec.stateStartMs;
     const loop = ANIMATIONS[rec.shownState].loop;
     const p = reduced ? 1 : loop ? (elapsed % dur) / dur : Math.min(1, elapsed / dur);
-    applyPose(rec, poseFor(rec.shownState, p, reduced));
+    const pose = poseFor(rec.shownState, p, reduced);
+    applyPose(rec, pose);
+    // Per-part secondary motion, layered AFTER the group pose (the pose moves the GROUP, secondary
+    // moves named CHILD parts about their captured rest - they compose, and neither ever touches the
+    // weak-spot or the scored sphere). Reduced motion keeps every part at rest.
+    if (!reduced) applySecondary(rec.mesh, rec.env, nowMs / 1000, rec.phase);
+    // Contact shadow: pinned to the grid plane beneath the POSED quarry (so a death sink strengthens
+    // it and an escape sprint drags it along), fading with the quarry's own opacity. shadowPose
+    // returns null for a below-plane quarry - no blob may ever poke through the floor.
+    const sp = shadowPose(rec.mesh.position, rec.baseScale);
+    if (sp) {
+      rec.shadow.visible = true;
+      rec.shadow.position.set(sp.x, sp.y, sp.z);
+      rec.shadow.scale.setScalar(sp.scale);
+      (rec.shadow.material as MeshBasicMaterial).opacity = sp.opacity * pose.opacity;
+    } else {
+      rec.shadow.visible = false;
+    }
   };
 
   const release = (rec: EnemyRecord): void => {
     group.remove(rec.mesh);
+    group.remove(rec.shadow);
     // Geometries AND materials are per-record (the materials are this rec's own clone of the
-    // template), so both are disposed here - nothing shared leaks or is freed twice.
+    // template), so both are disposed here - nothing shared leaks or is freed twice. The shadow blob
+    // owns its geometry + material too (only the alpha texture is layer-shared).
     rec.mesh.traverse((o) => {
       const mesh = o as Mesh;
       if (mesh.isMesh) mesh.geometry.dispose();
     });
     for (const m of materialList(rec.materials)) m.dispose();
+    disposeShadowBlob(rec.shadow);
   };
   const retire = (id: string, rec: EnemyRecord): void => {
     release(rec);
@@ -315,8 +396,13 @@ export async function createEnemyLayer(
         // Bolt away from screen center: a quarry on the right of the arena runs right, and vice-versa
         // (so the escape never sprints back through the crosshair). Fixed at spawn.
         escapeDir: object.position.x >= 0 ? 1 : -1,
+        env: activeEnv,
+        phase: spawnCount * PHASE_STEP,
+        shadow: createShadowBlob(shadowTexture),
       };
+      spawnCount += 1;
       group.add(mesh);
+      group.add(rec.shadow);
       lastNowMs = nowMs;
       render(rec, nowMs);
       enemies.set(id, rec);
@@ -342,6 +428,7 @@ export async function createEnemyLayer(
         }
       }
       updateDust(nowMs);
+      updateSparks(nowMs);
     },
 
     fire(nowMs: Ms, view: [Degrees, Degrees], targets: ReadonlyArray<TargetHandle>): void {
@@ -363,8 +450,11 @@ export async function createEnemyLayer(
           playState(rec, 'death', nowMs, null);
           enemies.delete(t.id);
           fadeouts.push(rec);
-          // Punctuate the kill with a pooled dust-puff at the quarry's feet (reused, never allocated).
+          // Punctuate the kill with a pooled dust-puff at the quarry's feet (reused, never allocated)
+          // and a pooled gold spark burst at the weak-spot impact point - both downstream of the
+          // classifyHit result already computed above, never a new signal.
           emitDust(rec.object.position, rec.baseScale, nowMs);
+          emitSpark(rec.object.position, rec.baseScale, nowMs);
         } else if (cls === 'graze') {
           playState(rec, 'flinch', nowMs, 'idle');
         }
@@ -397,9 +487,16 @@ export async function createEnemyLayer(
       for (const a of activeDust) disposeDust(a.group);
       dustPool.length = 0;
       activeDust.length = 0;
+      // Free the pooled spark bursts the same way.
+      for (const s of sparkPool) disposeSpark(s);
+      for (const a of activeSparks) disposeSpark(a.group);
+      sparkPool.length = 0;
+      activeSparks.length = 0;
       if (scene) scene.remove(group);
-      // Live + fadeout clones were disposed via release(); free the template last.
+      // Live + fadeout clones were disposed via release(); free the template last. The shared shadow
+      // alpha texture goes last of all (every blob material referencing it is already disposed).
       for (const m of materialList(materialTemplate)) m.dispose();
+      shadowTexture.dispose();
     },
   };
 }

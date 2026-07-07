@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { Color, EquirectangularReflectionMapping, Fog, type Scene } from 'three';
 import type { AimSample, Degrees } from '../../src/types';
 import { Arena } from '../../src/engine/arena';
-import type { RendererLike, InputSource } from '../../src/engine/arena';
+import type { RendererLike, InputSource, EnemyLayer } from '../../src/engine/arena';
 import { degreesPerCount } from '../../src/engine/camera-rig';
+import { ENV_INTENSITY, FOG_FAR, FOG_NEAR } from '../../src/engine/environment';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { separation } from '../../src/engine/targets';
 
@@ -178,5 +180,59 @@ describe('Arena instrument surface', () => {
     h.arena.tick(16);
     expect(frames).toBe(0);
     expect(h.disposes()).toBe(1);
+  });
+});
+
+describe('Arena environment dressing (fog + warm env map, cosmetic only)', () => {
+  /**
+   * Observe the private scene through the SANCTIONED seam: an attached EnemyLayer receives it in
+   * attach(). No reach-in casts - the same surface a cosmetic layer really gets.
+   */
+  function sceneOf(arena: Arena): Scene {
+    let captured: Scene | null = null;
+    const probe: EnemyLayer = {
+      attach(s: Scene) {
+        captured = s;
+      },
+      spawn() {},
+      update() {},
+      fire() {},
+      clear() {},
+      dispose() {},
+    };
+    arena.attachEnemies(probe);
+    if (!captured) throw new Error('attachEnemies never handed the layer the scene');
+    return captured;
+  }
+
+  it('fog is present, in the backdrop ink color, with the environment module near/far', () => {
+    const h = harness();
+    const scene = sceneOf(h.arena);
+    const fog = scene.fog as Fog;
+    expect(fog).toBeTruthy();
+    expect(fog.near).toBe(FOG_NEAR);
+    expect(fog.far).toBe(FOG_FAR);
+    // Fog MUST match the backdrop so depth fades into the film stock, not into a mismatched haze.
+    const bg = scene.background as Color;
+    expect(fog.color.getHexString()).toBe(bg.getHexString());
+  });
+
+  it('scene.environment carries the warm equirect env map at ENV_INTENSITY', () => {
+    const h = harness();
+    const scene = sceneOf(h.arena);
+    expect(scene.environment).toBeTruthy();
+    expect(scene.environment!.mapping).toBe(EquirectangularReflectionMapping);
+    expect(scene.environmentIntensity).toBe(ENV_INTENSITY);
+  });
+
+  it('dispose() disposes the env texture (no GPU-side leak across arenas)', () => {
+    const h = harness();
+    const scene = sceneOf(h.arena);
+    let disposed = false;
+    scene.environment!.addEventListener('dispose', () => {
+      disposed = true;
+    });
+    h.arena.dispose();
+    expect(disposed).toBe(true);
   });
 });

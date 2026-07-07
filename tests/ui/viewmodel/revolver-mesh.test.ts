@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { Group, Mesh, MeshStandardMaterial } from 'three';
+import { AdditiveBlending, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial } from 'three';
 import {
   revolverMesh,
   createRevolverMaterials,
   revolverMaterialList,
+  MUZZLE_FLASH_NAME,
+  VIEWMODEL_RENDER_ORDER,
   type RevolverMaterials,
 } from '../../../src/ui/viewmodel/revolver-mesh';
 import { hex } from '../../../src/palette';
@@ -72,6 +74,76 @@ describe('revolverMesh factory', () => {
     const mats: RevolverMaterials = createRevolverMaterials();
     const list = revolverMaterialList(mats);
     expect(list.length).toBeGreaterThanOrEqual(3);
-    for (const m of list) expect(m).toBeInstanceOf(MeshStandardMaterial);
+    // steel/wood/brass are lit MeshStandardMaterials; the fourth (flash) is an unlit MeshBasicMaterial.
+    for (const m of list) {
+      expect(m instanceof MeshStandardMaterial || m instanceof MeshBasicMaterial).toBe(true);
+    }
+  });
+
+  it('createRevolverMaterials includes a fourth additive-gold flash material in the disposal list', () => {
+    const mats: RevolverMaterials = createRevolverMaterials();
+    expect(mats.flash).toBeInstanceOf(MeshBasicMaterial);
+    expect(`#${mats.flash.color.getHexString()}`.toLowerCase()).toBe(hex.gold.toLowerCase());
+    expect(mats.flash.transparent).toBe(true);
+    expect(mats.flash.opacity).toBe(0);
+    expect(mats.flash.blending).toBe(AdditiveBlending);
+    expect(mats.flash.depthTest).toBe(false);
+    expect(mats.flash.depthWrite).toBe(false);
+
+    const list = revolverMaterialList(mats);
+    expect(list.length).toBeGreaterThanOrEqual(4);
+    expect(list).toContain(mats.flash);
+  });
+});
+
+describe('muzzle flash group', () => {
+  function findFlash(g: Group): Group {
+    const f = g.getObjectByName(MUZZLE_FLASH_NAME);
+    expect(f, 'muzzle flash group present').toBeTruthy();
+    return f as Group;
+  }
+
+  it('is a hidden group named MUZZLE_FLASH_NAME at the barrel tip', () => {
+    const flash = findFlash(revolverMesh());
+    expect(flash).toBeInstanceOf(Group);
+    expect(flash.visible).toBe(false);
+    expect(flash.position.x).toBeCloseTo(0, 12);
+    expect(flash.position.y).toBeCloseTo(0.02, 12);
+    expect(flash.position.z).toBeCloseTo(-0.37, 12);
+  });
+
+  it('is built from crossed petals + a center quad, all using the additive gold flash material', () => {
+    const flash = findFlash(revolverMesh());
+    const meshes: Mesh[] = [];
+    flash.traverse((o) => {
+      if ((o as Mesh).isMesh) meshes.push(o as Mesh);
+    });
+    // three crossed petals + one center quad
+    expect(meshes.length).toBe(4);
+    for (const m of meshes) {
+      const mat = m.material as MeshBasicMaterial;
+      expect(mat).toBeInstanceOf(MeshBasicMaterial);
+      expect(`#${mat.color.getHexString()}`.toLowerCase()).toBe(hex.gold.toLowerCase());
+      expect(mat.blending).toBe(AdditiveBlending);
+      expect(mat.depthTest).toBe(false);
+      expect(mat.depthWrite).toBe(false);
+      // draws even later than the rest of the viewmodel, so it composites on top of the gun too.
+      expect(m.renderOrder).toBeGreaterThan(VIEWMODEL_RENDER_ORDER);
+    }
+  });
+
+  it('the three petals are rotated 0/60/120 degrees around Z', () => {
+    const flash = findFlash(revolverMesh());
+    const meshes: Mesh[] = [];
+    flash.traverse((o) => {
+      if ((o as Mesh).isMesh) meshes.push(o as Mesh);
+    });
+    const rotations = meshes.map((m) => m.rotation.z).sort((a, b) => a - b);
+    const expected = [0, Math.PI / 3, (2 * Math.PI) / 3].sort((a, b) => a - b);
+    // one of the four meshes is the center quad (rotation 0 too, most likely) - just assert the
+    // distinct petal angles 0/60/120 are all present among the meshes' Z rotations.
+    for (const e of expected) {
+      expect(rotations.some((r) => Math.abs(r - e) < 1e-9)).toBe(true);
+    }
   });
 });

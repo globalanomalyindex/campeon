@@ -6,12 +6,21 @@ import {
   ENEMY_SIZE_K,
   MIN_ENEMY_HEIGHT,
   quarryWorldHeight,
+  partRest,
   type QuarryMesh,
 } from '../../../src/ui/enemy/meshes';
 import { hex } from '../../../src/palette';
 import type { InstrumentId } from '../../../src/types';
 
 const ALL: InstrumentId[] = ['track', 'flick', 'calibrate', 'strike'];
+
+/** Named strategy-specific moving parts per id (legs/feet stay deliberately unnamed). */
+const NAMED_PARTS: Record<InstrumentId, string[]> = {
+  track: ['part-wing-l', 'part-wing-r', 'part-tail', 'part-body'],
+  flick: ['part-hood', 'part-neck', 'part-fang', 'part-coil'],
+  calibrate: ['part-head', 'part-ridge', 'part-back'],
+  strike: ['part-plate', 'part-shoulder-l', 'part-shoulder-r', 'part-core'],
+};
 
 /** All palette hex values, lower-cased, for membership checks against material colors. */
 const PALETTE = new Set(Object.values(hex).map((h) => h.toLowerCase()));
@@ -99,6 +108,39 @@ describe('quarryMesh factory', () => {
       expect(g.position.x).toBe(0);
       expect(g.position.y).toBe(0);
       expect(g.position.z).toBe(0);
+    }
+  });
+
+  it('every strategy-specific moving part carries its stable name', () => {
+    for (const id of ALL) {
+      const g = quarryMesh(id);
+      for (const name of NAMED_PARTS[id]) {
+        expect(g.getObjectByName(name), `${id} has ${name}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('every named part captures a userData.rest matching its actual placed transform', () => {
+    for (const id of ALL) {
+      const g = quarryMesh(id);
+      for (const name of NAMED_PARTS[id]) {
+        const p = g.getObjectByName(name)!;
+        const rest = partRest(p);
+        expect(rest, `${id}/${name} carries rest`).toBeTruthy();
+        expect(rest!.px).toBe(p.position.x);
+        expect(rest!.py).toBe(p.position.y);
+        expect(rest!.pz).toBe(p.position.z);
+        expect(rest!.rx).toBe(p.rotation.x);
+        expect(rest!.ry).toBe(p.rotation.y);
+        expect(rest!.rz).toBe(p.rotation.z);
+      }
+    }
+  });
+
+  it('the weak-spot itself carries NO rest transform (secondary motion can never move it)', () => {
+    for (const id of ALL) {
+      const ws = quarryMesh(id).getObjectByName(WEAKSPOT_NAME)!;
+      expect(partRest(ws)).toBeNull();
     }
   });
 });
