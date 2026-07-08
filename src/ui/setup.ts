@@ -11,6 +11,15 @@ import { calibrateReducer, initialCalState, type CalState } from './calibrate-fl
 import { createSweepView, type SweepView } from './calibrate/sweep-view';
 import { createSpinView, type SpinView } from './calibrate/spin-view';
 
+/** Thin-shell injection seam (mirrors sessionView's SessionViewDeps): production mounts the real
+ *  WebGL sweep + spin views, but a jsdom test can swap in fakes to drive the guided commit path -
+ *  the sweep->spin->onSeed->commitGuided chain - without a GL context. */
+export interface SetupDeps {
+  createSweepView: typeof createSweepView;
+  createSpinView: typeof createSpinView;
+}
+const DEFAULT_SETUP_DEPS: SetupDeps = { createSweepView, createSpinView };
+
 /** The persistent 2-segment journey tracker overlaid across the sweep + spin steps. Pure markup so
  *  it is unit-testable: the active step is highlighted, an earlier finished step gets a checkmark. */
 export function calibrationProgress(step: 'sweep' | 'spin'): string {
@@ -23,7 +32,8 @@ export function calibrationProgress(step: 'sweep' | 'spin'): string {
   }</div>`;
 }
 
-export function setup(host: HTMLElement, ctx: AppContext): Screen {
+export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFAULT_SETUP_DEPS): Screen {
+  const { createSweepView, createSpinView } = deps;
   let state: CalState = initialCalState();
   let view: SweepView | SpinView | null = null;
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;

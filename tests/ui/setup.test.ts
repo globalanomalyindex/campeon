@@ -124,4 +124,27 @@ describe('setup: remembered calibration (Phase C)', () => {
     (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
     expect(ctx.savedPrefs()).toMatchObject({ dpi: 3200 });
   });
+
+  it('the GUIDED (sweep -> spin) commit also remembers the calibration and heads to the hunt', () => {
+    // The primary path per the intro copy. Injected fake views drive the sweep-done -> onSeed chain
+    // without a GL context, so a dropped rememberPrefs in commitGuided would fail here.
+    const ctx = rememberingCtx(null);
+    let sweepOpts: Parameters<typeof import('../../src/ui/calibrate/sweep-view').createSweepView>[1] | null = null;
+    let spinOpts: Parameters<typeof import('../../src/ui/calibrate/spin-view').createSpinView>[1] | null = null;
+    const deps = {
+      createSweepView: ((_host: HTMLElement, opts: never) => { sweepOpts = opts; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/sweep-view').createSweepView,
+      createSpinView: ((_host: HTMLElement, opts: never) => { spinOpts = opts; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/spin-view').createSpinView,
+    };
+    const host = document.createElement('div');
+    setup(host, ctx, deps).mount();
+
+    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    expect(sweepOpts, 'sweep view mounted on start-guided').toBeTruthy();
+    sweepOpts!.onResult({ dpi: 1600, accelerated: false }); // sweep measured a dpi -> advance to spin
+    expect(spinOpts, 'spin view mounted after a valid sweep').toBeTruthy();
+    spinOpts!.onSeed(30); // the spin supplies the seed -> commitGuided
+
+    expect(ctx.savedPrefs()).toMatchObject({ dpi: 1600 });
+    expect(ctx.nav).toEqual(['session']);
+  });
 });

@@ -3,6 +3,7 @@ import type { EnemyLayer } from '../../engine/arena';
 import type { Degrees, InstrumentId, Ms, TargetHandle } from '../../types';
 import { ANIMATIONS, type EnemyState } from './atlas';
 import { EnemyController } from './controller';
+import { easeOut } from './ease';
 import { classifyHit, type HitClass } from './hit';
 import {
   cloneQuarryMaterials,
@@ -61,9 +62,6 @@ export interface EnemyLayerHandle extends EnemyLayer {
   /** Choose which quarry subsequent spawns use (the active instrument's prey). */
   setEnvironment(id: InstrumentId): void;
 }
-
-/** Ease-out cubic - strong settle, no bounce (matches the brand motion rule). */
-const easeOut = (t: number): number => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
 
 /**
  * Golden-angle step (radians) between consecutive spawns' secondary-motion phases: coexisting

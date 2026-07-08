@@ -75,6 +75,7 @@ describe('remembered prefs (campeon.prefs.v1, Phase C)', () => {
       JSON.stringify({ ...prefs, bounds: [60, 15] }), // inverted window
       JSON.stringify({ ...prefs, bounds: [15] }),
       JSON.stringify({ ...prefs, currentGame: '' }),
+      JSON.stringify({ ...prefs, currentGame: 'minecraft' }), // non-empty but not a real game id
       JSON.stringify(42),
     ];
     for (const blob of bad) {

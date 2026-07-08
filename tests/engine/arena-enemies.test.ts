@@ -10,6 +10,7 @@ import {
 import type { AimSample, Degrees, TargetHandle, TargetSpec } from '../../src/types';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { TrialRecorder, type Recording } from '../../src/instruments/recording';
+import { createEnemyLayer } from '../../src/ui/enemy/enemy-layer';
 
 /** Records every cosmetic call the arena drives - proves the hooks fire without touching scoring. */
 class FakeEnemyLayer implements EnemyLayer {
@@ -358,6 +359,54 @@ describe('INTEGRITY GATE: cosmetic-overlay-reads-never-writes (full scored Recor
     const baseline = scriptedLifecycleSession(SPEC);
     const attacked = scriptedLifecycleSession(SPEC, new AdversarialEnemyLayer());
     expect(attacked).toEqual(baseline);
+  });
+});
+
+// The gate above proves the CONTRACT (a layer that reads-never-writes cannot move the stream) against
+// fake + adversarial stand-ins. This block proves the SHIPPING layer honors it: the REAL
+// createEnemyLayer now runs Phase B sublayers that touch positions every frame - applyPose copies the
+// scored position into the cosmetic quarry then does `+= lift/lateral`, applySecondary re-poses named
+// child parts, shadowPose/emitSpark/emitDust READ rec.mesh/rec.object.position. If any of those ever
+// aliased the scored Object3D instead of copying from it, the scored stream would drift - and ONLY a
+// byte-identical check against the real module (not a stub) can catch that regression. createEnemyLayer
+// resolves synchronously (procedural geometry, no async work), so it drops straight into the helpers.
+describe('INTEGRITY GATE: the REAL createEnemyLayer (Phase B secondary motion + shadows + sparks) writes nothing scored', () => {
+  it('a scripted session with the real layer records a byte-identical Recording (live motion)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const withReal = scriptedSession(MOVING_SPEC, layer);
+    const without = scriptedSession(MOVING_SPEC);
+    expect(withReal.recording).toEqual(without.recording);
+    // Sanity: the stream actually moved (a vacuous empty deepEqual would pass otherwise).
+    expect(without.recording.frames.length).toBeGreaterThan(0);
+    // The scored sphere's angular truth is unmoved by the per-part motion + shadow/spark position reads.
+    expect(withReal.handle.bearing()).toEqual(without.handle.bearing());
+    expect(withReal.handle.radiusDeg()).toEqual(without.handle.radiusDeg());
+    layer.dispose();
+  });
+
+  it('also holds for a static target', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const withReal = scriptedSession(SPEC, layer);
+    const without = scriptedSession(SPEC);
+    expect(withReal.recording).toEqual(without.recording);
+    layer.dispose();
+  });
+
+  it('driving the death/escape LIFECYCLE (kill->death, clear->escape, dust/spark emit) through the real layer stays byte-identical', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: false });
+    const baseline = scriptedLifecycleSession(MOVING_SPEC);
+    const attacked = scriptedLifecycleSession(MOVING_SPEC, layer);
+    expect(attacked).toEqual(baseline);
+    expect(baseline.frames.length).toBeGreaterThan(0);
+    layer.dispose();
+  });
+
+  it('the real layer also stays byte-identical under REDUCED motion (static idle + instant retire path)', async () => {
+    const layer = await createEnemyLayer({ reducedMotion: true });
+    const baseline = scriptedLifecycleSession(SPEC);
+    const attacked = scriptedLifecycleSession(SPEC, layer);
+    expect(attacked).toEqual(baseline);
+    layer.dispose();
   });
 });
 

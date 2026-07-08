@@ -12,6 +12,7 @@ import {
   Scene,
 } from 'three';
 import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, Ms, TargetHandle, TargetSpec } from '../types';
+import { hex } from '../palette';
 import { CameraRig } from './camera-rig';
 import { createWarmEnvTexture, ENV_INTENSITY, FOG_FAR, FOG_NEAR } from './environment';
 import { Target, MovingTarget, placeStatic, type Placement } from './targets';
@@ -91,6 +92,18 @@ export interface ArenaOptions {
  */
 export const ARENA_GROUND_Y = -3;
 
+/**
+ * A three color int for a warm arena SURFACE, expressed as a documented BRIGHTNESS of a palette
+ * pigment (never a raw literal): every leather-toned surface the arena draws - the stage floor, the
+ * grid hairlines - is `hex.hide` (the quarry's own dusty-leather token) at a different value, so a
+ * palette retune moves the whole warm family in lockstep. `k` < 1 darkens, > 1 lifts.
+ */
+function warmSurface(paletteHex: string, k: number): number {
+  const n = parseInt(paletteHex.slice(1), 16);
+  const ch = (shift: number): number => Math.min(255, Math.round(((n >> shift) & 0xff) * k));
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
 type AimCallback = (sample: AimSample, view: [Degrees, Degrees]) => void;
 type FrameCallback = (dtMs: Ms, nowMs: Ms) => void;
 type FireCallback = (nowMs: Ms) => void;
@@ -133,9 +146,10 @@ export class Arena implements ArenaScene {
   }
 
   private buildEnvironment(): void {
-    // Shared warm cinema-ink: both the backdrop AND the fog color, so depth fades into the film
-    // stock instead of a mismatched haze color revealing the far clip plane.
-    const inkColor = new Color('#0c0b09');
+    // Shared warm cinema-ink from the palette (the single source for the film stock): both the
+    // backdrop AND the fog color, so depth fades into the stock instead of a mismatched haze color
+    // revealing the far clip plane, and a palette retune moves both at once.
+    const inkColor = new Color(hex.ink);
     this.scene.background = inkColor; // warm cinema-ink, matches the app-wide film stock
     this.scene.fog = new Fog(inkColor.getHex(), FOG_NEAR, FOG_FAR);
     // Warm film-stock lighting: a cream sky over a warm ground, so lit surfaces read warm not blue-grey.
@@ -160,13 +174,15 @@ export class Arena implements ArenaScene {
     // per-target contact shadows have a surface to sit on. Dark warm leather, never pure black.
     const floor = new Mesh(
       new PlaneGeometry(400, 400),
-      new MeshStandardMaterial({ color: 0x221b14, roughness: 0.95, metalness: 0 }),
+      // The leather pigment at a deep value - darker than the quarry so a target reads against it.
+      new MeshStandardMaterial({ color: warmSurface(hex.hide, 0.37), roughness: 0.95, metalness: 0 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = ARENA_GROUND_Y - 0.02; // just under the grid hairlines
-    // Floor grid: warm cream-tinted hairlines over the lit floor, fading into the fog. The FIELD
-    // lines (4th arg) carry the read; the center cross sits a step brighter as the axis anchor.
-    const grid = new GridHelper(200, 80, 0x8a7a5f, 0x453b2d);
+    // Floor grid: warm hairlines (the same leather pigment lifted) over the lit floor, fading into
+    // the fog. The center cross (3rd arg) sits a step brighter as the axis anchor; the field lines
+    // (4th arg) sit dim between floor and cross so the near field carries the depth read.
+    const grid = new GridHelper(200, 80, warmSurface(hex.hide, 1.5), warmSurface(hex.hide, 0.75));
     grid.position.y = ARENA_GROUND_Y;
     this.scene.add(hemi, key, rim, fill, floor, grid);
     this.envDisposables.push(grid); // GridHelper owns a BufferGeometry + LineBasicMaterial

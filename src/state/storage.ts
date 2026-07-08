@@ -1,4 +1,9 @@
-import type { PersistedPrefs, Result, Session, Storage } from '../types';
+import type { GameId, PersistedPrefs, Result, Session, Storage } from '../types';
+import { GAME_YAW } from '../convert/yaw-table';
+
+/** The known game ids, so a remembered currentGame is validated against the real table (not just
+ *  "some non-empty string") - a stale/hand-edited id degrades the whole blob to a first visit. */
+const KNOWN_GAMES = new Set<string>(GAME_YAW.map((g) => g.id));
 
 /** Minimal key/value surface - satisfied by window.localStorage and by test fakes. */
 export interface KvBackend {
@@ -23,14 +28,17 @@ function validPrefs(p: unknown): PersistedPrefs | null {
   if (!finite(c.dpi) || c.dpi <= 0) return null;
   if (!finite(c.currentSens) || c.currentSens <= 0) return null;
   if (!finite(c.speedAccuracy) || c.speedAccuracy < 0 || c.speedAccuracy > 1) return null;
-  if (typeof c.currentGame !== 'string' || c.currentGame.length === 0) return null;
+  // Must be a REAL game id, not merely a non-empty string: a stale-schema or hand-edited id would
+  // otherwise seed a draft whose game matches no yaw-table row, silently breaking the result-table
+  // highlight and the setup pre-selection (and the doc contract promises to degrade such a blob).
+  if (typeof c.currentGame !== 'string' || !KNOWN_GAMES.has(c.currentGame)) return null;
   if (!Array.isArray(c.bounds) || c.bounds.length !== 2) return null;
   const [lo, hi] = c.bounds;
   if (!finite(lo) || !finite(hi) || !(lo > 0) || !(hi > lo)) return null;
   if (c.lastSessionId !== undefined && typeof c.lastSessionId !== 'string') return null;
   return {
     dpi: c.dpi,
-    currentGame: c.currentGame as PersistedPrefs['currentGame'],
+    currentGame: c.currentGame as GameId,
     currentSens: c.currentSens,
     speedAccuracy: c.speedAccuracy,
     bounds: [lo, hi],

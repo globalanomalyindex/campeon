@@ -1,5 +1,6 @@
 import { AdditiveBlending, Group, Mesh, MeshBasicMaterial, PlaneGeometry } from 'three';
 import { hex } from '../../palette';
+import { easeOut } from './ease';
 
 /**
  * PURE factory + pose driver for the pooled IMPACT-SPARK burst: a small fan of additive gold shards
@@ -29,8 +30,6 @@ function parseHex(h: string): number {
   return parseInt(h.replace('#', ''), 16);
 }
 
-/** Ease-out cubic - strong settle, no bounce (the same brand motion rule enemy-layer uses). */
-const easeOut = (t: number): number => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
 
 /**
  * Build ONE pooled spark burst: SPARK_SHARDS tiny gold planes fanned at DETERMINISTIC angles (an
