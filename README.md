@@ -37,15 +37,15 @@ each faculty produces a within-trial score; the four are normalized across the s
 ## tech
 
 - **typescript** (strict, `exactOptionalPropertyTypes`) + **vite** + **three.js**, fully client-side (no backend; `localStorage` only).
-- hash-routed spa; a hand-rolled **psx-era visual skin** (low-res render target, ordered dither + posterize, chroma-keyed desert eagle viewmodel, sprite-billboard targets).
-- **pure-core / thin-shell** architecture: all the math + logic is pure and unit-tested (vitest); only webgl/canvas shells are runtime-verified. ~340 tests.
+- hash-routed spa with a hand-rolled **cinematic 3d arena** - procedurally sculpted low-poly quarry and an in-scene western revolver (no external dcc pipeline, no baked assets), a warm procedural environment map, long dusk contact shadows, and a filmic tone-map + gold-selective bloom post pass (a PS1 "retro" skin kept selectable behind the same seam).
+- **pure-core / thin-shell** architecture: all the math + logic is pure and unit-tested (vitest); only the webgl/canvas shells are runtime-verified. 640+ tests, including an **integrity gate** that proves the scored stream is byte-identical with the cosmetic 3d on or off - the graphics can never move the number.
 - respects `prefers-reduced-motion` throughout.
 
 ## notes
 
-- this is a research-grade aim tool and a design-engineering portfolio piece - an exploratory instrument, not clinical or competitive-ranking software
-- 
+- this is a research-grade aim tool and a design-engineering portfolio piece - an exploratory instrument, not clinical or competitive-ranking software.
 - design spec + implementation plans live under [`docs/superpowers/`](docs/superpowers/).
 
-- designed & engineered by christopher robin fiore
-design engineer, creative technologist, happiest bf in the world :>
+---
+
+designed & engineered by **christopher robin fiore** - design engineer & creative technologist.
