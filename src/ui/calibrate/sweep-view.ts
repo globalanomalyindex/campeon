@@ -21,28 +21,46 @@ const PACE_SCALE = 6;     // counts/ms that fills the pace bar
 const SLOW_MAX = 2.2;     // counts/ms at or below = a good "slow" pace
 const FAST_MIN = 3.5;     // counts/ms at or above = a good "fast" pace
 
+// Esc unlocks and resets the current pass (see onLock), so the honest promise is "stop and start
+// over", not "stop". Held in one place because the idle copy is re-set on every unlock.
+const SUB_START = 'click here to begin. it hides the cursor so i can read your mouse\'s raw motion. press Esc to stop, and the pass starts over when you click back in.';
+
 export function createSweepView(
   host: HTMLElement,
-  opts: { referenceWidthCm: number; onResult: (r: SweepResult) => void; onInvalid: () => void; onLockFailed: () => void },
+  opts: {
+    referenceWidthCm: number;
+    reducedMotion: boolean;
+    onResult: (r: SweepResult) => void;
+    onInvalid: () => void;
+    onLockFailed: () => void;
+    /** The typed fallback, chosen deliberately (distinct from onLockFailed, which is a denial). */
+    onManual: () => void;
+    /** Leave the guided flow entirely. Every step owes the visitor a way out. */
+    onBack: () => void;
+  },
 ): SweepView {
   host.innerHTML = `
-    <section class="screen screen--arena fade-in">
+    <section class="screen screen--shell fade-in">
       <div class="wrap stack">
         <span class="cal-step" data-sweep="step">step 1 of 2 - the sweep</span>
         <h2 class="display">+ the sweep</h2>
-        <p class="gate__lead" data-sweep="lead">lay any card flat on your desk, next to your mouse.</p>
-        <p class="cal-sub" data-sweep="sub">click here to begin (it hides the cursor so we can read your mouse's raw motion). press Esc anytime to stop.</p>
+        <p class="gate__lead" data-sweep="lead" aria-live="polite" aria-atomic="true">lay any card flat on your desk, next to your mouse.</p>
+        <p class="cal-sub" data-sweep="sub">${SUB_START}</p>
         <div class="calibrate__stage">
           <canvas class="calibrate__canvas" data-sweep="canvas"></canvas>
           <div class="calibrate__hint" data-sweep="hint"><span class="cal-pulse"><span class="cal-pulse__dot"></span></span></div>
         </div>
         <div class="cal-pace" data-sweep="pacewrap" hidden><div class="cal-pace__fill" data-sweep="pace"></div></div>
-        <p class="cal-pace__label" data-sweep="pacelabel"></p>
-        <p class="cal-method mono" data-sweep="method">card sweeps land within about 3 to 5 percent; we search a window around it.</p>
+        <p class="cal-pace__label" data-sweep="pacelabel" aria-hidden="true"></p>
+        <p class="cal-method mono" data-sweep="method">card sweeps land within about 3 to 5 percent, so i search a window around it.</p>
         <div class="calibrate__readouts">
           <div class="calibrate__ro"><div class="k">step</div><div class="v mono" data-sweep="pass">pass 1 of 2 - slow</div></div>
           <div class="calibrate__ro"><div class="k">counts</div><div class="v mono" data-sweep="counts">0</div></div>
           <div class="calibrate__ro"><div class="k">measured dpi</div><div class="v mono" data-sweep="dpi">-</div></div>
+        </div>
+        <div class="cal-exit">
+          <button type="button" class="action action--ghost" data-sweep="back">back</button>
+          <button type="button" class="action action--ghost" data-sweep="manual">type the numbers instead</button>
         </div>
       </div>
     </section>`;
@@ -51,7 +69,6 @@ export function createSweepView(
   const canvas = $('canvas') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d');
   const pointer = createPointerLock(canvas);
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
 
   let phase: Phase = 'idle-slow';
   const slowPassCounts: number[] = []; // committed counts from each completed slow pass (length 0..SLOW_PASSES)
@@ -70,6 +87,9 @@ export function createSweepView(
   const fast = (): boolean => phase === 'idle-fast' || phase === 'running-fast';
 
   function sizeCanvas(): void {
+    // Read the ratio per resize: dragging the window to a different-density monitor fires a resize
+    // with a new devicePixelRatio, and a captured one would rescale the canvas to the old density.
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
     const r = canvas.getBoundingClientRect(); W = r.width; H = r.height;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -96,7 +116,7 @@ export function createSweepView(
     if (running()) { ctx.fillStyle = rgba('calibrate', 0.08); ctx.fillRect(W - W * 0.16, 0, W * 0.16, H); }
     // animated direction arrow: rightward while sweeping, leftward to cue "go back" before the fast pass
     const dir = phase === 'idle-fast' ? -1 : 1;
-    if (running() || phase === 'idle-fast') drawArrow(ctx, ts, dir, W, mid, ready && running());
+    if (running() || phase === 'idle-fast') drawArrow(ctx, ts, dir, W, mid, ready && running(), opts.reducedMotion);
     // cardiogram trail
     ctx.strokeStyle = rgba('paper', 0.12); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
@@ -173,13 +193,13 @@ export function createSweepView(
     $('step').textContent = fast() ? 'step 1 of 2 - the sweep (checking acceleration)' : 'step 1 of 2 - the sweep';
     if (!locked) {
       $('lead').textContent = 'lay any card flat on your desk, next to your mouse.';
-      $('sub').textContent = 'click here to begin (it hides the cursor so we can read your mouse\'s raw motion). press Esc anytime to stop.';
+      $('sub').textContent = SUB_START;
     } else if (phase === 'idle-slow') {
       const again = slowPassCounts.length > 0;
       $('lead').textContent = idleClickReady
         ? 'lined up? click once to start sliding.'
         : (again ? 'one more slow pass - line up with the LEFT edge again.' : 'now line your mouse up with the LEFT edge of your card.');
-      $('sub').textContent = again && !idleClickReady ? 'two slow passes let us cross-check the reading.' : '';
+      $('sub').textContent = again && !idleClickReady ? 'two slow passes let me cross-check the reading.' : '';
     } else if (phase === 'running-slow') {
       $('lead').textContent = ready
         ? `reached the right edge? click to finish slow pass ${slowPassNum}.`
@@ -229,8 +249,15 @@ export function createSweepView(
     else updateUi();
   };
   const onCanvasClick = (): void => { if (!pointer.isLocked()) void pointer.request().catch(() => opts.onLockFailed()); };
+  // The two ways out. Both release the lock first, so the cursor is back before the next screen
+  // paints. Keyboard reaches them by Tab even mid-pass, which is the only in-app exit there was not.
+  const leave = (fn: () => void) => (): void => { pointer.exit(); fn(); };
+  const onBackClick = leave(() => opts.onBack());
+  const onManualClick = leave(() => opts.onManual());
   document.addEventListener('pointerlockchange', onLock);
   canvas.addEventListener('click', onCanvasClick);
+  $('back').addEventListener('click', onBackClick);
+  $('manual').addEventListener('click', onManualClick);
   window.addEventListener('resize', sizeCanvas);
   sizeCanvas();
   updateUi();
@@ -242,26 +269,32 @@ export function createSweepView(
     if (idleTimer !== null) clearTimeout(idleTimer);
     document.removeEventListener('pointerlockchange', onLock);
     canvas.removeEventListener('click', onCanvasClick);
+    $('back').removeEventListener('click', onBackClick);
+    $('manual').removeEventListener('click', onManualClick);
     window.removeEventListener('resize', sizeCanvas);
     pointer.dispose();
   } };
 }
 
 /** A trio of chevrons sliding in `dir` (+1 right, -1 left) along the mid-line - a looping demo of the
- *  sweep direction. Turns green once the pass is far enough to finish. */
-function drawArrow(ctx: CanvasRenderingContext2D, ts: number, dir: number, W: number, y: number, done: boolean): void {
+ *  sweep direction. Turns green once the pass is far enough to finish. Under reduced motion the same
+ *  information is drawn once, static, at the mid-point: the cue is the direction, not the travel. */
+function drawArrow(ctx: CanvasRenderingContext2D, ts: number, dir: number, W: number, y: number, done: boolean, reduced: boolean): void {
   const period = 1400, span = W * 0.5, x0 = W * 0.25;
   const t = (ts % period) / period;
   ctx.strokeStyle = done ? rgba('ok', 0.9) : rgba('calibrate', 0.8);
   ctx.lineWidth = 3; ctx.lineCap = 'round';
-  for (let i = 0; i < 3; i++) {
-    const f = (t + i * 0.18) % 1;
-    const x = dir > 0 ? x0 + f * span : x0 + span - f * span;
-    const a = Math.sin(f * Math.PI); // fade in/out across the travel
-    ctx.globalAlpha = a;
+  const chevron = (x: number): void => {
     ctx.beginPath();
     ctx.moveTo(x - dir * 7, y - 7); ctx.lineTo(x + dir * 7, y); ctx.lineTo(x - dir * 7, y + 7);
     ctx.stroke();
+  };
+  if (reduced) { chevron(x0 + span / 2); return; }
+  for (let i = 0; i < 3; i++) {
+    const f = (t + i * 0.18) % 1;
+    const x = dir > 0 ? x0 + f * span : x0 + span - f * span;
+    ctx.globalAlpha = Math.sin(f * Math.PI); // fade in/out across the travel
+    chevron(x);
   }
   ctx.globalAlpha = 1;
 }

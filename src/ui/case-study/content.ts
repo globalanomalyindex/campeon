@@ -6,10 +6,10 @@ export interface CaseSection {
   idx: string;
   eyebrow: string[];
   spine?: string;
-  accent: 'track' | 'flick' | 'calibrate' | 'strike' | 'slate' | 'gold';
+  accent: 'track' | 'flick' | 'calibrate' | 'strike' | 'neutral' | 'primary';
   title: string;
   lede?: string;
-  /** The niche/selective pressure that forged this predator's accuracy - the thing campeón actually
+  /** The niche/selective pressure that forged this predator's accuracy, the thing campeón actually
    *  recreates (sensitivity is evolved IN it). Rendered as a first-class "the environment" line. */
   environment?: string;
   body: string[];
@@ -18,25 +18,27 @@ export interface CaseSection {
 
 const ACCENT_VAR: Record<CaseSection['accent'], string> = {
   track: 'var(--instrument-track)', flick: 'var(--instrument-flick)', calibrate: 'var(--instrument-calibrate)',
-  strike: 'var(--instrument-strike)', slate: 'var(--text-muted)', gold: 'var(--color-primary)',
+  strike: 'var(--instrument-strike)', neutral: 'var(--text-muted)', primary: 'var(--color-primary)',
 };
 export const accentVar = (a: CaseSection['accent']): string => ACCENT_VAR[a];
 
 export const SECTIONS: CaseSection[] = [
   {
-    id: 'premise', idx: 'i', accent: 'slate',
-    eyebrow: ['the science', 'a case study', 'cm/360'],
+    id: 'premise', idx: 'i', accent: 'neutral',
+    eyebrow: ['the problem', 'a case study', 'cm/360'],
     spine: 'one latent constant',
-    title: 'every trainer hands you a score. none hands you your number.',
-    lede: 'aim trainers measure how well you did today. campeón measures the one setting your hands were built for - and tells you how sure it is.',
+    title: 'One setting decides your aim. I built an instrument to measure yours.',
+    lede: 'This is for a PC player who already knows their sensitivity matters and has no way to find the right one. I wanted a number measured against my own hands, with its uncertainty attached.',
     body: [
-      'there is exactly one number that decides how far your hand travels to turn all the way around: <strong>cm/360</strong> - centimeters of mouse movement per 360°. it is hardware-independent, game-independent, the true unit of aim. everything downstream (your in-game sliders) is just this number wearing different clothes.',
-      'the problem: nobody can tell you <em>yours</em>. so campeón runs a hypothesis instead of a guess. a predator\'s deadly accuracy isn\'t magic - it is what its <strong>environment</strong> forced evolution to build. and a human already has the one knob that plays the role all that neural wiring does: <span class="cs-mark">sensitivity</span>, the gain that turns your instinctive flick into where the shot actually lands.',
-      'so campeón doesn\'t copy their brains - it rebuilds the four <strong>environments</strong> that forged their accuracy and drops you into them, your sensitivity standing in for the brain under selection. generation after generation it evolves that one number, keeping what scores higher, until it finds the sensitivity that makes you the deadliest predator each environment allows. four environments, one evolving number, a single master cm/360 with a confidence interval.',
+      'One number decides how far your hand travels to turn all the way around: <strong>cm/360</strong>, centimeters of mouse movement per 360°. It is hardware independent and game independent, the true unit of aim. Every in-game slider you have ever touched is this number wearing different clothes.',
+      'Nobody can tell you <em>yours</em>. A converter only translates a number you already picked. A pro\'s config is a stranger\'s hands, a stranger\'s grip and a stranger\'s desk. So I ran a hypothesis instead of a guess. A predator\'s accuracy is what its <strong>environment</strong> forced evolution to build, and a human already carries the one knob that plays the role all that neural wiring does: <span class="cs-mark">sensitivity</span>, the gain that turns an instinctive flick into where the shot actually lands.',
+      'So I rebuilt the four <strong>environments</strong> that forged that accuracy and drop you into them, your sensitivity standing in for the trait under selection. Generation after generation the search mutates that one number and keeps what scores higher, until it settles on the sensitivity you score highest at. Four environments, one evolving number, a single master cm/360 with a confidence interval.',
+      '<strong>What a session costs you.</strong> Two calibration steps first: drag a card\'s width across your pad so I can measure your DPI, then turn all the way around once so I can seed the search near where you already play. After that you play the four drills in short trials, at sensitivities the search picks. The first <span class="cs-mark">8 trials</span> seed the gene pool, and a whole session is capped at <span class="cs-mark">30 trials</span>. I have not timed sessions across a range of players, so I am not going to quote you a duration I never measured.',
     ],
     spec: [
-      { k: 'hypothesis', v: 'sensitivity is your target-acquisition brain - evolve it in the predators’ environments' },
-      { k: 'the variable', v: 'cm/360 - physical cm per 360° turn' },
+      { k: 'who it is for', v: 'a PC player who wants their own number, with its uncertainty' },
+      { k: 'the variable', v: 'cm/360 · physical cm per 360° turn' },
+      { k: 'the ask', v: 'calibrate · 4 drills · 8 seeding trials · 30 trial cap', mono: true },
       { k: 'method', v: 'evolutionary search over a speed↔accuracy manifold' },
       { k: 'output', v: 'one cm/360 + a 90% confidence interval', mono: true },
     ],
@@ -45,13 +47,13 @@ export const SECTIONS: CaseSection[] = [
     id: 'track', idx: 'ii', accent: 'track',
     eyebrow: ['environment 01', 'track', 'dragonfly + falcon'],
     spine: 'predictive tracking',
-    title: 'the lead. holding a moving target still.',
-    lede: 'a dragonfly intercepts prey ~95% of the time using a feed-forward internal model - it aims where prey will be, not where it is.',
-    environment: 'the open-air intercept: a target that weaves and reverses, with one pass to stay glued to it. miss where it is going and you starve - the niche that forged the dragonfly’s predictive lead. campeón rebuilds it as a weaving mover you have to hold.',
+    title: 'The lead. Holding a moving target still.',
+    lede: 'A dragonfly intercepts prey about 95% of the time using a feed-forward internal model. It aims where the prey is going to be.',
+    environment: 'The open-air intercept: a target that weaves and reverses, with one pass to stay glued to it. Miss where it is going and you starve. That pressure forged the dragonfly\'s predictive lead, so I rebuilt it as a weaving mover you have to hold.',
     body: [
-      'dragonfly target-selective descending neurons decode prey direction as a population vector at a sensorimotor latency of <strong>29.94 ± 5.75 ms</strong>; an efference-copy forward model predicts self-induced image motion so the strike <em>leads</em>. the peregrine falcon does the mirror task - <strong>vor + okr</strong> gaze-stabilization holds the target image still on the fovea, nulling its angular velocity, terminal guidance fitting proportional navigation.',
-      'campeón rebuilds this with a <strong>constant-velocity kalman filter</strong> that smooths the target\'s motion, then measures <em>your</em> tracking latency directly: L is the lag of the peak aim↔target cross-correlation, refined to sub-frame precision. that L is the dragonfly\'s forward-model horizon - <span class="cs-mark">fitted to you, not assumed</span>. (the filter\'s <em>innovation</em> ν = z − Hx̂⁻ predicts the <em>target</em>, not your aim, so it is deliberately not the score.)',
-      'the score\'s spine is the <span class="cs-mark">lag-compensated residual</span> - your aim against the target where you were truly tracking it, L ago. subtracting pure latency leaves only what sensitivity governs: tremor jitter (multiplied when you\'re too sensitive) and gain over/undershoot (when you\'re too slow), plus the relative angular velocity the falcon\'s vor + okr would null. those measured parts are folded into one number by three small, <em>disclosed</em> weights - a designed composite, not a single reading pretending to be one. the optimum jointly minimizes slip + jitter.',
+      'Dragonfly target-selective descending neurons decode prey direction as a population vector at a sensorimotor latency of <strong>29.94 ± 5.75 ms</strong><sup class="cs-cite">2</sup>, and an efference-copy forward model predicts self-induced image motion so the strike <em>leads</em><sup class="cs-cite">1</sup>. The peregrine falcon runs the mirror task: <strong>vor + okr</strong> gaze stabilization holds the target image still on the fovea, nulling its angular velocity, with terminal guidance that fits proportional navigation<sup class="cs-cite">3</sup>.',
+      'I rebuilt this with a <strong>constant-velocity kalman filter</strong> that smooths the target\'s motion, then measured <em>your</em> tracking latency directly: L is the lag of the peak aim↔target cross-correlation, refined to sub-frame precision. That L is the dragonfly\'s forward-model horizon, <span class="cs-mark">fitted to you</span>. (the filter\'s <em>innovation</em> ν = z − Hx̂⁻ predicts the <em>target</em> rather than your aim, so I deliberately kept it out of the score.)',
+      'The score\'s spine is the <span class="cs-mark">lag-compensated residual</span>: your aim against the target where you were truly tracking it, L ago. Subtracting pure latency leaves only what sensitivity governs. That is tremor jitter (multiplied when you are too sensitive) and gain over/undershoot (when you are too slow), plus the relative angular velocity the falcon\'s vor + okr would null. I fold those measured parts into one number with three small weights, and I disclose all three: it is a designed composite and I say so rather than dressing it up as a single reading. The optimum jointly minimizes slip and jitter.',
     ],
     spec: [
       { k: 'tsdn latency', v: '29.94 ± 5.75 ms', mono: true },
@@ -64,18 +66,18 @@ export const SECTIONS: CaseSection[] = [
     id: 'flick', idx: 'iii', accent: 'flick',
     eyebrow: ['environment 02', 'flick', 'spider + raptor'],
     spine: 'staged acquisition',
-    title: 'the snap. a flick is a three-stage pipeline.',
-    lede: 'a jumping spider detects with wide-field secondary eyes, fires a ballistic body saccade open-loop, then confirms with high-acuity principal eyes. that is exactly a human flick.',
-    environment: 'the ambush: prey breaks cover at an unpredictable angle and range, and the first explosive orient has to land before it is gone. that pressure built the spider’s open-loop snap and the raptor’s two-fovea trade. campeón rebuilds it as targets that pop across the field to acquire and lock.',
+    title: 'The snap. A flick is a three-stage pipeline.',
+    lede: 'A jumping spider detects with wide-field secondary eyes, fires a ballistic body saccade open-loop, then confirms with high-acuity principal eyes. That is exactly a human flick.',
+    environment: 'The ambush: prey breaks cover at an unpredictable angle and range, and the first explosive orient has to land before it is gone. That pressure built the spider\'s open-loop snap and the raptor\'s two-fovea trade. I rebuilt it as targets that pop across the field to acquire and lock.',
     body: [
-      'the spider\'s orient is pre-programmed - <strong>810–1300 °/s</strong>, amplitude preset from retinal eccentricity, no mid-flight correction - and the coarse error is cleaned up by the confirm stage. the raptor adds a two-fovea trade: a deep fovea (~140 cyc/deg, the scope) and a shallow fovea (wide, fast). speed vs precision, two modes.',
-      'campeón segments your mouse-velocity trace into the spider\'s stages - detection latency, the ballistic orient, the corrective sub-movements of the confirm - and scores each (amplitude, width) condition by <strong>fitts effective throughput</strong> (iso 9241-9): effective width <span class="cs-mark">We = 4.133·σ</span>, IDe = log2(Ae/We + 1), TP = IDe / MT. the orient\'s overshoot and the confirm\'s corrections need no separate penalty - they already inflate MT and σ, so a sloppy stage lowers its own throughput.',
-      'the raptor\'s two-fovea trade <em>is</em> the scorer. <span class="cs-mark">ballistic throughput</span> (big reorientations, cheap at lower cm/360) and <span class="cs-mark">precision-lock throughput</span> (fine placement, sharper at higher cm/360) are measured separately, and flick reports their <em>harmonic mean</em> - a number maximized exactly at the crossover where you serve both at once. this faculty is pure skill; only the strike pole bends to taste.',
+      'The spider\'s orient is pre-programmed at <strong>810 to 1300 °/s</strong><sup class="cs-cite">5</sup>, amplitude preset from retinal eccentricity, with no mid-flight correction, and the coarse error is cleaned up by the confirm stage<sup class="cs-cite">6</sup>. The raptor adds a two-fovea trade: a deep fovea (~140 cyc/deg, the scope) and a shallow fovea (wide, fast)<sup class="cs-cite">4</sup>. Speed against precision, two modes.',
+      'I segment your mouse-velocity trace into the spider\'s stages (detection latency, the ballistic orient, the corrective sub-movements of the confirm) and score each (amplitude, width) condition by <strong>fitts effective throughput</strong> per ISO 9241-9<sup class="cs-cite">11</sup>: effective width <span class="cs-mark">We = 4.133·σ</span>, IDe = log2(Ae/We + 1), TP = IDe / MT. The orient\'s overshoot and the confirm\'s corrections need no separate penalty, because they already inflate MT and σ, so a sloppy stage lowers its own throughput.',
+      'The raptor\'s two-fovea trade <em>is</em> the scorer. I measure <span class="cs-mark">ballistic throughput</span> (big reorientations, cheap at lower cm/360) and <span class="cs-mark">precision-lock throughput</span> (fine placement, sharper at higher cm/360) separately, and flick reports their <em>harmonic mean</em>, a number maximized exactly at the crossover where you serve both at once. This faculty is pure skill. Only the strike pole bends to taste, and section v says why.',
     ],
     spec: [
-      { k: 'spider orient', v: '810–1300 °/s, open-loop', mono: true },
+      { k: 'spider orient', v: '810 to 1300 °/s, open-loop', mono: true },
       { k: 'raptor deep fovea', v: '~140 cyc/deg' },
-      { k: 'scorer', v: 'two-mode crossover - harmonic mean of ballistic × precision tp' },
+      { k: 'scorer', v: 'two-mode crossover · harmonic mean of ballistic × precision tp' },
       { k: 'effective width', v: 'We = 4.133·σ', mono: true },
     ],
   },
@@ -83,16 +85,16 @@ export const SECTIONS: CaseSection[] = [
     id: 'calibrate', idx: 'iv', accent: 'calibrate',
     eyebrow: ['environment 03', 'calibrate', 'archerfish'],
     spine: 'bias vs variance',
-    title: 'the correction. separating aim from noise.',
-    lede: 'an archerfish shoots prey through the air–water boundary and must cancel a systematic refraction offset of up to 10–15°. it learns the correction trial by trial.',
-    environment: 'aiming through a lie: the water’s surface bends every shot, so where the prey looks and where it is diverge by a fixed offset. survival meant learning that offset cold - the same fight a shooter calls recoil, the gap between crosshair and point of impact.',
+    title: 'The correction. Separating aim from noise.',
+    lede: 'An archerfish shoots prey through the air to water boundary and has to cancel a systematic refraction offset of up to 10 to 15°. It learns the correction trial by trial.',
+    environment: 'Aiming through a lie: the water\'s surface bends every shot, so where the prey looks and where it is diverge by a fixed offset. Survival meant learning that offset cold. It is the same fight a shooter calls recoil, the gap between crosshair and point of impact.',
     body: [
-      'the tell that it is a real internal model: a <strong>negative aftereffect</strong> when the offset is removed - the signature of a recalibrated forward model. the abstraction campeón borrows is the cleanest in aim: <span class="cs-mark">error = systematic bias + random variance</span>. it is the same gap a shooter fights as <strong>recoil</strong> - the offset between where your crosshair points and where the rounds actually land. bias is learnable and removable; variance is your precision floor.',
-      'we estimate gain bias g = E[r_impact]/E[r_required] (g > 1 = oversensitive, g < 1 = undersensitive) and decompose <strong>MSE = |bias|² + σ_R²</strong>. cm/360 drives bias steeply and monotonically, so the <em>bias-zero sensitivity</em> - where g crosses 1 - is the headline estimator. variance is the hardware/skill floor, not the recommendation.',
+      'The tell that it is a real internal model is a <strong>negative aftereffect</strong> when the offset is removed, which is the signature of a recalibrated forward model<sup class="cs-cite">9</sup>. The abstraction I borrowed is the cleanest one in aim: <span class="cs-mark">error = systematic bias + random variance</span>. It is the same gap a shooter fights as <strong>recoil</strong>, the offset between where your crosshair points and where the rounds actually land. Bias is learnable and removable. Variance is your precision floor.',
+      'I estimate gain bias g = E[r_impact]/E[r_required] (g > 1 is oversensitive, g < 1 is undersensitive) and decompose <strong>MSE = |bias|² + σ_R²</strong>. Cm/360 drives bias steeply and monotonically, so the <em>bias-zero sensitivity</em>, where g crosses 1, is the headline estimator. Variance is the hardware and skill floor, and I report it rather than recommending against it.',
     ],
     spec: [
-      { k: 'refraction offset', v: 'up to 10–15°', mono: true },
-      { k: 'fps analog', v: 'recoil - crosshair vs. point of impact' },
+      { k: 'refraction offset', v: 'up to 10 to 15°', mono: true },
+      { k: 'fps analog', v: 'recoil · crosshair vs. point of impact' },
       { k: 'decomposition', v: 'MSE = |bias|² + σ_R²', mono: true },
       { k: 'headline', v: 'bias-zero cm/360 (gain g = 1)' },
     ],
@@ -101,77 +103,84 @@ export const SECTIONS: CaseSection[] = [
     id: 'strike', idx: 'v', accent: 'strike',
     eyebrow: ['environment 04', 'strike', 'mantis shrimp'],
     spine: 'the speed pole',
-    title: 'the limit. pure, uncorrectable speed.',
-    lede: 'the mantis shrimp strike is a latch-mediated spring: ~10,400 g, full discharge in ~1.1 ms, no mid-flight correction. it is the canonical speed pole of the speed–accuracy trade-off.',
-    environment: 'the strike window: a target drifts into range for a heartbeat, with no time for a second thought and no taking the shot back. that knife-edge built the mantis shrimp’s latch. campeón rebuilds it as fire-the-instant-you-see-it, misses allowed.',
+    title: 'The limit. Pure, uncorrectable speed.',
+    lede: 'The mantis shrimp strike is a latch-mediated spring: about 10,400 g, full discharge in about 1.1 ms, no mid-flight correction. It is the canonical speed pole of the speed↔accuracy trade-off.',
+    environment: 'The strike window: a target drifts into range for a heartbeat, with no time for a second thought and no taking the shot back. That knife edge built the mantis shrimp\'s latch. I rebuilt it as fire-the-instant-you-see-it, misses allowed.',
     body: [
-      'the charge phase is ~300× longer than the strike itself - commit, then there is no taking it back. campeón\'s strike drill is the same: fire as fast as possible, misses allowed, no settling. we record reaction t_R, ballistic strike t_S, peak velocity, endpoint scatter σ_θ, and hit rate H.',
-      'the pair <strong>(TTK = t_R + t_S, H)</strong> is your speed–accuracy operating point at each cm/360. this is what lets the optimizer respect <em>your</em> preference - the goal slider in setup - instead of assuming everyone wants the same trade. too sensitive: fast but σ_θ explodes and H collapses. too slow: tight but late.',
+      'The charge phase is about 300× longer than the strike itself<sup class="cs-cite">8</sup>: commit, and then there is no taking it back<sup class="cs-cite">7</sup>. My strike drill works the same way. Fire as fast as possible, misses allowed, no settling. I record reaction t_R, ballistic strike t_S, peak velocity, endpoint scatter σ_θ, and hit rate H.',
+      'The pair <strong>(TTK = t_R + t_S, H)</strong> is your speed↔accuracy operating point at each cm/360. Too sensitive and you are fast, but σ_θ explodes and H collapses. Too slow and you are tight, but late.',
+      '<strong>This is the one place taste enters, and here is the fence I put around it.</strong> Setup ships a continuous <span class="cs-mark">goal slider</span> from precision to speed rather than three presets, because the trade really is continuous and a preset would invent a step where the physics has none. It defaults to 0.5, so an untouched slider asks for the balanced point rather than for nothing. That preference tunes the <em>strike</em> pole only. I considered weighting all four facets by it and rejected that: track, flick and calibrate measure skill, and letting taste move them would let you dial your own skill measurement up. The cost of the slider is real and it is yours to pay. Set it wrong and you get a correct number for a goal you did not want.',
     ],
     spec: [
       { k: 'peak acceleration', v: '~10,400 g', mono: true },
       { k: 'strike duration', v: '~1.1 ms', mono: true },
       { k: 'operating point', v: '(TTK = t_R + t_S, hit rate)', mono: true },
+      { k: 'taste knob', v: 'goal slider · continuous · default 0.5 · strike pole only', mono: true },
     ],
   },
   {
-    id: 'engine', idx: 'vi', accent: 'gold',
+    id: 'engine', idx: 'vi', accent: 'primary',
     eyebrow: ['the engine', 'one system', 'speed↔accuracy'],
     spine: 'triangulation',
-    title: 'four environments, one number.',
-    lede: 'each environment scores you in its own units - bits per second, a (0,1] rate, strikes per second, degrees. the trick is fusing them without lying.',
+    title: 'Four environments, one number.',
+    lede: 'Each environment scores you in its own units: bits per second, a (0,1] rate, strikes per second, degrees. The trick is fusing them without lying.',
     body: [
-      'each environment is swept across cm/360 and <strong>z-scored across its own sweep</strong>. this was a choice with rejected alternatives: min-max normalizing would let one outlier trial set the whole scale, and rank-fusing would throw away <em>how much</em> better one sensitivity was than the next. z-scoring is an affine map, and a quadratic\'s peak is invariant under affine transforms - so it is the one option that makes heterogeneous metrics (bits/s, a (0,1] rate, strikes/s) commensurable <span class="cs-mark">without moving any instrument\'s own optimum</span>. that is the whole reason the fusion is honest rather than arbitrary.',
-      'the four environments blend on equal footing - your speed↔accuracy preference tunes the <em>strike</em> pole (the one facet that is taste, not skill), which then enters the blend. that blended score is <strong>fitness</strong>, and <span class="cs-mark">your sensitivity is the only gene</span> under selection. the search is the evolution the predators themselves underwent: each <span class="cs-mark">generation</span> mutates the fittest sensitivity so far by a gaussian step, plays the most promising offspring, and keeps it only if it scores higher - elitist selection, the step size self-adapting by the 1/5 success rule (offspring keep winning → widen the search; they stop → narrow in and refine). a <strong>gaussian-process</strong> (matérn-5/2) is the lineage\'s memory of the fitness landscape - it denoises selection so a lucky trial can\'t win, and screens offspring so none of your scarce trials are wasted. as the lineage converges, a <strong>parabola</strong> fit in log-sensitivity locates the peak (cross-checked against the gp\'s argmax) and a <strong>bootstrap</strong> draws the 90% confidence interval.',
-      'the payoff is conceptual: there is <em>one</em> latent constant on <em>one</em> manifold, and the four faculties are four views of it - and rather than assert that, the engine <strong>tests</strong> it, fitting each faculty\'s own peak and showing whether they triangulate one answer or scatter. the reported vertex is even detrended for the practice or fatigue you pick up across the session, so the number is where you aim best, not where you happened to finish. the interval\'s width is the estimate\'s total uncertainty - sampling noise, the fit, and how much the faculties disagree all widen it. a tight interval means the views concur on a sharp answer; <span class="cs-mark">a wide one is the system admitting the data don\'t yet pin the number down.</span>',
+      'I sweep each environment across cm/360 and <strong>z-score it across its own sweep</strong>. That was a choice with rejected alternatives. Min-max normalizing would let one outlier trial set the whole scale. Rank-fusing would throw away <em>how much</em> better one sensitivity was than the next. Z-scoring is an affine map, and a quadratic\'s peak is invariant under affine transforms, so it is the one option that makes heterogeneous metrics commensurable <span class="cs-mark">without moving any instrument\'s own optimum</span>. That is the whole reason the fusion is honest rather than arbitrary.',
+      'The four environments blend on equal footing, with your speed↔accuracy preference tuning the strike pole before it enters the blend. That blended score is <strong>fitness</strong>, and <span class="cs-mark">your sensitivity is the only gene</span> under selection. The search is the evolution the predators themselves underwent: each <span class="cs-mark">generation</span> mutates the fittest sensitivity so far by a gaussian step, plays the most promising offspring, and keeps it only if it scores higher. Elitist selection, with the step size self-adapting by the 1/5 success rule (offspring keep winning, so widen the search; they stop, so narrow in and refine).',
+      '<strong>The trial budget is what forces the rest of the design.</strong> I capped a session at <span class="cs-mark">30 trials</span>, because past that a player stops caring and the drift I am fighting in section vii gets worse than the signal I am buying. <span class="cs-mark">8</span> of those go to seeding the pool before the search starts, which leaves 22 to actually search with. A grid sweep spends all 30 confirming the obvious. A plain evolution strategy spends them on offspring that were never going to win. So a <strong>gaussian process</strong> (matérn-5/2) carries the lineage\'s memory of the fitness landscape: it screens a candidate without spending a trial on it, and it denoises selection so a lucky trial cannot win. The same budget is why a segment stops once its own 90% ci is tighter than <span class="cs-mark">6 cm/360</span>, and why "keep refining" buys 6 more generations rather than an open-ended run. A segment that has already answered should not be taking trials from one that has not.',
+      'As the lineage converges, a <strong>parabola</strong> fit in log-sensitivity locates the peak (cross-checked against the gp\'s argmax) and a <strong>bootstrap</strong> draws the 90% confidence interval.',
+      'The payoff is conceptual: there is <em>one</em> latent constant on <em>one</em> manifold, and the four faculties are four views of it. Rather than assert that, the engine <strong>tests</strong> it, fitting each faculty\'s own peak and showing whether they triangulate one answer or scatter. I also detrend the reported vertex for the practice or fatigue you pick up across the session, so the number lands where you aim best rather than where you happened to finish. The interval\'s width is the estimate\'s total uncertainty: sampling noise, the fit, and how much the faculties disagree all widen it. A tight interval means the views concur on a sharp answer. <span class="cs-mark">a wide one is the system admitting the data do not yet pin the number down.</span>',
     ],
     spec: [
       { k: 'normalize', v: 'per-instrument z-score (affine, peak-preserving)' },
       { k: 'search', v: '(1+λ) evolution strategy · mutate · select · 1/5-rule step', mono: true },
+      { k: 'trial budget', v: '30 trials max · 8 seeding the pool · 22 to search with', mono: true },
+      { k: 'segment stop', v: '90% ci tighter than 6 cm/360 · refine buys 6 generations', mono: true },
       { k: 'fitness memory', v: 'gaussian process · matérn-5/2 (denoise + screen)' },
-      { k: 'thesis test', v: 'per-facet peaks + concordance - shown, not assumed' },
+      { k: 'thesis test', v: 'per-facet peaks + concordance, shown' },
       { k: 'drift', v: 'within-session practice/fatigue detrended at finalize' },
-      { k: 'uncertainty', v: 'bootstrap 90% ci - widens with noise + facet disagreement' },
+      { k: 'uncertainty', v: 'bootstrap 90% ci · widens with noise + facet disagreement' },
     ],
   },
   {
-    id: 'honesty', idx: 'vii', accent: 'slate',
+    id: 'honesty', idx: 'vii', accent: 'neutral',
     eyebrow: ['the honest part', 'what this does not solve'],
     spine: 'measurement honesty',
-    title: 'the number, cross-examined.',
-    lede: 'the fastest way to trust a measurement is to watch someone attack it. so it was attacked - on its own terms, and the attacks that landed became changes.',
+    title: 'The number, cross-examined.',
+    lede: 'The fastest way to trust a measurement is to watch someone attack it. So I ran an adversarial review of my own measurement, on its own terms. Two of the attacks landed, and both became code changes.',
     body: [
-      '<strong>it caught itself lying in small ways, and was corrected.</strong> the strike drill had been dividing by a hand-picked one-degree constant and calling the result "measured uncertainty"; the flick drill signed its endpoint error by whichever way the hand happened to move, not by the axis the shot was actually along. both quietly bent the number. the tuned constant became the hit rate\'s own binomial standard error; the sign-hack became the <span class="cs-mark">ISO 9241-9 projection</span> it had always claimed to use. a measurement you cannot attack is a measurement you cannot trust.',
-      '<strong>it removes the drift you accrue mid-session, and refuses to say why.</strong> you get faster (practice) or slower (fatigue) over a few minutes, and an evolutionary search that samples late trials near your best sensitivity would bake that trend straight into the answer. so at the close it fits the trend out - an <span class="cs-mark">ANCOVA over trial order</span> - and discloses what it removed. the data cannot tell practice from fatigue apart, so it names both and claims neither; and when your trial order is too tangled with the sensitivities tested to separate the trend from the curve, it says so and leaves the number alone.',
-      '<strong>it tests the core hypothesis instead of assuming it.</strong> the whole design rests on one claim: that the four environments are four views of a single latent constant. so the result fits each faculty\'s <em>own</em> peak and <span class="cs-mark">draws them on the one axis</span> - four marks either triangulating the answer or visibly scattering. when they converge, that is the thesis holding up in front of you; when they scatter, the disagreement is shown rather than averaged away. the honest failure is the point - a fused average that hides four faculties quietly disagreeing would be the more impressive-looking lie.',
-      '<strong>the interval can be wide.</strong> a short session, or genuinely conflicting faculties, produces an honestly-wide ci rather than a falsely-precise point. the number comes with its own doubt, and the doubt is not decoration.',
-      '<strong>variance is a floor, not a knob.</strong> precision (σ_R) is set by your hardware and your hands. campeón reports it; it does not pretend a sensitivity can fix it. and a degenerate trial drops out of the blend rather than being padded with synthetic spread - padding would inflate the metric and lie. realistic spread belongs in the test fixtures, never in production.',
-      '<strong>raw input is gated.</strong> measurement only proceeds after pointer-lock raw capture and an acceleration check pass; os mouse acceleration would corrupt every reading, so it is detected and blocked up front.',
+      '<strong>I found two small lies in my own measurement and I fixed them.</strong> The strike drill had been dividing by a hand-picked one-degree constant and calling the result "measured uncertainty". The flick drill signed its endpoint error by whichever way my hand happened to move rather than by the axis the shot was along, so on a near-vertical reach the sign tracked horizontal wobble, inflating We and cancelling real bias out of Ae. Both quietly bent the number. The tuned constant became the hit rate\'s own binomial standard error carried through the delta method. The sign-hack became the <span class="cs-mark">ISO 9241-9</span> along-axis projection I had already claimed to use. Here is the diff.',
+      '<strong>I remove the drift you accrue mid-session, and I refuse to say why.</strong> You get faster (practice) or slower (fatigue) as a session runs, and an evolutionary search that samples late trials near your best sensitivity would bake that trend straight into the answer. So at the close I fit the trend out with an <span class="cs-mark">ANCOVA over trial order</span> and disclose what I removed. The data cannot tell practice from fatigue, so the readout names both and claims neither. When your trial order is too tangled with the sensitivities tested to separate the trend from the curve, it says so and leaves the number alone.',
+      '<strong>I test the core hypothesis instead of assuming it.</strong> The whole design rests on one claim: that the four environments are four views of a single latent constant. So the result fits each faculty\'s <em>own</em> peak and <span class="cs-mark">draws them on the one axis</span>, four marks either triangulating the answer or visibly scattering. When they converge, that is the thesis holding up in front of you. When they scatter, I show the disagreement rather than averaging it away. A fused average that hid four faculties quietly disagreeing would look better and mean less.',
+      '<strong>The interval can be wide.</strong> A short session, or genuinely conflicting faculties, produces an honestly wide ci rather than a falsely precise point. I ship the doubt along with the number, and the doubt is load-bearing.',
+      '<strong>Variance is a floor.</strong> Precision (σ_R) is set by your hardware and your hands. I report it and leave it alone, because no sensitivity can fix it. A degenerate trial drops out of the blend rather than being padded with synthetic spread, because padding would inflate the metric and lie. Realistic spread belongs in the test fixtures and nowhere near production.',
+      '<strong>I gate raw input, and then I let you walk past the gate.</strong> A measured session wants pointer-lock raw capture, and the calibration sweep runs an acceleration check because os mouse acceleration would make one true turn distance impossible to pin down. When that check fails, or when the browser refuses the lock outright, I still let you type your DPI and sensitivity by hand. Those typed numbers seed the search and are never treated as a measurement, and the button says so both times it appears. Showing you the gate and the door beside it beats pretending the door is not there.',
     ],
     spec: [
       { k: 'self-audit', v: 'a tuned constant + a sign-hack, found in the "measured" SE and removed' },
       { k: 'session drift', v: 'practice/fatigue fit out at finalize, the cause left unnamed' },
       { k: 'the thesis', v: 'four faculty peaks tested for agreement, never assumed' },
       { k: 'when unsure', v: 'the interval widens; degenerate trials drop, never padded' },
+      { k: 'the input gate', v: 'raw capture preferred · typed numbers seed only, never measured' },
     ],
   },
   {
-    id: 'colophon', idx: 'viii', accent: 'gold',
+    id: 'colophon', idx: 'viii', accent: 'primary',
     eyebrow: ['colophon', 'how it is built'],
     spine: 'design engineering',
-    title: 'how it is built.',
-    lede: 'a pure, unit-tested measurement core wrapped by an engine and a hand-rolled ui - so validity can be proven, not hoped, and the craft is held to the same standard as the math.',
+    title: 'How it is built.',
+    lede: 'A pure, unit-tested measurement core wrapped by an engine and a hand-rolled ui, so validity can be proven and the craft is held to the same standard as the math.',
     body: [
-      'the core (<strong>convert · scoring · optimizer · stats</strong>) is plain typescript, tested against published formulas: iso 9241-9 throughput, a constant-velocity kalman filter, a hand-rolled cholesky solve for the gaussian process. the cholesky and the gp are hand-rolled rather than pulled from a library on purpose - a portfolio measurement a reviewer cannot read line by line is a measurement a reviewer cannot trust. no framework, no backend, 630+ passing tests.',
-      'the seams are deliberate. every instrument is a pure <code>analyze()</code> plus a thin <code>run()</code> shell, so the math is tested against synthetic players and only the raw pointer/raf glue is runtime-only. the data-viz throughout is the same idea: a pure <code>plotGeometry()</code> (domain→pixel, fully unit-tested) and a thin renderer that only writes svg attributes.',
-      '<strong>the graphics are held to the measurement\'s honesty.</strong> the 3d is sculpted <em>procedurally in-repo</em> - no external tool, no baked asset a reviewer would have to take on faith; every quarry is primitives and palette math, every shader hand-written. and the cosmetic layers <span class="cs-mark">read the scored scene and write nothing back</span>, proven by a test that the scored stream is <em>byte-identical</em> with the skin on or off - the graphics can never move the number. the same discipline governs how it looks: a foreground silhouette may never borrow the background\'s own color; the environment map\'s low sun and the analytic rim light are derived from <em>one</em> direction, so a metal\'s specular ping and its silhouette halo agree instead of contradicting; the long shadow a target throws is both the diegetic dusk and the fix for a flat disc that vanishes at a first-person angle. honest light, not decorative light.',
-      '<strong>the arc is built the same way.</strong> a returning player\'s calibration is measured once and remembered, not re-asked. the search narrates itself as the evolution it actually is - a gene pool seeded, then generation after generation. and the payoff does not just print a number: it <span class="cs-mark">stages the reveal</span>, then shows the thesis being tested - each faculty\'s own peak marked on the one axis, triangulating the answer or honestly scattering - and hands you a live range to feel the number in your own hand. even a silent failure got caught here: a pointer-lock relock that died on the second escape, found and fixed like any measurement bug.',
-      'and it is pressure-tested the way it claims to be. an adversarial review of the measurement found the tuned constant and the sign-hack disclosed in section vii and forced their repair - the self-audit there is not rhetoric, it is changelog.',
-      'it runs at 60fps in a real webgl arena, respects <code>prefers-reduced-motion</code> everywhere, and reads cleanly enough to review. the whole thing is a single argument: that careful measurement and considered craft are the same discipline.',
+      'The core (<strong>convert · scoring · optimizer · stats</strong>) is plain typescript, tested against published formulas: iso 9241-9 throughput, a constant-velocity kalman filter, a hand-rolled cholesky solve for the gaussian process. I hand-rolled the cholesky and the gp rather than pulling a library for one reason: a portfolio measurement a reviewer cannot read line by line is a measurement a reviewer cannot trust. No framework, no backend, and a vitest suite of <span class="cs-mark">650+ tests</span> you can run with <code>npm test</code>.',
+      'The seams are deliberate. Every instrument is a pure <code>analyze()</code> plus a thin <code>run()</code> shell, so the math is tested against synthetic players and only the raw pointer/raf glue is runtime-only. The data-viz throughout is the same idea: a pure <code>plotGeometry()</code> (domain to pixel, fully unit-tested) and a thin renderer that only writes svg attributes. Every figure on this page is built from those same two pieces.',
+      '<strong>I hold the graphics to the measurement\'s honesty.</strong> The 3d is sculpted <em>procedurally in-repo</em>, with no external tool and no baked asset a reviewer would have to take on faith. Every quarry is primitives and palette math, every shader hand-written. The cosmetic layers <span class="cs-mark">read the scored scene and write nothing back</span>, proven by a test that the scored stream is <em>byte-identical</em> with the skin on or off, so the graphics can never move the number. The same discipline governs how it looks: a foreground silhouette may never borrow the background\'s own color; the environment map\'s low sun and the analytic rim light derive from <em>one</em> direction, so a metal\'s specular ping and its silhouette halo agree with each other; the long shadow a target throws is both the diegetic dusk and the fix for a flat disc that vanishes at a first-person angle. One light, one set of consequences.',
+      '<strong>I built the arc the same way.</strong> A returning player\'s calibration is measured once and remembered, so nobody redoes a sweep they already earned. The search narrates itself as the evolution it actually is, a gene pool seeded and then generation after generation. The payoff <span class="cs-mark">stages the reveal</span>, then shows the thesis being tested (each faculty\'s own peak marked on the one axis, triangulating or honestly scattering) and hands you a live range to feel the number in your own hand. A silent failure got caught in here too: a pointer-lock relock that died on the second escape, found and fixed like any measurement bug.',
+      'Here is what a reviewer can check instead of taking my word for it. <code>tests/engine/arena-enemies.test.ts</code> asserts the scored recording stream is byte-identical with the cosmetic layers on or off. <code>tests/ui/range-lock.test.ts</code> covers the relock bug above. <code>prefers-reduced-motion</code> is honoured on every screen, including the reveal on this page. I have not benchmarked frame time on a named machine, so there is no fps number here. The whole thing is a single argument: that careful measurement and considered craft are the same discipline.',
     ],
     spec: [
       { k: 'stack', v: 'typescript · vite · three.js · client-only' },
-      { k: 'tests', v: '630+, pure core tdd', mono: true },
+      { k: 'tests', v: '650+ · pure core tdd · npm test', mono: true },
+      { k: 'integrity gate', v: 'tests/engine/arena-enemies.test.ts', mono: true },
       { k: 'seams', v: 'pure analyze + thin shell · geometry + renderer' },
       { k: 'graphics', v: 'procedural in-repo · read-never-write · byte-identical scored stream' },
       { k: 'the arc', v: 'calibration remembered · reveal staged · thesis shown · range to feel it' },
@@ -179,25 +188,59 @@ export const SECTIONS: CaseSection[] = [
   },
 ];
 
-export const CITATIONS: string[] = [
-  'Mischiati et al. Internal models direct dragonfly interception steering. Nature 517 (2015).',
-  'Gonzalez-Bellido et al. Eight pairs of descending visual neurons … population vector of prey direction. PNAS 110(2) (2013).',
-  'Brighton, Thomas & Taylor. Terminal attack trajectories of peregrine falcons … proportional navigation. PNAS 114(51) (2017).',
-  'Tucker. The deep fovea, sideways vision and spiral flight paths in raptors. J. Exp. Biol. 203 (2000).',
-  'Land. Movements of the retinae of jumping spiders. J. Exp. Biol. 51 (1969); Zurek & Nelson, J. Comp. Physiol. A 198 (2012).',
-  'Patek et al. Deadly strike mechanism of a mantis shrimp. Nature 428 (2004); deVries & Patek, ICB 59(6) (2019).',
-  'Reinel & Schuster. The archerfish predictive C-start. J. Comp. Physiol. A (2023); Volotsky et al., eLife 13 (2024).',
-  'MacKenzie. Fitts\' law (ISO 9241-9 effective throughput), HHCI (2018).',
-  'Auer, Cesa-Bianchi & Fischer. Finite-time Analysis of the Multiarmed Bandit Problem (2002).',
+export interface Citation {
+  /** Marker number used by the <sup class="cs-cite"> references in the prose. */
+  n: number;
+  work: string;
+  /** The claim this source actually backs. A citation that cannot name one does not belong here. */
+  backs: string;
+}
+
+/** Every entry carries the claim it supports, and every marker in the prose resolves to one of
+ *  these. The UCB1 bandit citation that used to sit here was dropped: `src/optimizer/bandit.ts`
+ *  is a fallback engine the session never wires up, so no claim on this page rests on it. */
+export const CITATIONS: Citation[] = [
+  { n: 1, work: 'Mischiati et al. Internal models direct dragonfly interception steering. Nature 517 (2015).', backs: 'the efference-copy forward model in ii' },
+  { n: 2, work: 'Gonzalez-Bellido et al. Eight pairs of descending visual neurons … population vector of prey direction. PNAS 110(2) (2013).', backs: 'the 29.94 ± 5.75 ms latency in ii' },
+  { n: 3, work: 'Brighton, Thomas & Taylor. Terminal attack trajectories of peregrine falcons … proportional navigation. PNAS 114(51) (2017).', backs: 'the falcon\'s terminal guidance in ii' },
+  { n: 4, work: 'Tucker. The deep fovea, sideways vision and spiral flight paths in raptors. J. Exp. Biol. 203 (2000).', backs: 'the two-fovea trade in iii' },
+  { n: 5, work: 'Land. Movements of the retinae of jumping spiders. J. Exp. Biol. 51 (1969).', backs: 'the open-loop orient speed in iii' },
+  { n: 6, work: 'Zurek & Nelson. J. Comp. Physiol. A 198 (2012).', backs: 'the secondary-eye detect and principal-eye confirm stages in iii' },
+  { n: 7, work: 'Patek et al. Deadly strike mechanism of a mantis shrimp. Nature 428 (2004).', backs: 'the ~10,400 g strike in v' },
+  { n: 8, work: 'deVries & Patek. Integrative and Comparative Biology 59(6) (2019).', backs: 'the latch-mediated spring and its charge phase in v' },
+  { n: 9, work: 'Reinel & Schuster. The archerfish predictive C-start. J. Comp. Physiol. A (2023).', backs: 'the learned correction and its aftereffect in iv' },
+  { n: 10, work: 'Volotsky et al. eLife 13 (2024).', backs: 'the archerfish refraction offset in iv' },
+  { n: 11, work: 'MacKenzie. Fitts\' law. In The Wiley Handbook of Human-Computer Interaction (2018).', backs: 'effective throughput as the flick scorer in iii' },
+  { n: 12, work: 'ISO 9241-9:2000. Ergonomic requirements for office work with visual display terminals, part 9: requirements for non-keyboard input devices.', backs: 'We = 4.133·σ and the along-axis projection in iii and vii' },
 ];
+
+const REPO = 'https://github.com/globalanomalyindex/campeon';
+const SRC = `${REPO}/blob/main`;
+
+export interface CreditLink { label: string; href: string; note: string; }
 
 export const CREDIT = {
   by: 'designed and built by christopher robin fiore',
   theme: 'portfolio theme: looking to nature for answers',
+  /** Section viii argues the measurement is reviewable line by line, so the piece has to hand a
+   *  reviewer the lines. Each link points at the file the claim above it rests on. */
+  links: [
+    { label: 'the repository', href: REPO, note: 'all of it, client only, no backend' },
+    { label: 'the search', href: `${SRC}/src/optimizer/evolution.ts`, note: 'src/optimizer/evolution.ts' },
+    { label: 'the peak fit and the interval', href: `${SRC}/src/stats/peak-fit.ts`, note: 'src/stats/peak-fit.ts' },
+    { label: 'the strike se i repaired', href: `${SRC}/src/instruments/strike.ts`, note: 'src/instruments/strike.ts' },
+    { label: 'the flick projection i repaired', href: `${SRC}/src/instruments/flick.ts`, note: 'src/instruments/flick.ts' },
+    { label: 'the integrity gate', href: `${SRC}/tests/engine/arena-enemies.test.ts`, note: 'tests/engine/arena-enemies.test.ts' },
+  ] as CreditLink[],
 };
 
-/** Illustrative (not live) convergence dataset for Act iii: four organism mark-sets
- *  scattered across the sweep, converging on a concave fit peaked near 29 cm/360. */
+/**
+ * A WORKED EXAMPLE with invented numbers, drawn so the shape of a converged sweep is legible on a
+ * page a reader may reach before ever playing. Nothing here is measured, and every surface that
+ * renders it labels it as an illustration (see `buildFigure` in case-study.ts). Four mark-sets
+ * scattered across the sweep, a concave fit peaked near 29 cm/360, and four per-facet peaks that
+ * sit near one another without fully agreeing, which is the ordinary case.
+ */
 export function demoConvergence(): PlotInput {
   const bounds: [number, number] = [15, 60];
   const peak = 29;
@@ -209,5 +252,11 @@ export function demoConvergence(): PlotInput {
     xs.map((cm360) => ({ cm360, instrument, score: at(cm360) + jitter[instrument] })),
   );
   const curve = [16, 20, 25, 29, 34, 42, 55].map((cm) => ({ x: Math.log(cm), mean: at(cm) }));
-  return { bounds, marks, curve, ci90: [27.4, 31.1], peak, size: { width: 640, height: 280 } };
+  const facetPeaks = [
+    { instrument: 'track' as InstrumentId, peakCm360: 28.1, spreadLn: 0.07, laneConditioned: false },
+    { instrument: 'flick' as InstrumentId, peakCm360: 30.4, spreadLn: 0.08, laneConditioned: false },
+    { instrument: 'calibrate' as InstrumentId, peakCm360: 29.2, spreadLn: 0.06, laneConditioned: false },
+    { instrument: 'strike' as InstrumentId, peakCm360: 33.0, spreadLn: 0.11, laneConditioned: true },
+  ];
+  return { bounds, marks, curve, ci90: [27.4, 31.1], peak, facetPeaks, size: { width: 640, height: 280 } };
 }

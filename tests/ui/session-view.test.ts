@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   marksFromTrials, instructionFor, searchLabel, announceEstimate, sessionView,
-  CURTAIN_LINE, ENV_BEATS, dialedBudget, type SessionViewDeps,
+  CURTAIN_LINE, ENV_BEATS, dialedBudget, segmentShape, type SessionViewDeps,
 } from '../../src/ui/session-view';
 import type { AppContext } from '../../src/ui/shell';
 import type { InstrumentId, Report, TrialResult } from '../../src/types';
@@ -12,9 +12,20 @@ describe('session-view helpers', () => {
   it('frames the loop as evolution - gene-pool seeding, then numbered generations testing a sensitivity', () => {
     // The thesis ("generations of sensitivities") must be visible: cold-start trials are Generation 0
     // (the initial gene pool); after that each trial is a numbered generation testing one cm/360.
-    expect(searchLabel(0, 18, 8)).toBe('gen 0 · seeding the gene pool · testing 18.0 cm/360');
-    expect(searchLabel(8, 32.37, 8)).toBe('generation 1 · testing 32.4 cm/360');
-    expect(searchLabel(11, 30, 8)).toBe('generation 4 · testing 30.0 cm/360');
+    expect(searchLabel(0, 18, 8, 20)).toBe('gen 0 · seeding the gene pool · trial 1 of 20 · testing 18.0 cm/360');
+    expect(searchLabel(8, 32.37, 8, 20)).toBe('generation 1 · trial 9 of 20 · testing 32.4 cm/360');
+    expect(searchLabel(11, 30, 8, 20)).toBe('generation 4 · trial 12 of 20 · testing 30.0 cm/360');
+  });
+
+  it('always carries a denominator, so the run never reads as open-ended', () => {
+    // Behind one "begin" click sit minutes of drills. Every progress line has to say how far
+    // through the segment you are, not just which generation is running.
+    for (const i of [0, 5, 8, 19]) expect(searchLabel(i, 30, 8, 20)).toContain(`of 20`);
+  });
+
+  it('states the shape of the commitment before begin, from the constants the segment runs on', () => {
+    expect(segmentShape(12, 20)).toContain('12 to 20 rounds');
+    expect(segmentShape(12, 20)).toMatch(/minutes/);
   });
 
   it('maps trials to plot marks preserving cm360/score/instrument', () => {
@@ -56,8 +67,8 @@ function fakeContext(): { ctx: AppContext; saveSession: ReturnType<typeof vi.fn>
 }
 
 /** A fake ArenaStage that records lock calls and dispose count; never touches WebGL. */
-function fakeStage(): { stage: ArenaStage; requestLock: ReturnType<typeof vi.fn>; exitLock: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> } {
-  const requestLock = vi.fn(() => Promise.resolve('raw'));
+function fakeStage(denyLock = false): { stage: ArenaStage; requestLock: ReturnType<typeof vi.fn>; exitLock: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> } {
+  const requestLock = vi.fn(() => (denyLock ? Promise.reject(new Error('denied')) : Promise.resolve('raw')));
   const exitLock = vi.fn();
   const dispose = vi.fn();
   const stage = {
@@ -71,21 +82,27 @@ function fakeStage(): { stage: ArenaStage; requestLock: ReturnType<typeof vi.fn>
 
 /** Drive a mount with injected deps; the segment runner is a deferred we can hold open so the
  *  abort scrim's `running` gate is satisfiable mid-flight. */
-function mountWithRunningSegment() {
+function mountWithRunningSegment(opts: { denyLock?: boolean } = {}) {
   const { ctx, saveSession, saveResult, navigate } = fakeContext();
-  const { stage, requestLock, exitLock, dispose } = fakeStage();
+  const { stage, requestLock, exitLock, dispose } = fakeStage(opts.denyLock);
   const host = document.createElement('div');
   document.body.appendChild(host);
 
   let resolveSegment: ((v: { report: Report; trials: TrialResult[] }) => void) | null = null;
-  const runSegment = vi.fn(() => new Promise<{ report: Report; trials: TrialResult[] }>((res) => { resolveSegment = res; }));
+  let rejectSegment: ((e: unknown) => void) | null = null;
+  const runSegment = vi.fn(() => new Promise<{ report: Report; trials: TrialResult[] }>((res, rej) => {
+    resolveSegment = res; rejectSegment = rej;
+  }));
 
   const deps: SessionViewDeps = { createStage: () => stage, runSession: runSegment };
   const screen = sessionView(host, ctx, deps);
   screen.mount();
 
   const root = host.querySelector('.session') as HTMLElement;
-  return { host, root, screen, ctx, stage, requestLock, exitLock, dispose, saveSession, saveResult, navigate, runSegment, getResolve: () => resolveSegment };
+  return {
+    host, root, screen, ctx, stage, requestLock, exitLock, dispose, saveSession, saveResult, navigate,
+    runSegment, getResolve: () => resolveSegment, getReject: () => rejectSegment,
+  };
 }
 
 function dropLock(): void {
@@ -182,6 +199,7 @@ describe('session-view: abort scrim (P4-2)', () => {
     const scrim = root.querySelector('[data-abort]') as HTMLElement;
     expect(scrim.hidden).toBe(false);
     (root.querySelector('[data-abort="resume"]') as HTMLButtonElement).click();
+    await flush();
 
     expect(requestLock).toHaveBeenCalledTimes(1);   // ONLY requestLock
     expect(saveSession).not.toHaveBeenCalled();      // no scored trial stream persisted
@@ -191,13 +209,86 @@ describe('session-view: abort scrim (P4-2)', () => {
     screen.unmount();
   });
 
-  it('quit calls navigate("hero") ONLY: appends NO scored trial and does not double-dispose', async () => {
+  it('resume keeps the scrim up when the lock is REFUSED, and says why', async () => {
+    // Hiding the scrim on a refused lock (the ~1.5s post-Esc cooldown) would drop the user into
+    // an arena they cannot aim in and cannot leave. Same contract bindRangeLock already holds.
+    const { root, screen } = mountWithRunningSegment({ denyLock: true });
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    // A denied lock never starts the run, so drive the paused state through a granted one instead.
+    screen.unmount();
+
+    const live = mountWithRunningSegment();
+    (live.root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    dropLock();
+    const scrim = live.root.querySelector('[data-abort]') as HTMLElement;
+    live.requestLock.mockImplementation(() => Promise.reject(new Error('cooldown')));
+    (live.root.querySelector('[data-abort="resume"]') as HTMLButtonElement).click();
+    await flush();
+    await flush();
+    expect(scrim.hidden).toBe(false);
+    const note = live.root.querySelector('[data-abort="note"]') as HTMLElement;
+    expect(note.hidden).toBe(false);
+    expect(note.textContent!.toLowerCase()).toContain('cursor');
+    live.screen.unmount();
+  });
+
+  it('the paused scrim is a real dialog: named, aria-modal, focused, with the background inert', async () => {
+    const { root, screen } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    dropLock();
+
+    const scrim = root.querySelector('[data-abort]') as HTMLElement;
+    expect(scrim.getAttribute('role')).toBe('dialog');
+    expect(scrim.getAttribute('aria-label')).toBe('session paused');
+    expect(scrim.getAttribute('aria-modal')).toBe('true');
+    expect(document.activeElement).toBe(root.querySelector('[data-abort="resume"]'));
+    expect((root.querySelector('[data-hud="bar"]') as HTMLElement).hasAttribute('inert')).toBe(true);
+    // and it is announced, not just drawn
+    expect(root.querySelector('[data-hud="estimate"]')!.textContent).toBe('session paused');
+    screen.unmount();
+  });
+
+  it('Tab cycles inside the paused dialog instead of walking into the arena behind it', async () => {
+    const { root, screen } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    dropLock();
+
+    const quit = root.querySelector('[data-abort="quit"]') as HTMLButtonElement;
+    quit.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(document.activeElement).toBe(root.querySelector('[data-abort="resume"]'));
+    screen.unmount();
+  });
+
+  it('quit is never one click: it confirms, says what is thrown away, and only then navigates', async () => {
+    // The run lives entirely in screen-local state until finalize(), so quitting discards every
+    // trial. A single ghost button next to "resume" made that a one-click accident.
     const { root, screen, navigate, saveSession, dispose } = mountWithRunningSegment();
     (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
     await flush();
     dropLock();
 
-    (root.querySelector('[data-abort="quit"]') as HTMLButtonElement).click();
+    const quit = root.querySelector('[data-abort="quit"]') as HTMLButtonElement;
+    expect(quit.textContent!.toLowerCase()).toContain('discard');
+    quit.click();
+    expect(navigate).not.toHaveBeenCalled();          // the first press only opens the confirm
+
+    const confirm = root.querySelector('[data-abort="confirm"]') as HTMLElement;
+    expect(confirm.hidden).toBe(false);
+    expect(confirm.textContent!.toLowerCase()).toContain('nothing is saved');
+    expect(document.activeElement).toBe(root.querySelector('[data-abort="confirm-quit"]'));
+
+    // backing out returns to the paused choices and still has not navigated
+    (root.querySelector('[data-abort="cancel"]') as HTMLButtonElement).click();
+    expect(confirm.hidden).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+
+    quit.click();
+    (root.querySelector('[data-abort="confirm-quit"]') as HTMLButtonElement).click();
     expect(navigate).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledWith('hero');
     expect(saveSession).not.toHaveBeenCalled();      // no scored trial appended on the way out
@@ -205,6 +296,82 @@ describe('session-view: abort scrim (P4-2)', () => {
     // The shell's unmount→cleanup disposes ONCE (guarded). Quit must not add a second dispose.
     screen.unmount();
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('session-view: pointer-lock denial (never start a run you cannot play)', () => {
+  it('does NOT start the measurement, restores the card, and re-arms begin', async () => {
+    const { root, screen, runSegment } = mountWithRunningSegment({ denyLock: true });
+    const prelock = root.querySelector('[data-prelock]') as HTMLElement;
+    const begin = root.querySelector('[data-prelock="begin"]') as HTMLButtonElement;
+    begin.click();
+    await flush();
+    await flush();
+
+    expect(runSegment).not.toHaveBeenCalled();       // nothing scored, nothing running
+    expect(prelock.hidden).toBe(false);              // the card is back, not a dead arena
+    expect((root.querySelector('[data-prelock-lead]') as HTMLElement).textContent!.toLowerCase())
+      .toContain('cursor');
+    expect(document.activeElement).toBe(begin);      // and the way out is under the keyboard
+    screen.unmount();
+  });
+
+  it('a re-armed begin can still start the run once the lock is granted', async () => {
+    const { root, screen, requestLock, runSegment } = mountWithRunningSegment({ denyLock: true });
+    const begin = root.querySelector('[data-prelock="begin"]') as HTMLButtonElement;
+    begin.click();
+    await flush();
+    await flush();
+
+    requestLock.mockImplementation(() => Promise.resolve('raw'));
+    begin.click();
+    await flush();
+    expect(runSegment).toHaveBeenCalledTimes(1);
+    screen.unmount();
+  });
+
+  it('the pre-run card has a way out, so the state before begin is not a trap', () => {
+    const { root, screen, navigate } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="back"]') as HTMLButtonElement).click();
+    expect(navigate).toHaveBeenCalledWith('setup');
+    screen.unmount();
+  });
+});
+
+describe('session-view: a segment that throws is recoverable and visible', () => {
+  it('surfaces a failure notice instead of freezing, and never persists a partial run', async () => {
+    const { root, screen, getReject, saveSession, navigate } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    getReject()!(new Error('degenerate condition'));
+    await flush();
+    await flush();
+
+    const err = root.querySelector('[data-error]') as HTMLElement;
+    expect(err.hidden).toBe(false);
+    expect(err.getAttribute('role')).toBe('dialog');
+    expect(document.activeElement).toBe(root.querySelector('[data-error="quit"]'));
+    expect(saveSession).not.toHaveBeenCalled();
+    expect(root.querySelector('[data-hud="estimate"]')!.textContent).toContain('stopped');
+
+    (root.querySelector('[data-error="quit"]') as HTMLButtonElement).click();
+    expect(navigate).toHaveBeenCalledWith('hero');
+    screen.unmount();
+  });
+
+  it('releases the running flag, so "keep refining" is not dead behind its own guard', async () => {
+    const { root, screen, getReject, runSegment, getResolve } = mountWithRunningSegment();
+    (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    getReject()!(new Error('boom'));
+    await flush();
+    await flush();
+
+    // If `running` were still true the refine handler would return at its guard and call nothing.
+    (root.querySelector('[data-dialed="refine"]') as HTMLButtonElement).click();
+    expect(runSegment).toHaveBeenCalledTimes(2);
+    expect(getResolve()).toBeTypeOf('function');
+    screen.unmount();
   });
 });
 

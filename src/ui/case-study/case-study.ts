@@ -1,7 +1,11 @@
 import type { AppContext, Screen } from '../shell';
 import { plotGeometry, renderConvergencePlot } from '../convergence-plot';
+import { THESIS_COPY } from '../concord';
 import { SECTIONS, CITATIONS, CREDIT, accentVar, demoConvergence, type CaseSection } from './content';
-import { monoLabel, sectionNumeral, registrationFrame, specRail } from './chrome';
+import {
+  monoLabel, sectionNumeral, registrationFrame, specRail,
+  figure, specimenCard, screenSketch, codeCompare, linkList,
+} from './chrome';
 import { createReveal } from './reveal';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -18,10 +22,6 @@ function buildSection(s: CaseSection): HTMLElement {
 
   sec.appendChild(registrationFrame());
   sec.appendChild(sectionNumeral(SECTIONS.indexOf(s) + 1));
-  const exo = document.createElement('div');           // dotted exoskeleton frame around the column
-  exo.className = 'cs-exo';
-  exo.setAttribute('aria-hidden', 'true');
-  sec.appendChild(exo);
   if (s.spine) {
     const spine = document.createElement('div');
     spine.className = 'cs-spine';
@@ -64,43 +64,149 @@ function buildSection(s: CaseSection): HTMLElement {
   body.innerHTML = s.body.map((p) => `<p>${p}</p>`).join('');
   grid.appendChild(body);
 
-  if (s.spec) grid.appendChild(specRail(s.spec));
+  for (const artifact of artifactsFor(s.id)) grid.appendChild(artifact);
 
-  if (s.id === 'engine') grid.appendChild(buildFigure());
+  if (s.spec) grid.appendChild(specRail(s.spec));
   if (s.id === 'colophon') grid.appendChild(buildRefsAndCredit());
 
   sec.appendChild(grid);
   return sec;
 }
 
+/** The inline artifacts a section shows rather than asserts. Every one whose numbers are invented
+ *  carries a visible synthetic-data tag; the rest are redraws of shipped screens. */
+function artifactsFor(id: CaseSection['id']): HTMLElement[] {
+  if (id === 'engine') return [buildFigure()];
+  if (id === 'honesty') return [buildRepairFigure(), buildGateFigure()];
+  if (id === 'colophon') return [buildResultCardFigure()];
+  return [];
+}
+
 function buildFigure(): HTMLElement {
-  const fig = document.createElement('figure');
-  fig.className = 'cs-figure';
-  fig.setAttribute('data-demo', '');
   const input = demoConvergence();
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('data-plot', '');
-  svg.setAttribute('aria-hidden', 'true'); // the figcaption is the accessible description
   renderConvergencePlot(svg, plotGeometry(input), 'blended score (z)');
-  fig.appendChild(svg);
-  const cap = document.createElement('figcaption');
-  cap.textContent =
-    'four instruments, each z-scored across the sweep, converging on one peak. the gold band is the 90% ci - it widens with measurement noise and facet disagreement.';
-  fig.appendChild(cap);
-  return fig;
+  return figure({
+    screen: 'fig. 01 · the convergence plot',
+    demo: 'worked example · invented numbers',
+    art: svg,
+    caption:
+      'nothing here was measured. i drew a converged sweep by hand so the shape is legible before you have played a session, and the real plot is the same code with your trials in it. four instruments, each z-scored across its own sweep, converging on one peak.',
+    notes: [
+      { n: 1, text: 'the band around the peak is the 90% ci. it widens with measurement noise and with facet disagreement, so a wide band is the honest output of a thin session.' },
+      { n: 2, text: `the four marks along the top are each faculty's own peak, which is the one-number thesis being tested rather than assumed. drawn as they sit here, the shipped readout would say: ${THESIS_COPY['some-spread']}.` },
+      { n: 3, text: 'strike is drawn hollow because its peak is conditioned on your goal slider, so it is a labelled marker rather than a fourth estimate of the same constant.' },
+    ],
+  });
+}
+
+function buildRepairFigure(): HTMLElement {
+  return figure({
+    screen: 'fig. 02 · the two repairs',
+    art: codeCompare(
+      {
+        label: 'before', file: 'the tuned constant',
+        lines: ['// strike: "measured" uncertainty', 'const se = sigmaTheta / 1.0; // deg', '', '// flick: endpoint sign', 'const err = radial * signOf(yawOrder);'],
+      },
+      {
+        label: 'after', file: 'src/instruments/strike.ts · flick.ts',
+        lines: [
+          '// strike: the hit rate\'s own binomial SE,',
+          '// carried through the delta method',
+          'const relAcc = Math.sqrt(H * (1 - H) / n) / H;',
+          '',
+          '// flick: ISO 9241-9 along-axis projection',
+          'const errAlong = missComponents(',
+          '  presentAim, tgt, aim).radial;',
+        ],
+      },
+    ),
+    caption:
+      'the two lines the adversarial review took apart, and what replaced them. the left column is reconstructed from the change, the right column is what ships today. both files are linked in the colophon so you can read the rest of the context.',
+    notes: [
+      { n: 1, text: 'the hand-picked one-degree divisor produced a number that looked measured and was not. the binomial standard error is the score\'s own functional form, so nothing unmeasured enters the nugget.' },
+      { n: 2, text: 'signing the total radial miss by yaw order meant a near-vertical reach had its sign set by horizontal wobble, which inflated We and cancelled real bias out of Ae.' },
+    ],
+  });
+}
+
+function buildGateFigure(): HTMLElement {
+  return figure({
+    screen: 'fig. 03 · setup, calibration blocked',
+    art: screenSketch({
+      heading: 'mouse acceleration detected',
+      lines: [
+        'the sweep says your mouse speeds up the faster you move, which makes one true turn distance impossible to pin down.',
+        'turn off enhance pointer precision, or your driver\'s acceleration, then run it again.',
+      ],
+      actions: [{ label: 'try again', primary: true }, { label: 'i\'ll type my numbers instead' }],
+      footnote: 'typed numbers seed the search. they are never the answer.',
+    }),
+    caption:
+      'a redraw of the screen a blocked calibration lands on. the decision worth defending is the second button: i keep the escape hatch, and i label what it costs you rather than hiding it behind the gate.',
+    notes: [
+      { n: 1, text: 'the primary action is the one that keeps the session measurable, so it is the only lapis control on the screen.' },
+      { n: 2, text: 'the ghost button next to it is the honest admission that a browser can refuse pointer lock outright, in which case there is no measured path to offer.' },
+      { n: 3, text: 'the footnote is the same sentence on both screens that expose this button, because the claim it protects is the one a reader would otherwise carry away wrong.' },
+    ],
+  });
+}
+
+function buildResultCardFigure(): HTMLElement {
+  return figure({
+    screen: 'fig. 04 · the result, as a specimen card',
+    demo: 'worked example · invented numbers',
+    art: specimenCard({
+      cm360: '29.4',
+      ci: '90% ci 27.4 to 31.1 cm/360',
+      facets: [
+        { instrument: 'track', label: 'track', value: '28.1' },
+        { instrument: 'flick', label: 'flick', value: '30.4' },
+        { instrument: 'calibrate', label: 'calibrate', value: '29.2' },
+        { instrument: 'strike', label: 'strike', value: '33.0' },
+      ],
+      note: 'the four views broadly agree; a few more trials would tighten this band.',
+    }),
+    caption:
+      'the payoff screen, at reading scale, with invented numbers. one dominant field and small accents, which is the same composition the rest of the app is built on.',
+    notes: [
+      { n: 1, text: 'the number is warm ink on paper rather than a coloured headline. the composition carries the payoff, so colour is left free to mean something.' },
+      { n: 2, text: 'the 90% ci is a hairline rule under the number rather than a badge, because it is a property of the measurement rather than a status.' },
+      { n: 3, text: 'the four facets are a mineral-coded rail read as a museum tag. lapis is missing from it on purpose: blue is reserved for things you can act on.' },
+      { n: 4, text: 'a number you hand-tuned in the range renders this card with no ci at all. a tuned value has no measured interval, so it gets none.' },
+    ],
+  });
 }
 
 function buildRefsAndCredit(): DocumentFragment {
   const frag = document.createDocumentFragment();
-  const ul = document.createElement('ul');
-  ul.className = 'cs-refs';
-  ul.setAttribute('data-demo', '');
+  const heading = document.createElement('p');
+  heading.className = 'cs-refs-head mono';
+  heading.textContent = 'sources · each one tied to the claim it carries';
+  frag.appendChild(heading);
+
+  const ol = document.createElement('ol');
+  ol.className = 'cs-refs';
   for (const c of CITATIONS) {
     const li = document.createElement('li');
-    li.textContent = c;
-    ul.appendChild(li);
+    li.value = c.n;
+    const work = document.createElement('span');
+    work.className = 'cs-ref-work';
+    work.textContent = c.work;
+    const backs = document.createElement('span');
+    backs.className = 'cs-ref-backs mono';
+    backs.textContent = c.backs;
+    li.append(work, backs);
+    ol.appendChild(li);
   }
-  frag.appendChild(ul);
+  frag.appendChild(ol);
+
+  const readHead = document.createElement('p');
+  readHead.className = 'cs-refs-head mono';
+  readHead.textContent = 'read the source';
+  frag.append(readHead, linkList(CREDIT.links));
+
   const by = document.createElement('p');
   by.className = 'cs-credit';
   by.textContent = CREDIT.by;

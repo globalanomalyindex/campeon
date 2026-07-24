@@ -6,6 +6,7 @@ import { mulberry32 } from '../stats/rng';
 import { CONCORD_COPY } from './concord';
 import { plotGeometry, plotLegendHtml, renderConvergencePlot, type PlotMark } from './convergence-plot';
 import { createArenaStage } from './arena-stage';
+import { openModal, type ModalHandle } from './modal';
 import { rememberPrefs, type AppContext, type Screen } from './shell';
 import type { InstrumentId, Report, TrialResult } from '../types';
 
@@ -14,26 +15,36 @@ const MAX_TRIALS = 30;     // hard cap across all segments
 const COLD_START = 8;      // Generation 0 - the initial gene pool
 const FIRST_STOP_CI = 6;   // a segment converges when the 90% CI (cm/360) is tighter than this
 const REFINE_GENS = 6;     // extra generations per "keep refining"
+const MIN_TRIALS = 12;     // the segment never stops short of this, however tight the CI gets
+const FIRST_SEGMENT = Math.min(MAX_TRIALS, COLD_START + 12); // the first segment's hard ceiling
 
 export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
   return trials.map((t) => ({ cm360: t.cm360, score: t.score, instrument: t.instrument }));
 }
 
 const COPY: Record<InstrumentId, string> = {
-  track: '+track · the open-air intercept - hold your lead on the weaving prey (dragonfly + falcon)',
-  flick: '+flick · the ambush - break-cover targets to snap and lock (spider + raptor)',
-  calibrate: '+calibrate · shooting through the bend - learn the gap between aim and impact (archerfish)',
-  strike: '+strike · the strike window - commit the instant you see it, no settling (mantis shrimp)',
+  track: 'track · the open-air intercept · hold your lead on the weaving prey (dragonfly, falcon)',
+  flick: 'flick · the ambush · break-cover targets to snap and lock (spider, raptor)',
+  calibrate: 'calibrate · shooting through the bend · learn the gap between aim and impact (archerfish)',
+  strike: 'strike · the strike window · commit the instant you see it, no settling (mantis shrimp)',
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
 /** Live HUD line for the evolutionary loop. Cold-start trials are Generation 0 (the initial gene
- *  pool); after that, each trial is a numbered generation testing one mutated sensitivity. */
-export function searchLabel(index: number, cm360: number, coldStart: number): string {
-  const testing = `testing ${cm360.toFixed(1)} cm/360`;
+ *  pool); after that, each trial is a numbered generation testing one mutated sensitivity. The
+ *  `of total` denominator is the segment's hard ceiling, so the line always says how far in you
+ *  are: without it the run reads as open-ended and there is no way to judge whether to stop. */
+export function searchLabel(index: number, cm360: number, coldStart: number, total: number): string {
+  const where = `trial ${index + 1} of ${total} · testing ${cm360.toFixed(1)} cm/360`;
   return index < coldStart
-    ? `gen 0 · seeding the gene pool · ${testing}`
-    : `generation ${index - coldStart + 1} · ${testing}`;
+    ? `gen 0 · seeding the gene pool · ${where}`
+    : `generation ${index - coldStart + 1} · ${where}`;
+}
+
+/** What the visitor is committing to when they press begin. Derived from the same constants the
+ *  segment actually runs on, so the promise cannot drift away from the loop. */
+export function segmentShape(minTrials: number, maxTrials: number): string {
+  return `${minTrials} to ${maxTrials} rounds before the first result. I'd budget about five minutes.`;
 }
 
 /** Concise spoken summary for the estimate live region (P4-3). The CI range is spelled " to " so a
@@ -85,28 +96,32 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       root.className = 'screen screen--arena session';
       root.dataset.surface = 'chamber';
       root.innerHTML = `
+        <h1 class="sr-only">the hunt</h1>
         <canvas class="session__canvas"></canvas>
         <div class="session__crosshair" aria-hidden="true"></div>
-        <header class="session__hud mono"><span data-hud="instruction">click to begin</span>
+        <header class="session__hud mono" data-hud="bar"><span data-hud="instruction">click to begin</span>
           <span data-hud="progress"></span></header>
-        <figure class="session__plot"><svg data-plot aria-hidden="true"></svg>
+        <figure class="session__plot" data-plot-fig><svg data-plot aria-hidden="true"></svg>
           ${plotLegendHtml()}
           <span class="mono session__estimate-visual" data-hud="estimate-visual" aria-hidden="true"></span>
           <figcaption class="mono" data-hud="estimate" aria-live="polite" aria-atomic="true"></figcaption></figure>
         <div class="session__prelock" data-prelock>
           <span class="cal-pulse"><span class="cal-pulse__dot"></span></span>
           <p class="mono session__prelock-label">the hunt</p>
-          <p class="session__prelock-lead">watch the prey break cover, then snap on and fire. each round tests one
-            sensitivity; the search evolves toward your sharpest cm/360.</p>
-          <p class="session__prelock-lead session__prelock-sub">when the search settles you'll get to lock it in - or
-            keep refining. press <kbd>Esc</kbd> any time to pause.</p>
-          <button class="action action--primary" data-prelock="begin">begin</button>
+          <p class="session__prelock-lead" data-prelock-lead>watch the prey break cover, then snap on and fire. each
+            round tests one sensitivity; the search evolves toward your sharpest cm/360.</p>
+          <p class="session__prelock-lead session__prelock-sub">${segmentShape(MIN_TRIALS, FIRST_SEGMENT)} when the
+            search settles you can lock it in or keep refining. press <kbd>Esc</kbd> any time to pause.</p>
+          <div class="session__prelock-actions">
+            <button class="action action--primary" data-prelock="begin">begin</button>
+            <button class="action action--ghost" data-prelock="back">back to setup</button>
+          </div>
         </div>
         <div class="session__beat" data-beat aria-hidden="true" hidden>
           <p class="session__beat-title" data-beat-title></p>
           <p class="mono session__beat-sub" data-beat-sub></p>
         </div>
-        <div class="session__dialed" data-panel hidden>
+        <div class="session__dialed" data-panel role="dialog" aria-label="dialed in" hidden>
           <p class="mono session__dialed-label">dialed in</p>
           <p class="display session__dialed-num"><span data-dialed="num"></span><small> cm/360</small></p>
           <p class="mono session__dialed-ci">90% CI <span data-dialed="ci"></span></p>
@@ -119,10 +134,28 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         </div>
         <div class="session__abort" data-abort role="dialog" aria-label="session paused" hidden>
           <p class="mono session__abort-label">paused</p>
-          <p class="session__abort-lead">the hunt is still in flight - your sensitivity search hasn't been touched.</p>
-          <div class="session__abort-actions">
+          <p class="session__abort-lead">the run is held right here. resume puts the cursor back and carries on from
+            the same trial.</p>
+          <p class="session__abort-note" data-abort="note" hidden></p>
+          <div class="session__abort-actions" data-abort="choices">
             <button class="action action--primary" data-abort="resume">resume</button>
-            <button class="action action--ghost" data-abort="quit">quit to menu</button>
+            <button class="action action--ghost" data-abort="quit">quit and discard this run</button>
+          </div>
+          <div data-abort="confirm" hidden>
+            <p class="session__abort-lead">quitting throws away every trial in this run. nothing is saved, and the
+              next run starts the search from scratch.</p>
+            <div class="session__abort-actions">
+              <button class="action action--primary" data-abort="confirm-quit">discard the run and quit</button>
+              <button class="action action--ghost" data-abort="cancel">keep the run</button>
+            </div>
+          </div>
+        </div>
+        <div class="session__abort" data-error role="dialog" aria-label="the run stopped" hidden>
+          <p class="mono session__abort-label">the run stopped</p>
+          <p class="session__abort-lead">something went wrong mid-run, so I stopped rather than score a trial I
+            can't trust. nothing was saved.</p>
+          <div class="session__abort-actions">
+            <button class="action action--primary" data-error="quit">back to the menu</button>
           </div>
         </div>`;
       host.appendChild(root);
@@ -135,10 +168,17 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       const hudEstimateVisual = root.querySelector('[data-hud="estimate-visual"]')!; // per-trial visual readout (aria-hidden)
       const panel = root.querySelector('[data-panel]') as HTMLElement;
       const prelock = root.querySelector('[data-prelock]') as HTMLElement;
+      const prelockLead = root.querySelector('[data-prelock-lead]') as HTMLElement;
       const beginBtn = root.querySelector('[data-prelock="begin"]') as HTMLButtonElement;
       const abort = root.querySelector('[data-abort]') as HTMLElement;
+      const errorEl = root.querySelector('[data-error]') as HTMLElement;
+      const hudBar = root.querySelector('[data-hud="bar"]') as HTMLElement;
+      const plotFig = root.querySelector('[data-plot-fig]') as HTMLElement;
       const $d = (s: string) => root.querySelector(`[data-dialed="${s}"]`) as HTMLElement;
       const $a = (s: string) => root.querySelector(`[data-abort="${s}"]`) as HTMLButtonElement;
+      // The HUD and the plot are the only background content behind an open overlay; both go
+      // inert so a Tab from inside a dialog cannot walk out into them.
+      const behind = [hudBar, plotFig];
 
       const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
       const stage = createStage(root, { canvas, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, reducedMotion: reduced });
@@ -197,56 +237,72 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         // below before the first await, so the second microtask sees it true and bails. cm/360 is never
         // at risk (the gold sphere owns it); this protects the search lineage + live plot consistency.
         running = true;
-        const { report, trials } = await runSession({
-          dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
-          engine, instruments: INSTRUMENTS, scene: stage.arena, schedule: SCHEDULE,
-          maxTrials, coldStart: COLD_START, rng: mulberry32(2026), minTrials: 12,
-          ...(ciStopWidth !== undefined ? { ciStopWidth } : {}),
-          bootstrapIters: 300, initialTrials: allTrials, shouldStop: () => lockedIn,
-          onTrialStart: (id, i, cm360) => {
-            hudInstruction.textContent = instructionFor(id);
-            hudProgress.textContent = searchLabel(i, cm360, COLD_START);
-            // Announce ONLY when the instrument changes (a segment-meaningful moment), not every trial.
-            if (id !== announcedInstrument) { announcedInstrument = id; hudEstimate.textContent = instructionFor(id); }
-            // First encounter of an environment: a one-time title-card beat naming the probe.
-            if (!seenEnvs.has(id)) {
-              seenEnvs.add(id);
-              showBeat(ENV_BEATS[id].title, ENV_BEATS[id].sub);
-            }
-            // The seed curtain: fires exactly once, on the first trial PAST Generation 0. Written
-            // after the instrument announce so it wins the live region on a tie (rarer beat wins).
-            if (i === COLD_START && !curtainDropped) {
-              curtainDropped = true;
-              hudEstimate.textContent = CURTAIN_LINE;
-              showBeat('evolution begins', 'the gene pool is seeded - each round now tests one mutated sensitivity');
-            }
-            stage.setEnemyEnvironment(id); // skin this trial's targets with the environment's prey
-            stage.arena.clearTargets();
-          },
-          onTrial: (_t, trials2, interim) => { lastReport = interim; drawPlot(interim, trials2); },
-        });
-        allTrials = trials; lastReport = report;
-        running = false;
+        // try/finally, so a throw anywhere under here releases `running`. Without it one failure
+        // leaves the flag stuck true forever: the abort scrim's gate stays armed, "keep refining"
+        // is dead behind its own guard, and the session freezes with nothing on screen to say so.
+        try {
+          const { report, trials } = await runSession({
+            dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
+            engine, instruments: INSTRUMENTS, scene: stage.arena, schedule: SCHEDULE,
+            maxTrials, coldStart: COLD_START, rng: mulberry32(2026), minTrials: MIN_TRIALS,
+            ...(ciStopWidth !== undefined ? { ciStopWidth } : {}),
+            bootstrapIters: 300, initialTrials: allTrials, shouldStop: () => lockedIn,
+            onTrialStart: (id, i, cm360) => {
+              hudInstruction.textContent = instructionFor(id);
+              hudProgress.textContent = searchLabel(i, cm360, COLD_START, maxTrials);
+              // Announce ONLY when the instrument changes (a segment-meaningful moment), not every trial.
+              if (id !== announcedInstrument) { announcedInstrument = id; hudEstimate.textContent = instructionFor(id); }
+              // First encounter of an environment: a one-time title-card beat naming the probe.
+              if (!seenEnvs.has(id)) {
+                seenEnvs.add(id);
+                showBeat(ENV_BEATS[id].title, ENV_BEATS[id].sub);
+              }
+              // The seed curtain: fires exactly once, on the first trial PAST Generation 0. Written
+              // after the instrument announce so it wins the live region on a tie (rarer beat wins).
+              if (i === COLD_START && !curtainDropped) {
+                curtainDropped = true;
+                hudEstimate.textContent = CURTAIN_LINE;
+                showBeat('evolution begins', 'the gene pool is seeded - each round now tests one mutated sensitivity');
+              }
+              stage.setEnemyEnvironment(id); // skin this trial's targets with the environment's prey
+              stage.arena.clearTargets();
+            },
+            onTrial: (_t, trials2, interim) => { lastReport = interim; drawPlot(interim, trials2); },
+          });
+          allTrials = trials; lastReport = report;
+        } finally {
+          running = false;
+        }
       };
 
       const finalize = (): void => {
         if (!alive || !lastReport) return;
         const report = lastReport;
-        const sessionId = `s-${allTrials.length}-${Math.round(report.optimalCm360 * 100)}`;
+        // Identity is the clock, not the outcome: a content-derived id made two runs that matched
+        // on trial count and optimum overwrite each other in both stores, and a hardcoded
+        // createdAt: 0 left every record unsortable and unprunable.
+        const now = Date.now();
+        const sessionId = `s-${now}-${allTrials.length}`;
         const result = buildResult(report, allTrials, ctx.draft.dpi, undefined, ctx.draft.bounds, ctx.draft.profile);
-        ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: 0 });
+        ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: now });
         ctx.storage.saveResult(sessionId, result);
         ctx.lastResult = { sessionId, result };
         rememberPrefs(ctx, sessionId); // point the returning-visitor restore at this result
         ctx.navigate('result');
       };
 
+      // Only one overlay is ever open, so one handle is enough. Held so the trap can be released
+      // and focus returned to whatever the user was on before the overlay appeared.
+      let modal: ModalHandle | null = null;
+      const closeModal = (): void => { modal?.release(); modal = null; };
+
       const showPanel = (report: Report): void => {
         stage.exitLock(); // hand the cursor back so the panel buttons are clickable
         drawPlot(report, allTrials);
         hudEstimate.textContent = announceEstimate(report); // dialed-in: a meaningful moment to announce
         $d('num').textContent = report.optimalCm360.toFixed(1);
-        $d('ci').textContent = `${report.ci90[0].toFixed(1)}–${report.ci90[1].toFixed(1)} cm/360`;
+        // " to ", never an en-dash: the range is read aloud as well as seen.
+        $d('ci').textContent = `${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)} cm/360`;
         // Decision support for lock-vs-refine: the CI-width bucket in its honesty-vetted copy (a
         // width observation, never a single-cause claim) plus the plain trial-budget facts.
         const concord = ciConcord(report.optimalCm360, report.ci90);
@@ -260,14 +316,64 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         }
         $d('budget').textContent = dialedBudget(allTrials.length, MAX_TRIALS, REFINE_GENS);
         panel.hidden = false;
+        // The panel already announces itself through the live region; what it was missing is focus.
+        closeModal();
+        modal = openModal(panel, { initialFocus: $d('lock') as HTMLButtonElement, inert: behind });
       };
 
       const begin = async (): Promise<void> => {
         // The reveal is now the in-scene 3D revolver's own look/fire motion (no named sprite draw anim).
-        await runSegment(Math.min(MAX_TRIALS, COLD_START + 12), FIRST_STOP_CI);
+        await runSegment(FIRST_SEGMENT, FIRST_STOP_CI);
         if (!alive) return;
         if (lockedIn) { finalize(); return; }
         showPanel(lastReport!);
+      };
+
+      // The paused scrim is a real modal: it takes focus, traps Tab while open, and hands focus
+      // back on dismissal. Escape routes to resume, which is the only non-destructive way out.
+      const abortNote = root.querySelector('[data-abort="note"]') as HTMLElement;
+      const quitBtn = $a('quit');
+      const quitChoices = root.querySelector('[data-abort="choices"]') as HTMLElement;
+      const quitConfirm = root.querySelector('[data-abort="confirm"]') as HTMLElement;
+
+      const setAbort = (show: boolean): void => {
+        if (show === !abort.hidden) return;
+        abort.hidden = !show;
+        if (show) {
+          quitConfirm.hidden = true; quitChoices.hidden = false; abortNote.hidden = true;
+          hudEstimate.textContent = 'session paused';
+          closeModal();
+          modal = openModal(abort, { initialFocus: $a('resume'), onEscape: () => resume(), inert: behind });
+        } else {
+          closeModal();
+        }
+      };
+
+      // Resume dismisses ONLY once the lock is actually back. Hiding the scrim on a refused lock
+      // (the ~1.5s post-Esc cooldown) would drop the user into an arena they cannot aim in, which
+      // is the same failure bindRangeLock already refuses to ship.
+      const resume = (): void => {
+        void stage.requestLock().then(
+          () => { if (alive) setAbort(false); },
+          () => {
+            if (!alive) return;
+            abortNote.textContent = "your browser hasn't handed the cursor back yet. wait a second, then press resume again.";
+            abortNote.hidden = false;
+          },
+        );
+      };
+
+      // A segment that throws leaves nothing to show and nothing to save. Say so and give the one
+      // honest way out, rather than leaving a frozen arena the user cannot read or escape.
+      const showFailure = (err: unknown): void => {
+        if (!alive) return;
+        console.error('[session] the run stopped', err);
+        setAbort(false);
+        closeModal();
+        panel.hidden = true;
+        errorEl.hidden = false;
+        hudEstimate.textContent = 'the run stopped before it could finish';
+        modal = openModal(errorEl, { initialFocus: root.querySelector('[data-error="quit"]') as HTMLButtonElement, inert: behind });
       };
 
       // Reveal the abort scrim ONLY when the lock dropped while a segment is mid-flight: lock dropped
@@ -275,40 +381,69 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       // pure SHELL wiring - it appends NO scored trial and never touches the gold target / cm360.
       const syncAbort = (): void => {
         const lockDropped = document.pointerLockElement !== canvas;
-        abort.hidden = !(lockDropped && running && panel.hidden && !lockedIn);
+        setAbort(lockDropped && running && panel.hidden && errorEl.hidden && !lockedIn);
       };
       document.addEventListener('pointerlockchange', syncAbort);
 
-      $d('lock').addEventListener('click', () => { lockedIn = true; panel.hidden = true; finalize(); });
+      $d('lock').addEventListener('click', () => { lockedIn = true; closeModal(); panel.hidden = true; finalize(); });
       $d('refine').addEventListener('click', () => {
         if (running) return;
+        closeModal();
         panel.hidden = true;
         const target = Math.min(MAX_TRIALS, allTrials.length + REFINE_GENS);
         if (target <= allTrials.length) { finalize(); return; } // hit the cap - lock in
         void stage.requestLock().catch(() => {});
-        void runSegment(target, undefined).then(() => { if (alive && !lockedIn) showPanel(lastReport!); });
+        void runSegment(target, undefined)
+          .then(() => { if (alive && !lockedIn) showPanel(lastReport!); })
+          .catch(showFailure);
       });
 
-      // Abort scrim: resume re-acquires the lock ONLY (the in-flight trial continues, the gold target
-      // keeps cm/360 byte-identical); quit navigates home ONLY (the shell's unmount→cleanup disposes
-      // once via the guarded `alive` flag - we add NO second dispose here, and NO scored trial).
-      $a('resume').addEventListener('click', () => {
-        abort.hidden = true;
-        void stage.requestLock().catch(() => {});
+      $a('resume').addEventListener('click', resume);
+      // Quitting discards every trial in the run, so it is never one click. The first press swaps
+      // the scrim into the confirm state that says plainly what is about to be thrown away.
+      quitBtn.addEventListener('click', () => {
+        quitChoices.hidden = true;
+        quitConfirm.hidden = false;
+        $a('confirm-quit').focus();
       });
-      $a('quit').addEventListener('click', () => { ctx.navigate('hero'); });
+      $a('cancel').addEventListener('click', () => {
+        quitConfirm.hidden = true;
+        quitChoices.hidden = false;
+        $a('resume').focus();
+      });
+      $a('confirm-quit').addEventListener('click', () => { closeModal(); ctx.navigate('hero'); });
+      root.querySelector('[data-error="quit"]')!.addEventListener('click', () => { closeModal(); ctx.navigate('hero'); });
 
       // ONE start gesture, pinned to the focusable begin button (no canvas-click hybrid, so the start
       // path can never desync). The button hands off to the lock request, then the segment loop.
+      // `startPending` is the synchronous half of the old { once: true }: it still collapses a stacked
+      // double-click to one launch, but it can be released when the lock is DENIED so begin re-arms.
+      let startPending = false;
+      const onLockDenied = (): void => {
+        if (!alive) return;
+        startPending = false;
+        prelock.hidden = false;
+        // Starting the measurement without the lock would be an arena with no aim and no way out,
+        // so nothing runs: the card comes back and says what happened.
+        prelockLead.textContent = "your browser wouldn't hide the cursor, so I haven't started anything. that usually "
+          + 'means the last Esc is still cooling down, or the page is embedded without pointer lock. press begin to try again.';
+        beginBtn.textContent = 'try again';
+        beginBtn.focus();
+      };
       beginBtn.addEventListener('click', () => {
+        if (startPending || running) return;
+        startPending = true;
         prelock.hidden = true;
-        void stage.requestLock().then(begin).catch(begin);
-      }, { once: true }); // start is a one-shot; with the runSegment re-entry guard this closes the double-click vector
+        // Two-argument then(), so a rejected LOCK and a failed SEGMENT land in different places.
+        void stage.requestLock().then(() => begin().catch(showFailure), onLockDenied);
+      });
+      root.querySelector('[data-prelock="back"]')!.addEventListener('click', () => { closeModal(); ctx.navigate('setup'); });
 
       cleanup = () => {
         alive = false;
         lockedIn = true; // break any in-flight segment so it never touches a torn-down context
         if (beatTimer !== null) clearTimeout(beatTimer);
+        closeModal();
         document.removeEventListener('pointerlockchange', syncAbort);
         stage.dispose();
       };

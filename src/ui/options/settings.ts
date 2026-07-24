@@ -1,5 +1,4 @@
-import type { Cm360, GameId, YawEntry } from '../../types';
-import { GAME_YAW } from '../../convert/yaw-table';
+import type { Cm360 } from '../../types';
 
 export const DEFAULT_BOUNDS: [Cm360, Cm360] = [15, 60];
 const LO = 5, HI = 150, MIN_SPAN = 5;
@@ -13,20 +12,6 @@ export function normalizeBounds(a: number, b: number): [Cm360, Cm360] {
   let hi = Math.min(HI, Math.max(a, b));
   if (hi - lo < MIN_SPAN) hi = lo + MIN_SPAN;
   return [lo, hi];
-}
-
-export type YawOverrides = Partial<Record<GameId, number>>;
-
-export function effectiveYaw(id: GameId, overrides: YawOverrides): number {
-  const o = overrides[id];
-  if (o !== undefined && Number.isFinite(o) && o > 0) return o;
-  const base = GAME_YAW.find((e) => e.id === id);
-  if (!base) throw new Error(`Unknown game: ${id}`);
-  return base.yaw;
-}
-
-export function effectiveYawTable(overrides: YawOverrides): YawEntry[] {
-  return GAME_YAW.map((e) => ({ ...e, yaw: effectiveYaw(e.id, overrides) }));
 }
 
 /** Center the optimizer's search window on a seed cm/360 (the comfortable turn), clamped to sane bounds. */

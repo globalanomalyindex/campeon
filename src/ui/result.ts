@@ -13,8 +13,8 @@ const fmt = (v: number, digits = 1): string => (Number.isFinite(v) ? v.toFixed(d
 // the user's chosen speed↔accuracy taste (profile.speedAccuracy, NOT the hardcoded instrumentWeights.strike).
 // Claim only what the weighting provably does - which side it leans - never a fabricated counterfactual ms.
 const strikeLean = (sa: number): string => {
-  const side = sa > 0.5 ? 'speed' : sa < 0.5 ? 'accuracy' : 'a balanced speed/accuracy point';
-  return `leaning toward ${side} (your call)`;
+  const side = sa > 0.5 ? 'speed' : sa < 0.5 ? 'accuracy' : 'an even balance';
+  return `leaning toward ${side}, which you chose`;
 };
 // Signed standardized contribution (z-score units, σ). Dash for NaN/missing - never a fabricated facet pick.
 const fmtZ = (v: number | undefined): string =>
@@ -25,8 +25,8 @@ const fmtZ = (v: number | undefined): string =>
 // the extended fit fell back the value is dashed and the copy must make NO removal claim.
 const driftNote = (v: number | undefined): string =>
   v !== undefined && Number.isFinite(v)
-    ? 'session drift - practice or fatigue, the data cannot say which - removed from the number.'
-    : 'session drift was not separable this run - nothing removed; the number is the plain fit.';
+    ? 'Session drift is removed from the number. It could be practice or it could be fatigue, and the data cannot separate the two.'
+    : 'Session drift was not separable this run, so nothing was removed and the number is the plain fit.';
 
 // A5 thesis block: each probe's own peak (or a dash - never faked), strike flagged as the
 // taste-conditioned lane that is EXCLUDED from the verdict tier. Pure markup over measured values.
@@ -34,14 +34,14 @@ function thesisHtml(fc: FacetConcordance): string {
   const rows = fc.facets
     .map((f) => {
       const peak = f.peakCm360 !== undefined && Number.isFinite(f.peakCm360) ? f.peakCm360.toFixed(1) : '-';
-      return `<span class="result__thesis-facet" data-thesis-facet="${f.instrument}">${f.instrument} ${peak}${f.laneConditioned ? '<sup>*</sup>' : ''}</span>`;
+      return `<span class="result__thesis-facet" data-thesis-facet="${f.instrument}"><span class="dot dot--${f.instrument}"></span> ${f.instrument} ${peak}${f.laneConditioned ? '<sup>*</sup>' : ''}</span>`;
     })
     .join(' · ');
   const starred = fc.facets.some((f) => f.laneConditioned && f.peakCm360 !== undefined);
   return `<div class="result__thesis" data-result="thesis" data-thesis-tier="${fc.tier ?? 'inconclusive'}">
     <p class="result__thesis-line">${fc.tier ? THESIS_COPY[fc.tier] : THESIS_INCONCLUSIVE}</p>
     <p class="result__thesis-facets mono">each probe's own peak (cm/360, marked ◆ on the plot): ${rows}</p>
-    ${starred ? `<p class="result__thesis-note mono"><sup>*</sup>strike encodes your speed/accuracy taste - shown, but excluded from the verdict</p>` : ''}
+    ${starred ? `<p class="result__thesis-note"><sup>*</sup>Strike encodes the speed and accuracy lean you chose. It is shown here and excluded from the verdict.</p>` : ''}
   </div>`;
 }
 
@@ -92,61 +92,65 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       // evidence around it - the payoff reads as a reveal, not a data dump.
       root.innerHTML = `
         <div class="wrap stack result__inner">
-          <p class="result__lead" data-reveal style="--reveal-i:0">your sweet spot</p>
+          <p class="result__lead" data-reveal style="--reveal-i:0">Your number</p>
           <h1 class="display result__number" data-reveal style="--reveal-i:1"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
           <p class="result__sr-summary sr-only">${srSummary(r, tuned)}</p>
           ${tuned
-            ? `<p class="result__ci result__ci--tuned mono" data-reveal style="--reveal-i:2">tuned by feel - not a measured optimum</p>`
-            : `<p class="result__ci mono" data-reveal style="--reveal-i:2">90% CI <span data-result="ci">${fmt(r.ci90[0])}–${fmt(r.ci90[1])}</span> cm/360</p>`}
+            ? `<p class="result__ci result__ci--tuned" data-reveal style="--reveal-i:2">You picked this one by feel, so it carries no measured interval.</p>`
+            : `<p class="result__ci" data-reveal style="--reveal-i:2">90% confidence interval <span data-result="ci">${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}</span> cm/360</p>`}
           ${concord
             ? `<p class="result__concord" data-result="concord" data-concord="${concord}" data-reveal style="--reveal-i:3">${CONCORD_COPY[concord]}</p>`
             : ''}
           ${!tuned && r.curve && r.bounds
             ? `<figure class="result__plot" data-reveal style="--reveal-i:4"><svg data-plot aria-hidden="true"></svg>
-                <figcaption class="mono">the four probes converging on your one number ${plotLegendHtml()}</figcaption></figure>`
+                <figcaption>The four probes converging on your one number. ${plotLegendHtml()}</figcaption></figure>`
             : ''}
-          <p class="result__credit" data-reveal style="--reveal-i:5">your most-evolved sensitivity - the target-acquisition “brain” six predators sharpened across four environments: dragonfly · falcon · spider · raptor · archerfish · mantis shrimp</p>
+          <p class="result__credit" data-reveal style="--reveal-i:5">Measured across four environments and six organisms: dragonfly, falcon, spider, raptor, archerfish, mantis shrimp.</p>
           <div class="result__tier" data-tier="origin" data-reveal style="--reveal-i:6">
-            <p class="result__tier-head mono">where the number comes from</p>
+            <p class="result__tier-head t-label">Where the number comes from</p>
             <div class="result__breakdown">
-              <div><span class="result__bk-label">bias-zero <em>archerfish</em></span><span class="mono" data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
+              <div><span class="result__bk-label"><span class="dot dot--calibrate"></span> Bias zero <em>archerfish</em></span><span data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
               ${!tuned
-                ? `<div><span class="result__bk-label">session drift <em>practice or fatigue</em></span><span class="mono" data-result="driftZ">${fmtZ(r.driftZ)}</span></div>`
+                ? `<div><span class="result__bk-label">Session drift <em>practice or fatigue</em></span><span data-result="driftZ">${fmtZ(r.driftZ)}</span></div>`
                 : ''}
             </div>
-            ${!tuned ? `<p class="result__drift-note mono">${driftNote(r.driftZ)}</p>` : ''}
+            ${!tuned ? `<p class="result__drift-note">${driftNote(r.driftZ)}</p>` : ''}
             ${fc ? thesisHtml(fc) : ''}
             ${hasFacets
               ? `<figure class="result__facets"><svg data-facets aria-hidden="true"></svg>
-                  <figcaption class="mono">track + flick - the two intercept probes, marked where they pull on the blend
-                    <span class="result__facet-z">+track <span data-breakdown="trackContribZ">${fmtZ(bk.trackContribZ)}</span> · +flick <span data-breakdown="flickContribZ">${fmtZ(bk.flickContribZ)}</span></span></figcaption></figure>`
+                  <figcaption>Track and flick, the two intercept probes, marked where they pull on the blend.
+                    <span class="result__facet-z"><span class="dot dot--track"></span> track <span data-breakdown="trackContribZ">${fmtZ(bk.trackContribZ)}</span> · <span class="dot dot--flick"></span> flick <span data-breakdown="flickContribZ">${fmtZ(bk.flickContribZ)}</span></span></figcaption></figure>`
               : ''}
           </div>
           <div class="result__tier" data-tier="readings" data-reveal style="--reveal-i:7">
-            <p class="result__tier-head mono">readings at that sensitivity</p>
+            <p class="result__tier-head t-label">Readings at that sensitivity</p>
             <div class="result__breakdown">
-              <div><span class="result__bk-label">precision floor</span><span class="mono" data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
-              <div><span class="result__bk-label">time-to-kill <em>mantis shrimp</em>${lean !== undefined ? ` <span class="result__lean" data-result="strikeLean">${strikeLean(lean)}</span>` : ''}</span><span class="mono" data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
-              <div><span class="result__bk-label">hit rate</span><span class="mono" data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
+              <div><span class="result__bk-label">Precision floor</span><span data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
+              <div><span class="result__bk-label"><span class="dot dot--strike"></span> Time to kill <em>mantis shrimp</em>${lean !== undefined ? ` <span class="result__lean" data-result="strikeLean">${strikeLean(lean)}</span>` : ''}</span><span data-breakdown="ttkMs">${fmt(r.breakdown.ttkMs, 0)} ms</span></div>
+              <div><span class="result__bk-label">Hit rate</span><span data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
             </div>
             ${lean !== undefined
-              ? `<p class="result__lean-note mono">track, flick and calibrate are pure skill readings; the strike pair encodes your chosen speed/accuracy lean, not a measured optimum.</p>`
+              ? `<p class="result__lean-note">Track, flick and calibrate are pure skill readings. The strike pair encodes the speed and accuracy lean you chose, so it reports a taste, not an optimum.</p>`
               : ''}
           </div>
           <div data-reveal style="--reveal-i:8">
-            <label class="field result__game-pick">your game
+            <label class="field result__game-pick"><span>Your game</span>
               <select data-action="your-game">${GAME_YAW.map((g) => `<option value="${g.id}"${g.id === ctx.draft.currentGame ? ' selected' : ''}>${g.label}</option>`).join('')}</select></label>
-            <table class="result__games"><thead><tr><th>game</th><th>sensitivity</th></tr></thead><tbody>${rows}</tbody></table>
-            <p class="result__saved mono">saved locally</p>
+            <table class="result__games"><thead><tr><th>Game</th><th>Sensitivity</th></tr></thead><tbody>${rows}</tbody></table>
+            <p class="result__saved">Saved locally. Nothing leaves your machine.</p>
           </div>
           <div class="result__actions" data-reveal style="--reveal-i:9">
-            <button class="action action--primary" data-action="range">step into the range - feel it</button>
-            <button class="action action--ghost" data-action="again">run again</button>
-            <button class="action action--ghost" data-action="export">export json</button>
+            <button class="action action--primary" data-action="range">Step into the range</button>
+            <button class="action action--secondary" data-action="case-study">Read how this works</button>
+            <button class="action action--ghost" data-action="again">Run again</button>
+            <button class="action action--ghost" data-action="export">Export JSON</button>
           </div>
         </div>`;
       root.querySelector('[data-action="again"]')!.addEventListener('click', () => ctx.navigate('hero'));
       root.querySelector('[data-action="range"]')!.addEventListener('click', () => ctx.navigate('range'));
+      // The result is the one place a reader is most likely to want the reasoning, and it was the
+      // one screen with no route to it.
+      root.querySelector('[data-action="case-study"]')!.addEventListener('click', () => ctx.navigate('case-study'));
       root.querySelector('[data-action="export"]')!.addEventListener('click', () => {
         const sessions = ctx.storage.loadSessions();
         const results = ctx.lastResult ? { [ctx.lastResult.sessionId]: ctx.lastResult.result } : {};

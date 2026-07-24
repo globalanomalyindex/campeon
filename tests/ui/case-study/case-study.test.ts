@@ -13,13 +13,16 @@ function ctx(navigate = vi.fn()): AppContext {
 }
 
 describe('caseStudy screen', () => {
-  it('mounts the lowercase article with all eight sections and the citations', () => {
+  it('mounts the article with all eight sections and the citations', () => {
     const host = document.createElement('div');
     const screen = caseStudy(host, ctx());
     screen.mount();
     expect(host.querySelector('.case')).not.toBeNull();
     expect(host.querySelectorAll('.cs-section').length).toBe(8);
-    expect(host.querySelectorAll('.cs-exo').length).toBe(8); // dotted exoskeleton frame renders per section (load-bearing)
+    // The registration marks are the specimen-sheet motif now. The dotted .cs-exo frame
+    // that used to sit behind every section was a second, redundant frame and is gone.
+    expect(host.querySelectorAll('.cs-reg').length).toBeGreaterThanOrEqual(8);
+    expect(host.querySelectorAll('.cs-exo').length).toBe(0);
     expect(host.querySelectorAll('.cs-refs li').length).toBeGreaterThanOrEqual(8);
     screen.unmount();
   });

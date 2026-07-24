@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeBounds, effectiveYaw, effectiveYawTable, DEFAULT_BOUNDS, boundsFromSeed } from '../../../src/ui/options/settings';
+import { normalizeBounds, DEFAULT_BOUNDS, boundsFromSeed } from '../../../src/ui/options/settings';
 
 describe('options settings helpers', () => {
   it('normalizeBounds orders, clamps to [5,150], guarantees a >=5 span, and never inverts', () => {
@@ -17,15 +17,6 @@ describe('options settings helpers', () => {
       expect(hi).toBeLessThanOrEqual(150);
       expect(hi - lo).toBeGreaterThanOrEqual(5);
     }
-  });
-  it('effectiveYaw uses an override when present, else the table value', () => {
-    expect(effectiveYaw('cs2', {})).toBeCloseTo(0.022, 6);
-    expect(effectiveYaw('cs2', { cs2: 0.03 })).toBeCloseTo(0.03, 6);
-  });
-  it('effectiveYawTable merges overrides over the base table', () => {
-    const t = effectiveYawTable({ valorant: 0.08 });
-    expect(t.find((e) => e.id === 'valorant')!.yaw).toBeCloseTo(0.08, 6);
-    expect(t.find((e) => e.id === 'cs2')!.yaw).toBeCloseTo(0.022, 6);
   });
 });
 

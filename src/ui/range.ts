@@ -5,7 +5,21 @@ import { initRange, onKill, dueSpawns, bindSpawn, type RangeSlot, type RangeStat
 import { bindRangeLock } from './range-lock';
 import { nudgeCm360 } from './range-nudge';
 import { adoptResult } from './range-adopt';
+import { openModal, type ModalHandle } from './modal';
 import { classifyHit } from './enemy/hit';
+
+/**
+ * Adopting writes to its OWN record, so the measured Result is never overwritten. The measured
+ * number is the measurement; a hand-picked one is a preference, and a preference must not be able
+ * to destroy a measurement in one click. `${measuredId}${TUNED_ID_SUFFIX}` also lets this screen
+ * find its way back to the measured record on a second visit.
+ */
+export const TUNED_ID_SUFFIX = '-tuned';
+
+/** The measured record's id, whether we arrived carrying the measured result or the tuned one. */
+export function measuredIdOf(sessionId: string): string {
+  return sessionId.endsWith(TUNED_ID_SUFFIX) ? sessionId.slice(0, -TUNED_ID_SUFFIX.length) : sessionId;
+}
 
 const SLOTS: RangeSlot[] = [
   { kind: 'fixed', placement: { yaw: -12, pitch: 0, distance: 8, worldRadius: 0.6 } }, // near
@@ -22,32 +36,50 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
 
   return {
     mount() {
-      const measured = ctx.lastResult?.result;
+      const carried = ctx.lastResult?.result;
       const sessionId = ctx.lastResult?.sessionId;
-      if (!measured || !sessionId) { ctx.navigate('hero'); return; }
+      if (!carried || !sessionId) { ctx.navigate('hero'); return; }
+      // Re-read the MEASURED record rather than trusting whatever we arrived carrying: on a second
+      // visit ctx.lastResult holds the tuned value, and reading that would label a hand-picked
+      // number "your measured sweet spot" and make "reset to measured" reset to it.
+      const measuredId = measuredIdOf(sessionId);
+      const measured = ctx.storage.loadResults?.()[measuredId] ?? carried;
+      const tunedId = `${measuredId}${TUNED_ID_SUFFIX}`;
       const dpi = ctx.draft.dpi;
       const bounds = ctx.draft.bounds;
       const measuredCm360 = measured.optimalCm360;
-      let current = measuredCm360;
+      let current = carried.optimalCm360; // re-entering with a tuned value keeps that feel
 
       const root = document.createElement('section');
       root.className = 'screen screen--arena range';
       root.dataset.surface = 'chamber';
       root.innerHTML = `
+        <h1 class="sr-only">the range</h1>
         <canvas class="session__canvas"></canvas>
         <div class="session__crosshair" aria-hidden="true"></div>
-        <header class="range__hud mono">
+        <header class="range__hud mono" aria-live="polite" aria-atomic="true">
           <span class="display"><span data-range="cm360">${fmt(current)}</span><small> cm/360</small></span>
           <span class="range__delta" data-range="delta"></span>
         </header>
         <footer class="range__bar">
-          <button class="action action--ghost" data-range="down" aria-label="decrease sensitivity by 0.5">−</button>
-          <button class="action action--ghost" data-range="up" aria-label="increase sensitivity by 0.5">+</button>
+          <button class="action action--ghost range__step" data-range="down" aria-label="decrease sensitivity by 0.5">−</button>
+          <button class="action action--ghost range__step" data-range="up" aria-label="increase sensitivity by 0.5">+</button>
           <button class="action action--primary" data-range="adopt">adopt this feel</button>
           <button class="action action--ghost" data-range="reset">reset to measured</button>
           <button class="action action--ghost" data-range="exit">back to result</button>
         </footer>
-        <p class="range__hint mono" aria-hidden="true">click to lock · [ / ] nudge · shift = fine · esc releases</p>`;
+        <p class="range__hint">click the arena to lock the cursor. bracket keys nudge the sensitivity, hold shift for a
+          fine step, and Esc releases the cursor.</p>
+        <div class="range__confirm" data-confirm role="dialog" aria-labelledby="range-confirm-title" hidden>
+          <p class="mono range__confirm-label" id="range-confirm-title">adopt this feel</p>
+          <p class="range__confirm-lead">this saves <span data-confirm="num"></span> cm/360 as a number you picked by
+            hand. it carries no measured CI, so the result screen drops the convergence plot and the four facets.
+            your measured <span data-confirm="measured"></span> cm/360 stays saved, and reset brings it back.</p>
+          <div class="range__confirm-actions">
+            <button class="action action--primary" data-confirm="adopt">adopt it</button>
+            <button class="action action--ghost" data-confirm="cancel">keep tuning</button>
+          </div>
+        </div>`;
       host.appendChild(root);
 
       const canvas = root.querySelector('canvas') as HTMLCanvasElement;
@@ -70,18 +102,40 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
       root.querySelector('[data-range="up"]')!.addEventListener('click', () => nudge(1, false));
       root.querySelector('[data-range="exit"]')!.addEventListener('click', () => ctx.navigate('result'));
       root.querySelector('[data-range="reset"]')!.addEventListener('click', () => {
+        // Nothing to write back: the measured record was never overwritten, so reset just points
+        // the app at it again.
         applyCm(measuredCm360);
-        ctx.lastResult = { sessionId, result: measured };
-        ctx.storage.saveResult(sessionId, measured);
+        ctx.lastResult = { sessionId: measuredId, result: measured };
       });
+
+      // Adopting is the one action here that changes what the result screen shows, so it asks
+      // first and says what it costs.
+      const confirmEl = root.querySelector('[data-confirm]') as HTMLElement;
+      const $c = (s: string) => root.querySelector(`[data-confirm="${s}"]`) as HTMLElement;
+      let confirmModal: ModalHandle | null = null;
+      const closeConfirm = (): void => {
+        confirmEl.hidden = true;
+        confirmModal?.release();
+        confirmModal = null;
+      };
       root.querySelector('[data-range="adopt"]')!.addEventListener('click', () => {
+        $c('num').textContent = fmt(current);
+        $c('measured').textContent = fmt(measuredCm360);
+        confirmEl.hidden = false;
+        confirmModal = openModal(confirmEl, { initialFocus: $c('adopt'), onEscape: closeConfirm });
+      });
+      $c('cancel').addEventListener('click', closeConfirm);
+      $c('adopt').addEventListener('click', () => {
         const tunedResult = adoptResult(measured, current, dpi); // carries tuned: true
-        ctx.lastResult = { sessionId, result: tunedResult };
-        ctx.storage.saveResult(sessionId, tunedResult);
+        // Its OWN record. The measured Result at `measuredId` is left exactly as the run wrote it.
+        ctx.storage.saveResult(tunedId, tunedResult);
+        ctx.lastResult = { sessionId: tunedId, result: tunedResult };
+        closeConfirm();
         ctx.navigate('result');
       });
 
       const onKey = (e: KeyboardEvent): void => {
+        if (!confirmEl.hidden) return; // the dialog owns the keyboard while it is open
         if (e.key === '[') nudge(-1, e.shiftKey);
         else if (e.key === ']') nudge(1, e.shiftKey);
       };
@@ -146,6 +200,7 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
 
       cleanup = () => {
         alive = false;
+        closeConfirm();
         unbindLock();
         window.removeEventListener('keydown', onKey);
         offFire?.();

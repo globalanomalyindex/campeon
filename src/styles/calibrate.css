@@ -1,4 +1,4 @@
-/* campeón — calibration
+/* campeón: calibration
    The sweep and the spin. Both measure, so both carry the calibrate mineral
    (turquoise) as their signal colour. The canvas itself is a measuring surface,
    so it sits on ink while the surrounding chrome stays on paper. */
@@ -77,10 +77,12 @@
 .cal-progress__seg { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-muted); }
 .cal-progress__seg[data-state='active'] { color: var(--instrument-calibrate); }
 .cal-progress__seg[data-state='done'] { color: var(--color-success); }
+/* A numbered step is a frame, so it is a square cell on the ramp, not a pill. */
 .cal-progress__num {
   display: inline-grid; place-items: center;
-  width: 18px; height: 18px;
+  width: var(--space-4); height: var(--space-4);
   border: 1px solid currentColor;
+  border-radius: var(--radius-none);
   font-size: var(--text-caption); letter-spacing: 0;
 }
 .cal-progress__arrow { color: var(--text-subtle); }
@@ -156,6 +158,20 @@
   letter-spacing: var(--tracking-label);
   min-width: 2ch;
 }
+
+/* The way out of a guided step. Held at the foot of the sweep and the spin so a keyboard
+   visitor can Tab to a real control from either one, mid-pass included. */
+.cal-exit { display: flex; flex-wrap: wrap; gap: var(--space-5); }
+
+/* A field-level problem, stated where the field is. Carries the warning mineral as text
+   only: no fill, no icon, nothing that reads as an alarm. */
+.field__error {
+  font: var(--type-body-sm);
+  color: var(--color-warning);
+  max-width: var(--measure-prose);
+}
+.field__error:empty { display: none; }
+.field input[aria-invalid='true'], .field select[aria-invalid='true'] { border-color: var(--color-warning); }
 
 @media (prefers-reduced-motion: reduce) {
   .cal-pulse__dot { animation: none; }

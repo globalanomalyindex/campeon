@@ -284,9 +284,11 @@ describe('result screen', () => {
     expect(v).toBeTruthy();
     expect(v.textContent).toBe('-');
     const txt = host.textContent!.toLowerCase();
-    // a dashed readout must NOT claim anything was removed from the number
-    expect(txt).not.toContain('removed from the number');
-    expect(txt).toContain('nothing removed');
+    // A dashed readout must make NO removal claim. Assert the property rather than one
+    // phrasing, so the copy can be rewritten without silently dropping the honesty guard.
+    expect(txt).not.toMatch(/\bremoved from the number\b/);
+    expect(txt).toMatch(/not separable|nothing was removed/);
+    expect(txt).toMatch(/plain fit/);
   });
 
   it('gates the drift readout behind !tuned (a hand-picked value makes no drift-removal claim)', () => {
@@ -306,7 +308,8 @@ describe('result screen', () => {
     expect(lean).toBeTruthy();
     const t = lean.textContent!.toLowerCase();
     expect(t).toContain('speed');
-    expect(t).toContain('your call');
+    // The lean must be attributed to the user, so it never reads as a measured finding.
+    expect(t).toMatch(/you chose|your call|your choice/);
     // the note must make clear track/flick/calibrate are pure skill while strike encodes the chosen lean
     expect(host.textContent!.toLowerCase()).toContain('skill');
   });

@@ -38,6 +38,17 @@ const ROUTE_HASH: Record<Route, string> = {
 };
 const HASH_ROUTE = new Map<string, Route>(Object.entries(ROUTE_HASH).map(([r, h]) => [h, r as Route]));
 
+/** What each route is called out loud. Announced on navigation and used as the page title. */
+export const ROUTE_NAME: Record<Route, string> = {
+  hero: 'campeón',
+  setup: 'set up the run',
+  session: 'the hunt',
+  result: 'your result',
+  'case-study': 'how I built it',
+  options: 'options',
+  range: 'the range',
+};
+
 function defaultDraft(): SessionDraft {
   return {
     dpi: 800,
@@ -88,21 +99,13 @@ const GUARDS: Partial<Record<Route, (ctx: AppContext) => Route | null>> = {
 export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void; context: AppContext } {
   let current: Screen | null = null;
 
-  // Old-school film cut between screens: a quick cream flash on every route change.
-  const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let flashEl: HTMLElement | null = null;
-  function flashCut(): void {
-    if (reduceMotion || typeof document === 'undefined') return;
-    if (!flashEl) {
-      flashEl = document.createElement('div');
-      flashEl.className = 'route-flash';
-      flashEl.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(flashEl);
-    }
-    flashEl.classList.remove('is-on');
-    void flashEl.offsetWidth; // reflow so the animation restarts on rapid navigation
-    flashEl.classList.add('is-on');
-  }
+  // One live region for the whole app. Navigation replaces the entire document body, which is
+  // silent to a screen reader, so the route name is spoken here instead. Re-appended on every
+  // render because replaceChildren() clears it along with the old screen.
+  const announcer = document.createElement('p');
+  announcer.className = 'sr-only';
+  announcer.setAttribute('aria-live', 'polite');
+  announcer.setAttribute('aria-atomic', 'true');
 
   const storage = deps.storage ?? inMemoryStorage();
   const prefs = storage.loadPrefs?.() ?? null;
@@ -112,7 +115,6 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     storage,
     draft: draftFromPrefs(prefs),
     navigate(route: Route) {
-      flashCut();
       location.hash = ROUTE_HASH[route];
       render(route);
     },
@@ -136,9 +138,26 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     current?.unmount();
     root.replaceChildren();
     context.route = route;
+
+    // Each screen gets its own landmark, and focus moves into it once it is mounted. Without
+    // this, navigation removes the element that had focus and the browser drops focus back on
+    // <body>: a keyboard or screen-reader user lands at the top of the document every time and
+    // has no idea the screen changed. tabindex="-1" makes the landmark a programmatic target
+    // only, so it never joins the tab order.
+    const main = document.createElement('main');
+    main.tabIndex = -1;
+    main.dataset.route = route;
+    root.append(main, announcer);
+
     const factory = deps.screens[route];
-    current = factory(root, context);
+    current = factory(main, context);
     current.mount();
+    main.focus();
+
+    if (typeof document !== 'undefined') document.title = `${ROUTE_NAME[route]} · campeón`;
+    // Cleared first so re-entering the same route still counts as a change worth announcing.
+    announcer.textContent = '';
+    announcer.textContent = ROUTE_NAME[route];
   }
 
   function start(): void {
@@ -146,7 +165,7 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     // echo is deduped here so a screen never mounts twice. Genuine nav (back/forward) still routes.
     window.addEventListener('hashchange', () => {
       const next = routeFromHash();
-      if (next !== context.route) { flashCut(); render(next); }
+      if (next !== context.route) render(next);
     });
     render(routeFromHash());
   }

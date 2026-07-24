@@ -46,9 +46,19 @@ describe('case-study content', () => {
     expect(all).toContain('looking to nature for answers');
     expect(all).toContain('christopher robin fiore');
   });
-  it('lists the spec §13 citations (≥ 8 sources, each with a year)', () => {
+  it('lists the citations, each with a year AND the claim it backs', () => {
     expect(CITATIONS.length).toBeGreaterThanOrEqual(8);
-    for (const c of CITATIONS) expect(c).toMatch(/\(\d{4}\)|\b(19|20)\d{2}\b/);
+    for (const c of CITATIONS) {
+      expect(c.work, `citation ${c.n} needs a year`).toMatch(/\(\d{4}\)|\b(19|20)\d{2}\b/);
+      // A source that cannot name the claim it supports is decoration, so the claim is
+      // part of the data rather than something a reader has to infer.
+      expect(c.backs.length, `citation ${c.n} must name what it backs`).toBeGreaterThan(8);
+    }
+  });
+
+  it('numbers the citations contiguously so every prose marker resolves', () => {
+    const ns = CITATIONS.map((c) => c.n);
+    expect(ns).toEqual(Array.from({ length: CITATIONS.length }, (_, i) => i + 1));
   });
   it('the convergence demo is concave with four organism mark-sets converging near the peak', () => {
     const demo = demoConvergence();

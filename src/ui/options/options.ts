@@ -1,119 +1,150 @@
-import type { AppContext, Screen } from '../shell';
-import type { GameId } from '../../types';
-import { CONVERSION_SCHOOLS, monitorDistanceMatchCm360 } from '../../convert/schools';
-import { effectiveYawTable, normalizeBounds, type YawOverrides } from './settings';
+// Options.
+//
+// This screen used to carry three panels and only one of them did anything, and even
+// that one wrote to an in-memory draft that was thrown away on the next reload. The
+// conversion-school select changed no conversion anywhere in the app, and the per-game
+// yaw inputs fed a map that only the table above them ever read. A control that moves
+// and changes nothing is worse than no control, so:
+//
+//   - the search window is a real setting now. It is applied on an explicit press,
+//     written to the live draft (which is what the optimizer searches), and saved
+//     through the same prefs seam calibration uses, so it survives a reload.
+//   - the game table is read only. Making a yaw override actually bite would mean
+//     threading it through convert/yaw-table, convert/schools and optimizer/result,
+//     none of which this screen owns, so it states the constants instead of pretending
+//     to edit them.
+//   - the FOV panel is a converter, not a setting. It takes a number and gives you a
+//     number. That is its whole job and it does it on screen.
+import { rememberPrefs, type AppContext, type Screen } from '../shell';
+import { GAME_YAW } from '../../convert/yaw-table';
+import { monitorDistanceMatchCm360 } from '../../convert/schools';
+import { normalizeBounds } from './settings';
 import { sensFor } from '../../convert/cm360';
 
+/** Geometric middle of the search window: the scale is logarithmic, so the mean is too. */
+const windowMid = (lo: number, hi: number): number => Math.round(Math.sqrt(lo * hi));
+
 export function options(host: HTMLElement, ctx: AppContext): Screen {
-  const overrides: YawOverrides = {};
   return {
     mount() {
       const root = document.createElement('section');
-      root.className = 'screen screen--shell options fade-in';
+      root.className = 'screen screen--shell options';
       const [lo, hi] = ctx.draft.bounds;
-      let mid = Math.round(Math.sqrt(lo * hi));
+      let mid = windowMid(lo, hi);
+
+      // Prefs exist only after a calibration, and setup reads their presence as "this
+      // visitor has calibrated before". Writing them from here for a first-time visitor
+      // would invent a calibration they never ran, so the save is gated on one existing.
+      const calibrated = (ctx.storage.loadPrefs?.() ?? null) !== null;
+      const measured = ctx.lastResult?.result.optimalCm360;
 
       root.innerHTML = `
-        <div class="wrap options__inner stack">
-          <button class="action action--ghost" data-action="back">back</button>
-          <h2 class="options__title display">+ options</h2>
+        <div class="options__bar">
+          <div class="wrap options__bar-inner">
+            <button class="action action--secondary options__back" data-action="back">
+              <span class="options__arrow" aria-hidden="true">←</span>Back to the start
+            </button>
+          </div>
+        </div>
 
-          <section class="options__panel" data-panel="school">
-            <h3 class="options__h">conversion school</h3>
-            <label class="field">method
-              <select data-school>${CONVERSION_SCHOOLS.map((s) => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
-            </label>
-            <p class="options__note mono" data-school-note>${CONVERSION_SCHOOLS[0]!.note}</p>
-            <div data-fov-block hidden>
-              <label class="field">source fov (°) <input type="number" data-fov="source" value="103" min="60" max="140"></label>
-              <label class="field">target fov (°) <input type="number" data-fov="target" value="90" min="60" max="140"></label>
-              <label class="field">screen fraction <input type="number" data-fov="fraction" value="0" min="0" max="1" step="0.1"></label>
-              <p class="options__readout">at <span class="mono" data-fov-mid>${mid}</span> cm/360 → <span class="mono" data-fov-out>-</span> cm/360</p>
+        <div class="wrap options__inner">
+          <h2 class="options__title">Options</h2>
+          <p class="options__lead">Two things live here. The window I search for your number, and a converter for carrying a number between fields of view.</p>
+
+          <section class="options__panel" data-panel="bounds">
+            <h3 class="options__h">The search window <span class="options__sub">cm/360</span></h3>
+            <p class="options__note">This is the range I search while you play the drills. A wider window covers more of the scale and takes longer to settle. Running a new calibration replaces it with a window around whatever I measure.</p>
+            <div class="options__row">
+              <label class="field"><span>Lowest</span><input type="number" data-bound="lo" value="${lo}" min="5" max="150"></label>
+              <label class="field"><span>Highest</span><input type="number" data-bound="hi" value="${hi}" min="5" max="150"></label>
+            </div>
+            <p class="options__readout">Searching <span class="t-figure options__figure" data-bounds-out>${lo} to ${hi}</span> cm/360</p>
+            <div class="options__commit">
+              <button class="action action--primary" data-action="apply-bounds">Apply this window</button>
+              <p class="options__status" data-bounds-status role="status" aria-live="polite"></p>
             </div>
           </section>
 
           <section class="options__panel" data-panel="games">
-            <h3 class="options__h">per-game yaw + sensitivity <span class="options__sub mono">dpi ${ctx.draft.dpi} · <span data-mid-sub>${mid}</span> cm/360</span></h3>
-            <table class="options__table"><thead><tr><th>game</th><th>yaw (°/count)</th><th>sensitivity</th></tr></thead>
-            <tbody data-games-body></tbody></table>
-            <button class="action action--ghost" data-action="reset-yaw">reset yaw to defaults</button>
+            <h3 class="options__h">Game yaw <span class="options__sub">at <span data-mid-sub>${mid}</span> cm/360</span></h3>
+            <p class="options__note">These are the community-derived yaw constants I use to turn cm/360 into a native in-game number. The sensitivity column is what each game would want at the middle of the window above, on ${ctx.draft.dpi} dpi. I show them read only, since they are reference rather than a setting.</p>
+            <div class="options__scroll">
+              <table class="options__table">
+                <thead><tr><th>Game</th><th>Yaw, degrees per count</th><th>Sensitivity</th><th>Note</th></tr></thead>
+                <tbody data-games-body></tbody>
+              </table>
+            </div>
           </section>
 
-          <section class="options__panel" data-panel="bounds">
-            <h3 class="options__h">cm/360 search bounds</h3>
-            <p class="options__note">the range the optimizer searches. wider = more thorough, slower.</p>
-            <div class="options__bounds">
-              <label class="field">min <input type="number" data-bound="lo" value="${lo}" min="5" max="150"></label>
-              <label class="field">max <input type="number" data-bound="hi" value="${hi}" min="5" max="150"></label>
+          <section class="options__panel" data-panel="fov">
+            <h3 class="options__h">Field of view converter</h3>
+            <p class="options__note">campeón measures cm/360, which does not depend on your field of view. If you want the same on-screen travel after changing FOV, this is the number that holds it. Screen fraction is how far across the half screen you are flicking, where 0 is a small correction near the centre.</p>
+            <div class="options__row">
+              <label class="field"><span>From cm/360</span><input type="number" data-fov="from" value="${measured !== undefined ? measured.toFixed(1) : mid}" min="1" max="200" step="0.1"></label>
+              <label class="field"><span>Source FOV</span><input type="number" data-fov="source" value="103" min="60" max="140"></label>
+              <label class="field"><span>Target FOV</span><input type="number" data-fov="target" value="90" min="60" max="140"></label>
+              <label class="field"><span>Screen fraction</span><input type="number" data-fov="fraction" value="0" min="0" max="1" step="0.1"></label>
             </div>
-            <p class="options__readout">searching <span class="mono" data-bounds-out>${lo}–${hi}</span> cm/360</p>
+            <p class="options__readout">Same feel at <span class="t-figure options__figure" data-fov-out>-</span> cm/360</p>
+            ${measured !== undefined ? `<p class="options__caption">Starting from your last result.</p>` : ''}
           </section>
         </div>`;
 
       const $ = <T extends Element>(sel: string): T => root.querySelector<T>(sel)!;
 
+      // ── The game reference table ─────────────────────────────────────────
       const renderGames = (): void => {
-        $('[data-games-body]').innerHTML = effectiveYawTable(overrides).map((e) => `
+        $('[data-games-body]').innerHTML = GAME_YAW.map((e) => `
           <tr data-yaw-row data-game="${e.id}">
             <td>${e.label}</td>
-            <td><input class="options__yaw" type="number" step="0.0001" data-yaw="${e.id}" value="${e.yaw}" aria-label="${e.label} yaw (degrees per count)"></td>
-            <td class="mono" data-sens="${e.id}">${sensFor(mid, ctx.draft.dpi, e.yaw).toFixed(3)}</td>
+            <td class="t-figure-text">${e.yaw}</td>
+            <td class="t-figure-text" data-sens="${e.id}">${sensFor(mid, ctx.draft.dpi, e.yaw).toFixed(3)}</td>
+            <td class="options__cell-note">${e.note ?? ''}</td>
           </tr>`).join('');
       };
       renderGames();
-      $('[data-games-body]').addEventListener('input', (ev) => {
-        const t = ev.target as HTMLInputElement;
-        const id = t.getAttribute('data-yaw') as GameId | null;
-        if (!id) return;
-        const v = parseFloat(t.value);
-        if (Number.isFinite(v) && v > 0) {
-          overrides[id] = v;
-          $(`[data-sens="${id}"]`).textContent = sensFor(mid, ctx.draft.dpi, v).toFixed(3);
-        }
-      });
-      $('[data-action="reset-yaw"]').addEventListener('click', () => {
-        for (const k of Object.keys(overrides)) delete overrides[k as GameId];
-        renderGames();
-      });
 
-      const fovBlock = $('[data-fov-block]') as HTMLElement;
-      const recalcFov = (): void => {
-        const sFov = parseFloat($<HTMLInputElement>('[data-fov="source"]').value);
-        const tFov = parseFloat($<HTMLInputElement>('[data-fov="target"]').value);
-        const frac = parseFloat($<HTMLInputElement>('[data-fov="fraction"]').value);
-        const out = monitorDistanceMatchCm360(mid, sFov, tFov, Number.isFinite(frac) ? frac : 0);
-        $('[data-fov-out]').textContent = Number.isFinite(out) ? out.toFixed(1) : '-';
-      };
-      $('[data-school]').addEventListener('change', (ev) => {
-        const id = (ev.target as HTMLSelectElement).value;
-        const school = CONVERSION_SCHOOLS.find((s) => s.id === id)!;
-        $('[data-school-note]').textContent = school.note;
-        fovBlock.hidden = !school.fovAware;
-        if (school.fovAware) recalcFov();
-      });
-      fovBlock.addEventListener('input', recalcFov);
-
+      // ── The search window ────────────────────────────────────────────────
       const loInput = $<HTMLInputElement>('[data-bound="lo"]');
       const hiInput = $<HTMLInputElement>('[data-bound="hi"]');
-      const syncBounds = (): [number, number] => {
+      const status = $('[data-bounds-status]');
+
+      // Typing previews the normalized window but commits nothing: the old screen wrote
+      // the draft on every keystroke, which is how an edit could look applied and not be.
+      $('[data-panel="bounds"]').addEventListener('input', () => {
         const [nlo, nhi] = normalizeBounds(parseFloat(loInput.value), parseFloat(hiInput.value));
-        ctx.draft.bounds = [nlo, nhi];
-        $('[data-bounds-out]').textContent = `${nlo}–${nhi}`;
-        return [nlo, nhi];
-      };
-      // live: keep the draft + readout in step as the user types (without clobbering the fields mid-type)
-      $('[data-panel="bounds"]').addEventListener('input', syncBounds);
-      // commit (blur/enter): snap the inputs to the normalized values + refresh the mid-derived previews
-      $('[data-panel="bounds"]').addEventListener('change', () => {
-        const [nlo, nhi] = syncBounds();
+        $('[data-bounds-out]').textContent = `${nlo} to ${nhi}`;
+        status.textContent = 'Press apply to use this window.';
+      });
+
+      $('[data-action="apply-bounds"]').addEventListener('click', () => {
+        const [nlo, nhi] = normalizeBounds(parseFloat(loInput.value), parseFloat(hiInput.value));
         loInput.value = String(nlo);
         hiInput.value = String(nhi);
-        mid = Math.round(Math.sqrt(nlo * nhi));
+        ctx.draft.bounds = [nlo, nhi];
+        $('[data-bounds-out]').textContent = `${nlo} to ${nhi}`;
+
+        mid = windowMid(nlo, nhi);
         $('[data-mid-sub]').textContent = String(mid);
-        $('[data-fov-mid]').textContent = String(mid);
         renderGames();
-        if (!fovBlock.hidden) recalcFov();
+
+        if (calibrated) {
+          rememberPrefs(ctx);
+          status.textContent = `Saved. I search ${nlo} to ${nhi} cm/360.`;
+        } else {
+          status.textContent = `Applied for this visit. I search ${nlo} to ${nhi} cm/360, and I start saving the window once you calibrate.`;
+        }
       });
+
+      // ── The FOV converter ────────────────────────────────────────────────
+      const recalcFov = (): void => {
+        const num = (k: string): number => parseFloat($<HTMLInputElement>(`[data-fov="${k}"]`).value);
+        const frac = num('fraction');
+        const out = monitorDistanceMatchCm360(num('from'), num('source'), num('target'), Number.isFinite(frac) ? frac : 0);
+        $('[data-fov-out]').textContent = Number.isFinite(out) ? out.toFixed(1) : '-';
+      };
+      $('[data-panel="fov"]').addEventListener('input', recalcFov);
+      recalcFov();
 
       $('[data-action="back"]').addEventListener('click', () => ctx.navigate('hero'));
       host.appendChild(root);

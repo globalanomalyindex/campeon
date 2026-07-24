@@ -1,10 +1,15 @@
-/* campeón — shell
+/* campeón: shell
    Screen scaffolding and the shared primitives. Two surfaces only: paper for
    everything the visitor reads, ink for the chamber where measurement happens.
    See docs/design/canon.md. */
 
 /* ── Scaffolding ─────────────────────────────────────────────────────────── */
 #app { display: block; min-height: 100%; }
+/* Every route mounts inside its own landmark, and the router moves focus here on
+   navigation. tabindex="-1" makes it a programmatic target only, so it never joins
+   the tab order and never needs a ring of its own. */
+#app > main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+#app > main:focus { outline: none; }
 .screen { min-height: 100vh; display: flex; flex-direction: column; }
 .screen--shell { background: var(--surface-page); color: var(--text-body); }
 .screen--arena { background: var(--surface-page); color: var(--text-body); }
@@ -281,10 +286,24 @@
   padding: var(--space-3) var(--space-5);
   z-index: 11; pointer-events: auto;
 }
+/* The two step controls are single glyphs, so they carry an explicit target size:
+   a ghost button's line box alone is far under the 44px minimum. */
+.range__bar .range__step {
+  min-inline-size: 44px; min-block-size: 44px;
+  padding-inline: var(--space-3);
+  text-align: center;
+}
+
+/* The instruction that tells you how to START the range. It is read as well as seen,
+   so it sits at body size and holds a measure rather than one nowrap line. */
 .range__hint {
-  position: fixed; left: 50%; bottom: calc(var(--space-5) + 4rem); transform: translateX(-50%);
-  font: var(--type-body-sm); color: var(--text-muted);
-  z-index: 10; pointer-events: none; white-space: nowrap;
+  position: fixed; left: 50%; bottom: calc(var(--space-5) + 5rem); transform: translateX(-50%);
+  width: min(46ch, 88vw); text-align: center;
+  font: var(--type-body-sm); color: var(--text-body);
+  background: var(--surface-scrim);
+  border: 1px solid var(--border-hairline);
+  padding: var(--space-3) var(--space-4);
+  z-index: 10; pointer-events: none;
 }
 
 /* A miss reads as a mark near the crosshair, in the danger mineral. */
@@ -330,6 +349,61 @@
 .session__dialed-num small { font-size: 0.28em; color: var(--text-muted); font-family: var(--font-text); }
 .session__dialed-ci { color: var(--text-muted); }
 .session__dialed-actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; justify-content: center; }
+
+/* ── Chamber overlays ─────────────────────────────────────────────────────
+   One shape for every card that covers the arena: the pre-run brief, the paused
+   scrim, the failure notice, the adopt confirm. Full-bleed scrim, centred column,
+   prose held to a measure. They share the dialed-in panel's geometry so stepping
+   between them reads as the same room. */
+.session__prelock, .session__abort, .range__confirm {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-3); text-align: center;
+  padding: var(--space-6);
+  background: var(--surface-scrim);
+  color: var(--text-body);
+}
+.session__prelock[hidden], .session__abort[hidden], .range__confirm[hidden] { display: none; }
+
+.session__prelock-label, .session__abort-label, .range__confirm-label {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.session__prelock-lead, .session__abort-lead, .range__confirm-lead {
+  font: var(--type-body-md); color: var(--text-body);
+  max-width: 52ch;
+}
+.session__prelock-sub, .session__abort-note { color: var(--text-muted); font: var(--type-body-sm); max-width: 52ch; }
+.session__abort-note { color: var(--color-warning); }
+.session__prelock kbd {
+  font-family: var(--font-mono); font-size: var(--text-body-sm);
+  border: 1px solid var(--border-default); padding: 0 var(--space-1);
+}
+.session__prelock-actions, .session__abort-actions, .range__confirm-actions {
+  display: flex; gap: var(--space-3); margin-top: var(--space-4);
+  flex-wrap: wrap; justify-content: center;
+}
+.session__abort [hidden] { display: none; }
+
+/* The first-encounter title card: a brief, aria-hidden beat. Fade only. */
+.session__beat {
+  position: fixed; inset: 0; z-index: 15;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2); text-align: center;
+  pointer-events: none; opacity: 0;
+}
+.session__beat[hidden] { display: none; }
+.session__beat.is-on { animation: beat-fade var(--dur-slower) var(--ease-standard) forwards; }
+.session__beat-title { font: var(--type-display-sm); color: var(--text-strong); }
+.session__beat-sub { font: var(--type-body-sm); color: var(--text-muted); }
+@keyframes beat-fade { to { opacity: 1; } }
+
+.session__estimate-visual {
+  display: block; margin-top: var(--space-2);
+  font: var(--type-body-sm); color: var(--text-muted);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
 
 /* ── Result: the specimen card ────────────────────────────────────────────
    One dominant field, small accents. The number is warm ink on paper and the

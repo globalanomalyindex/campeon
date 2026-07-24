@@ -1,19 +1,38 @@
-/* campeón — options
+/* campeón: options
    A settings sheet read as a specimen drawer: square panels butted onto a
-   hairline lattice, tabular figures on every number the user can change. */
+   hairline lattice, tabular figures on every number the user can change.
+   See docs/design/canon.md. */
+
+/* The way out is a bar, not a word in a corner. It stays put while the sheet
+   scrolls, so leaving is one press from anywhere on the screen. */
+.options__bar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--border-hairline);
+}
+.options__bar-inner {
+  width: min(56rem, 92vw);
+  padding: var(--space-3) var(--space-5);
+}
+.options__back { display: inline-flex; align-items: center; gap: var(--space-2); }
+.options__arrow { font-family: var(--font-text); }
 
 .options__inner {
   width: min(56rem, 100%);
   margin-inline: auto;
-  padding: var(--space-9) var(--space-5);
+  padding: var(--space-8) var(--space-5) var(--space-9);
 }
 .options__title { font: var(--type-display-sm); letter-spacing: var(--tracking-tight); color: var(--text-strong); }
+.options__lead {
+  font: var(--type-body-lg); color: var(--text-body);
+  max-width: var(--measure-prose); margin-top: var(--space-4);
+}
 
 .options__panel {
   border: 1px solid var(--border-hairline);
   background: var(--surface-card);
   padding: var(--space-5);
-  margin-top: var(--space-5);
+  margin-top: var(--space-6);
 }
 .options__h {
   font: var(--type-heading-md);
@@ -25,15 +44,37 @@
 .options__sub {
   font: var(--type-label); font-family: var(--font-text);
   letter-spacing: var(--tracking-label); text-transform: uppercase;
+  font-feature-settings: var(--features-figures);
   color: var(--text-muted);
+  white-space: nowrap;
 }
 .options__note { font: var(--type-body-sm); color: var(--text-muted); margin: var(--space-2) 0; max-width: var(--measure-prose); }
+.options__caption { font: var(--type-body-sm); color: var(--text-subtle); margin-top: var(--space-2); }
 
+.options__row { display: flex; gap: var(--space-5); flex-wrap: wrap; margin-top: var(--space-4); }
+.options__row .field input { width: 10rem; max-width: 100%; }
+
+.options__readout { color: var(--text-body); margin-top: var(--space-4); }
+.options__figure { font-size: var(--text-heading-md); }
+
+/* Applying is a press, so the button and what it did stand together. */
+.options__commit {
+  display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-hairline);
+}
+.options__status { font: var(--type-body-sm); color: var(--text-muted); max-width: 44ch; }
+
+/* The reference table can outgrow a phone, so it scrolls inside the panel
+   rather than pushing the page sideways. */
+.options__scroll { overflow-x: auto; }
 .options__table { width: 100%; border-collapse: collapse; margin-top: var(--space-3); font: var(--type-body-sm); }
 .options__table th, .options__table td {
   padding: var(--space-2) var(--space-3);
   text-align: left;
   border-bottom: 1px solid var(--border-hairline);
+  white-space: nowrap;
 }
 .options__table th {
   font: var(--type-label); font-family: var(--font-text);
@@ -41,33 +82,4 @@
   color: var(--text-muted);
 }
 .options__table td { color: var(--text-body); }
-
-.options__yaw {
-  width: 7rem;
-  font: var(--type-body-sm);
-  font-feature-settings: var(--features-figures);
-  font-variant-numeric: tabular-nums slashed-zero;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-default);
-  background: var(--surface-page);
-  color: var(--text-strong);
-}
-.options__yaw:focus-visible,
-.options [data-bound]:focus-visible,
-.options [data-school]:focus-visible,
-.options [data-fov]:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring);
-  outline-offset: 1px;
-  border-color: var(--color-primary);
-}
-
-.options__bounds { display: flex; gap: var(--space-5); flex-wrap: wrap; }
-.options__readout { color: var(--text-body); margin-top: var(--space-3); }
-.options__readout .mono {
-  font-family: var(--font-display);
-  font-feature-settings: var(--features-figures);
-  font-variant-numeric: tabular-nums slashed-zero;
-  font-size: var(--text-heading-md);
-  color: var(--text-strong);
-}
-[data-fov-block] .field { margin-top: var(--space-3); }
+.options__cell-note { color: var(--text-muted); white-space: normal; min-width: 18ch; }

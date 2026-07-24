@@ -16,6 +16,42 @@ import { mulberry32 } from '../stats/rng';
 import { trialsToObservations } from './objective';
 import { fitGpParams } from './gp';
 
+/**
+ * The order the cold-start levels are presented in.
+ *
+ * The opening trials lay a grid across the search range, and they used to be handed over
+ * in ascending order. That made the correlation between trial index and cm/360 exactly
+ * 1.0, so practice was perfectly confounded with the variable under test: a player warms
+ * up as a session runs, the later cold-start trials sat at the higher sensitivities, and
+ * the warm-up gain was therefore read as evidence for the slow end of the range. The
+ * drift adjustment in finalize cannot rescue it either, because its own collinearity
+ * guard drops the drift column exactly when the aliasing is worst.
+ *
+ * This hands back a fixed low-discrepancy permutation instead: level(k) = (k * stride) % n,
+ * where stride is the integer nearest n * phi that is coprime with n. Coprimality is what
+ * makes it a permutation; the golden-ratio spacing is what keeps |corr(k, level)| small.
+ *
+ * It is deterministic and draws nothing from the session RNG, which the instruments share.
+ * Perturbing that stream would change the target geometry a player sees.
+ *
+ * The schedule cycles instruments, so each instrument only sees every n-th entry. The
+ * stride keeps those subsequences spread as well, which matters because the drift
+ * adjustment is fitted per instrument.
+ */
+export function coldStartOrder(n: number): readonly number[] {
+  if (n <= 2) return Array.from({ length: Math.max(0, n) }, (_, i) => i);
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  const target = Math.round(n * 0.6180339887498949);
+  let stride = 0;
+  for (let d = 0; d < n && stride === 0; d++) {
+    for (const cand of [target + d, target - d]) {
+      if (cand > 1 && cand < n && gcd(cand, n) === 1) { stride = cand; break; }
+    }
+  }
+  if (stride === 0) stride = 1;
+  return Array.from({ length: n }, (_, k) => (k * stride) % n);
+}
+
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
 export interface FinalizeOptions {
@@ -177,7 +213,9 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
   const coldStart = config.coldStart ?? Math.max(4, 2 * schedule.length);
   const minTrials = config.minTrials ?? 8;
   const iters = config.bootstrapIters ?? 400;
-  const seedAt = (k: number): Cm360 => Math.exp(loX + ((k + 0.5) / coldStart) * (hiX - loX));
+  const levelAt = (k: number): Cm360 => Math.exp(loX + ((k + 0.5) / coldStart) * (hiX - loX));
+  const orderedLevel = coldStartOrder(coldStart);
+  const seedAt = (k: number): Cm360 => levelAt(orderedLevel[k] ?? k);
 
   const trials: TrialResult[] = config.initialTrials ? [...config.initialTrials] : [];
   while (trials.length < config.maxTrials) {
@@ -205,7 +243,14 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
 
     if (config.ciStopWidth !== undefined && trials.length >= minTrials) {
       try {
-        const ci = bootstrapCi([...trialsToObservations(trials, profile)], iters, rng);
+        // Its own stream, like the interim report above. Passing the shared instrument RNG
+        // here meant every stop check burned a few hundred draws, so the target geometry a
+        // player saw later in the session depended on how many stop checks had run.
+        const ci = bootstrapCi(
+          [...trialsToObservations(trials, profile)],
+          iters,
+          mulberry32(0x570b ^ trials.length),
+        );
         if (Math.abs(ci[1] - ci[0]) <= config.ciStopWidth) break;
       } catch {
         // not yet concave-fittable → keep gathering

@@ -16,7 +16,10 @@ describe('case-study.css', () => {
     }
   });
   it('defines the brutalist-editorial chrome selectors', () => {
-    for (const sel of ['.cs-grid', '.cs-numeral', '.cs-reg', '.cs-spine', '.cs-spec', '.cs-exo', '.cs-eyebrow']) {
+    // .cs-exo, the dotted frame that used to sit behind every section, is gone: it was
+    // decoration the specimen-sheet motif already carries with the registration marks.
+    for (const sel of ['.cs-grid', '.cs-numeral', '.cs-reg', '.cs-spine', '.cs-spec',
+      '.cs-eyebrow', '.cs-cite', '.cs-demo-tag', '.cs-notes']) {
       expect(css).toContain(sel);
     }
   });

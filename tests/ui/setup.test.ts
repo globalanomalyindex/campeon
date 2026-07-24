@@ -6,6 +6,9 @@ import { yawFor } from '../../src/convert/yaw-table';
 import { boundsFromSeed } from '../../src/ui/options/settings';
 import type { AppContext, Route, SessionDraft } from '../../src/ui/shell';
 
+type SweepOpts = Parameters<typeof import('../../src/ui/calibrate/sweep-view').createSweepView>[1];
+type SpinOpts = Parameters<typeof import('../../src/ui/calibrate/spin-view').createSpinView>[1];
+
 function fakeCtx(): AppContext & { nav: Route[] } {
   const nav: Route[] = [];
   const draft: SessionDraft = { dpi: 800, currentGame: 'cs2', currentSens: 1, bounds: [15, 60],
@@ -64,6 +67,83 @@ describe('setup (guided calibration orchestrator)', () => {
     const seed = cmPer360(1600, 0.5, yawFor(ctx.draft.currentGame));
     expect(ctx.draft.bounds).toEqual(boundsFromSeed(seed));
     expect(ctx.nav).toContain('session');
+  });
+
+  it('the intro offers a way back out of the flow', () => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    const back = host.querySelector('[data-action="to-hero"]') as HTMLButtonElement;
+    expect(back).toBeTruthy();
+    back.click();
+    expect(ctx.nav).toEqual(['hero']);
+  });
+
+  it('speaks in the first person singular, with no institutional "we"', () => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    expect(host.textContent!).not.toMatch(/\bwe\b|\bwe'll\b|\bus\b/i);
+  });
+});
+
+// ── The typed step validates at the boundary ──
+// A dpi of 0 used to reach CameraRig, divide by zero and blank the page - and rememberPrefs had
+// already persisted it, so the blank page came back on every later visit.
+
+describe('setup: the typed step refuses numbers the arena cannot use', () => {
+  function manualStep(ctx: ReturnType<typeof fakeCtx>): HTMLElement {
+    const host = document.createElement('div');
+    setup(host, ctx).mount();
+    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
+    return host;
+  }
+  const type = (host: HTMLElement, field: string, value: string): void => {
+    const el = host.querySelector(`[data-field="${field}"]`) as HTMLInputElement;
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  it.each([['', 'empty'], ['0', 'zero'], ['-5', 'negative'], ['40000', 'above the supported range']])(
+    'a %s dpi (%s) neither navigates nor reaches the draft, and says why', (bad) => {
+      const ctx = fakeCtx(); const host = manualStep(ctx);
+      type(host, 'dpi', bad);
+      (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
+      expect(ctx.nav).toEqual([]);
+      expect(ctx.draft.dpi).toBe(800); // the draft is untouched
+      const err = host.querySelector('[data-error]')!;
+      expect(err.getAttribute('role')).toBe('alert');
+      expect(err.textContent!.toLowerCase()).toContain('dpi');
+      expect(host.querySelector('[data-field="dpi"]')!.getAttribute('aria-invalid')).toBe('true');
+    });
+
+  it('a zero or missing sensitivity is refused too, and names the sensitivity field', () => {
+    const ctx = fakeCtx(); const host = manualStep(ctx);
+    type(host, 'sens', '0');
+    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
+    expect(ctx.nav).toEqual([]);
+    expect(host.querySelector('[data-error]')!.textContent!.toLowerCase()).toContain('sensitivity');
+    expect(host.querySelector('[data-field="sens"]')!.getAttribute('aria-invalid')).toBe('true');
+    expect(host.querySelector('[data-field="dpi"]')!.getAttribute('aria-invalid')).toBe('false');
+  });
+
+  it('clears the message as soon as the number is corrected, then commits', () => {
+    const ctx = fakeCtx(); const host = manualStep(ctx);
+    const begin = host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement;
+    type(host, 'dpi', '0');
+    begin.click();
+    expect(begin.getAttribute('aria-disabled')).toBe('true');
+    type(host, 'dpi', '1600');
+    expect(host.querySelector('[data-error]')!.textContent).toBe('');
+    expect(begin.getAttribute('aria-disabled')).toBe('false');
+    begin.click();
+    expect(ctx.draft.dpi).toBe(1600);
+    expect(ctx.nav).toEqual(['session']);
+  });
+
+  it('never persists a dpi the arena cannot use', () => {
+    const ctx = rememberingCtx(null); const host = manualStep(ctx);
+    type(host, 'dpi', '0');
+    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
+    expect(ctx.savedPrefs()).toBeNull();
   });
 });
 
@@ -146,5 +226,67 @@ describe('setup: remembered calibration (Phase C)', () => {
 
     expect(ctx.savedPrefs()).toMatchObject({ dpi: 1600 });
     expect(ctx.nav).toEqual(['session']);
+  });
+
+  it('hides the saved-calibration fast path when the stored dpi is unusable', () => {
+    // A pref poisoned before the boundary check existed must not route straight into a divide by
+    // zero on every later visit. Recalibrating is the only offer left.
+    const ctx = rememberingCtx({ ...PREFS, dpi: 0 }); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    expect(host.querySelector('[data-action="use-saved"]')).toBeNull();
+    expect(host.querySelector('[data-action="start-guided"]')!.className).toContain('action--primary');
+  });
+});
+
+// ── The guided steps are not a corridor ──
+
+describe('setup: the sweep and the spin can be left', () => {
+  function captureOpts(): { deps: Parameters<typeof setup>[2]; sweep: () => SweepOpts; spin: () => SpinOpts } {
+    let sweepOpts: SweepOpts | null = null;
+    let spinOpts: SpinOpts | null = null;
+    const deps = {
+      createSweepView: ((_h: HTMLElement, o: SweepOpts) => { sweepOpts = o; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/sweep-view').createSweepView,
+      createSpinView: ((_h: HTMLElement, o: SpinOpts) => { spinOpts = o; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/spin-view').createSpinView,
+    };
+    return { deps, sweep: () => sweepOpts!, spin: () => spinOpts! };
+  }
+
+  it('the sweep can go back to the intro and can hand off to the typed step', () => {
+    const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    cap.sweep().onBack();
+    expect(host.querySelector('[data-action="start-guided"]'), 'back returns to the intro').toBeTruthy();
+
+    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    cap.sweep().onManual();
+    expect(host.querySelector('[data-field="dpi"]'), 'manual reaches the typed step').toBeTruthy();
+  });
+
+  it('the spin can go back to the intro and can hand off to the typed step', () => {
+    const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    cap.sweep().onResult({ dpi: 1600, accelerated: false });
+    cap.spin().onBack();
+    expect(host.querySelector('[data-action="start-guided"]')).toBeTruthy();
+    expect(ctx.nav).toEqual([]); // leaving the spin commits nothing
+  });
+
+  it.each([true, false])('passes prefers-reduced-motion (%s) into both guided views', (reduce) => {
+    // The views draw their cues on canvas, which the CSS reduced-motion block cannot reach, so the
+    // preference has to travel as a flag or it is simply ignored.
+    const prev = (window as { matchMedia?: unknown }).matchMedia;
+    (window as unknown as { matchMedia: unknown }).matchMedia = (q: string) => ({ matches: reduce && q.includes('reduced-motion') });
+    try {
+      const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
+      setup(host, ctx, cap.deps).mount();
+      (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+      expect(cap.sweep().reducedMotion).toBe(reduce);
+      cap.sweep().onResult({ dpi: 1600, accelerated: false });
+      expect(cap.spin().reducedMotion).toBe(reduce);
+    } finally {
+      (window as unknown as { matchMedia: unknown }).matchMedia = prev;
+    }
   });
 });
