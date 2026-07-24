@@ -38,7 +38,7 @@ function parseHex(h: string): number {
  */
 export function sparkBurst(): Group {
   const mat = new MeshBasicMaterial({
-    color: parseHex(hex.gold),
+    color: parseHex(hex.sulfur),
     transparent: true,
     opacity: 0,
     blending: AdditiveBlending,

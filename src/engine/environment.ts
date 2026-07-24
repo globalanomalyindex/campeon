@@ -67,10 +67,10 @@ const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2
 
 // Palette-derived RGB anchors (0-255), scaled per the derivations below. Every derivation stays a
 // pure function of `hex` - no hardcoded colors outside these scalings.
-const CREAM: Vec3 = hexToRgb(hex.cream);
+const PAPER: Vec3 = hexToRgb(hex.paper);
 const HIDE: Vec3 = hexToRgb(hex.hide);
 const INK: Vec3 = hexToRgb(hex.ink);
-const GOLD: Vec3 = hexToRgb(hex.gold);
+const SUN: Vec3 = hexToRgb(hex.sulfur);
 
 function hexToRgb(h: string): Vec3 {
   const n = parseInt(h.slice(1), 16);
@@ -98,7 +98,7 @@ const SUN_EDGE_RAD = 0.35;
 // at/near 255 (cream.r=239, gold.g=196 but gold.r=255), so the 50/50 mix peaks near 255 without
 // any extra scaling - a real specular ping for metals (gunmetal/brass viewmodel) without blowing
 // past the 0-255 texel range.
-const SUN_COLOR: Vec3 = lerp(CREAM, GOLD, 0.5);
+const SUN_COLOR: Vec3 = lerp(PAPER, SUN, 0.5);
 
 /**
  * Shade one equirect texel (0-255 RGB) for world direction `dir`. Per {@link dirToEquirectUv}'s
@@ -113,8 +113,8 @@ function shadeTexel(dir: Vec3): Vec3 {
     // Sky: vertical gradient from a dim warm horizon glow (cream * 0.35) up to a darker warm zenith
     // (cream * 0.10), keyed on |y| (0 at horizon, 1 at zenith).
     const t = clamp(dir[1], 0, 1);
-    const horizonColor = scale(CREAM, 0.35);
-    const zenithColor = scale(CREAM, 0.1);
+    const horizonColor = scale(PAPER, 0.35);
+    const zenithColor = scale(PAPER, 0.1);
     color = lerp(horizonColor, zenithColor, t);
   } else {
     // Ground: dark warm brown (hide * 0.15 at the horizon) falling to near-black warm ink straight

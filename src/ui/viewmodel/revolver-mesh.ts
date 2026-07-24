@@ -98,7 +98,7 @@ export function createRevolverMaterials(): RevolverMaterials {
     steel: mkMat(parseHex(hex.gunmetal), { metalness: 0.35, roughness: 0.5 }),
     wood: mkMat(parseHex(hex.wood), { metalness: 0.0, roughness: 0.7 }),
     brass: mkMat(parseHex(hex.brass), { metalness: 0.45, roughness: 0.4 }),
-    flash: mkFlashMat(parseHex(hex.gold)),
+    flash: mkFlashMat(parseHex(hex.sulfur)),
   };
 }
 

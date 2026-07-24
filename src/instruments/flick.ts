@@ -150,7 +150,15 @@ export const flick = {
         reachFrames = [];
       };
 
+      // The first stimulus is presented on the first frame, not eagerly, so presentedAt
+      // carries the real arena clock. The clock runs from arena construction and never
+      // resets, so stamping the first target with 0 made the opening tap of every trial
+      // absorb the entire elapsed session. That error GREW as the session went on, so it
+      // biased the located optimum toward whatever was measured early rather than adding
+      // symmetric noise. Regression: tests/instruments/clock-stamp.test.ts.
+      let opened = false;
       const offFrame = scene.onFrame((_dt, now) => {
+        if (!opened) { opened = true; present(now); return; }
         if (handle) {
           reachFrames.push({ t: now, aim: scene.view(), target: handle.bearing(), targetRadius: handle.radiusDeg() });
         }
@@ -193,7 +201,6 @@ export const flick = {
         }
       });
 
-      present(0);
     });
   },
 };

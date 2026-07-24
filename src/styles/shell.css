@@ -1,418 +1,393 @@
+/* campeón — shell
+   Screen scaffolding and the shared primitives. Two surfaces only: paper for
+   everything the visitor reads, ink for the chamber where measurement happens.
+   See docs/design/canon.md. */
+
+/* ── Scaffolding ─────────────────────────────────────────────────────────── */
 #app { display: block; min-height: 100%; }
 .screen { min-height: 100vh; display: flex; flex-direction: column; }
-.screen--shell { background: var(--surface); color: var(--text); }
-.screen--arena { background: var(--cinema-ink); color: var(--text); }
+.screen--shell { background: var(--surface-page); color: var(--text-body); }
+.screen--arena { background: var(--surface-page); color: var(--text-body); }
 
-.wrap { width: min(72rem, 92vw); margin-inline: auto; }
-.stack > * + * { margin-top: var(--space-3); }
+.wrap { width: min(var(--container), 92vw); margin-inline: auto; }
+.stack > * + * { margin-top: var(--space-4); }
 
-.action { font-family: var(--font-display); background: none; border: 0; cursor: pointer; color: inherit; transition: transform var(--dur-fast) var(--ease-out); }
-.action--primary { color: var(--gold); font-size: 1.5rem; }
-.action--ghost { color: var(--text-muted); font-size: 1rem; }
-.action--ghost:hover { color: var(--text); }
-.action--primary::before, .action--ghost::before { content: '+ '; }
-.action:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-.action:active { transform: scale(.97); }
-/* the goal slider rides the brand gold */
-.field input[type="range"] { accent-color: var(--gold); }
+/* ── The panel ────────────────────────────────────────────────────────────
+   One primitive for every raised surface: HUD, plot, control bar, card. Square,
+   hairline, matte. Padding is inner, so panels butt against each other cleanly. */
+.panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  padding: var(--space-4);
+}
+.panel--tight { padding: var(--space-3); }
+.panel--sunk { background: var(--surface-sunken); }
+
+/* Grids that join on the 1px lattice rather than floating apart. */
+.lattice {
+  display: grid; gap: 1px;
+  background: var(--border-hairline);
+  border: 1px solid var(--border-hairline);
+}
+.lattice > * { background: var(--surface-card); padding: var(--space-4); }
+
+/* ── Actions ──────────────────────────────────────────────────────────────
+   Square, Regular weight, hierarchy by fill and colour. Press settles down 1px.
+   The old decorative "+" prefix is gone: it was injected via CSS content and read
+   aloud as "plus" by screen readers. */
+.action {
+  font: var(--type-body-md);
+  font-family: var(--font-text);
+  border: 1px solid transparent;
+  border-radius: var(--radius-none);
+  cursor: pointer;
+  padding: var(--pad-control-y) var(--pad-control-x);
+  transition: var(--transition-control);
+  text-align: left;
+}
+.action--primary {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  border-color: var(--color-primary);
+}
+.action--primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+
+.action--secondary {
+  background: var(--surface-card);
+  color: var(--text-strong);
+  border-color: var(--border-default);
+}
+.action--secondary:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+
+.action--ghost {
+  background: none;
+  color: var(--text-muted);
+  border-color: transparent;
+  padding-inline: 0;
+}
+.action--ghost:hover { color: var(--text-strong); }
+
+.action:active { transform: translateY(1px); }
+.action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.action[disabled] {
+  color: var(--text-disabled);
+  border-color: var(--border-hairline);
+  background: var(--surface-sunken);
+  cursor: not-allowed;
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
+.field > span, .field > label {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.field input, .field select {
+  font: var(--type-body-md);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  padding: var(--pad-control-y) var(--space-3);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-strong);
+  border-radius: var(--radius-none);
+}
+.field input:focus-visible, .field select:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+.field input[type='range'] { accent-color: var(--color-primary); padding: 0; border: 0; background: none; }
 
 .mono { font-family: var(--font-mono); }
-.display { font-family: var(--font-display); line-height: .92; }
+.display { font-family: var(--font-display); letter-spacing: var(--tracking-display); }
 
-.fade-in { animation: fade-in var(--dur-med) var(--ease-out); }
-@keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* ── The specimen tag ─────────────────────────────────────────────────────
+   A catalogue number, a name, and the organisms. Used wherever an instrument or a
+   measurement needs identifying. */
+/* The number never breaks: it wraps as a unit and the organisms drop below it. */
+.tag { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+.tag__no {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); color: var(--text-muted);
+  white-space: nowrap;
+}
+.tag__name {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-body);
+}
+/* The colour dot is the brand's most specific marker: it says which mineral, and
+   therefore which instrument, a thing belongs to. */
+.dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: var(--radius-round);
+  flex: 0 0 auto;
+}
+.dot--track     { background: var(--instrument-track); }
+.dot--flick     { background: var(--instrument-flick); }
+.dot--calibrate { background: var(--instrument-calibrate); }
+.dot--strike    { background: var(--instrument-strike); }
 
-/* film-cut flash between screens (set by the shell router on every navigation) */
-.route-flash { position: fixed; inset: 0; z-index: 9999; background: var(--cinema-cream, #efe7d6); opacity: 0; pointer-events: none; }
-.route-flash.is-on { animation: route-cut 280ms var(--ease-out); }
-@keyframes route-cut { 0% { opacity: .85; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .route-flash { display: none; } }
+/* ── Reveal ───────────────────────────────────────────────────────────────
+   A calm settle: opacity plus a small translation. No bounce anywhere. */
+.reveal { opacity: 0; transform: translateY(6px); animation: reveal var(--dur-slow) var(--ease-standard) forwards; }
+.reveal[data-reveal] { animation-delay: calc(var(--reveal-i, 0) * 70ms); }
+@keyframes reveal { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; animation: none; } }
 
-/* ─── Hero: spaghetti-western title sequence → menu ─────────────────────────── */
+/* ── Hero ─────────────────────────────────────────────────────────────────
+   A specimen card. The wordmark, one plain sentence, and the way in. Nothing is
+   gated behind a timed sequence: the visitor can act on arrival. */
 .hero {
-  position: fixed; inset: 0; z-index: 0;
-  display: grid; place-items: center;
-  background: var(--cinema-ink);
-  color: var(--cinema-cream);
-  overflow: hidden;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: var(--space-7);
+  padding: var(--space-9) clamp(var(--space-5), 7vw, var(--space-10));
+  background: var(--surface-page);
+}
+@media (min-width: 60rem) {
+  .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; gap: var(--space-10); }
 }
 
-/* film grain: a faint turbulence wash that flickers at a few frames a second */
-.reel {
-  position: absolute; inset: -25%; z-index: 2; pointer-events: none;
-  opacity: .05; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: reel-flicker 1.1s steps(2) infinite;
-}
-@keyframes reel-flicker { 0% { transform: translate(0, 0); } 50% { transform: translate(-2%, 1.5%); } 100% { transform: translate(1.5%, -1%); } }
-
-/* the screen flash (cut between beats) */
-.flash {
-  position: absolute; inset: 0; z-index: 5; pointer-events: none;
-  background: var(--cinema-cream); opacity: 0;
-  transition: opacity 220ms var(--ease-out);
-}
-.flash.is-on { opacity: .92; transition-duration: 55ms; }
-
-/* the cinematic line stack */
-.intro {
-  position: absolute; inset: 0; z-index: 3;
-  display: grid; place-items: center; cursor: pointer;
-  transition: opacity 380ms var(--ease-out);
-}
-.intro.is-gone { opacity: 0; pointer-events: none; }
-/* lines share one centered cell but play strictly one at a time: the outgoing line fully clears
-   (quicker fade-out) before the next begins (slow dreamy fade-in) - asymmetric so nothing overlaps. */
-.intro__stack { display: grid; place-items: center; text-align: center; padding: 0 var(--space-4); }
-.intro__line, .intro__title { grid-area: 1 / 1; }
-.intro__line {
-  font-family: var(--font-cinema); color: var(--cinema-cream); max-width: min(90vw, 52ch);
-  font-size: clamp(1.4rem, 3.4vw, 2.7rem); line-height: 1.22; letter-spacing: .01em;
-  opacity: 0; filter: blur(3px);
-  transition: opacity 1000ms var(--ease-out), filter 1000ms var(--ease-out); /* fade OUT (a quick cut) */
-}
-.intro__line.is-on { opacity: 1; filter: blur(0);
-  transition: opacity 1400ms var(--ease-out), filter 1400ms var(--ease-out); /* fade IN (slow, dreamy) */
-}
-.intro__title {
-  font-family: var(--font-cinema); line-height: 1; letter-spacing: -.01em;
-  font-size: clamp(3rem, 12vw, 8rem);
-  opacity: 0; transform: scale(.97); filter: blur(8px);
-  transition: opacity 1000ms var(--ease-out), transform 1000ms var(--ease-out), filter 1000ms var(--ease-out);
-}
-.intro__title.is-on { opacity: 1; transform: none; filter: blur(0);
-  transition: opacity 1400ms var(--ease-out), transform 1400ms var(--ease-out), filter 1400ms var(--ease-out);
-}
-.intro__el { color: var(--cinema-cream); }
-.intro__champ { color: var(--blood); transition: filter 700ms var(--ease-out); }
-/* glow via filter (drop-shadow), not text-shadow, to stay on the compositor-safe property set */
-.intro__title.is-on .intro__champ { filter: drop-shadow(0 0 16px color-mix(in oklab, var(--blood) 60%, transparent)); }
-.intro__skip {
-  position: absolute; bottom: var(--space-4); right: var(--space-4); z-index: 4;
-  background: none; border: 0; cursor: pointer;
-  color: color-mix(in oklab, var(--cinema-cream) 55%, transparent);
-  font-family: var(--font-mono); font-size: .78rem; letter-spacing: .14em; text-transform: uppercase;
-  transition: color 140ms var(--ease-out);
-}
-.intro__skip:hover { color: var(--cinema-cream); }
-.intro__skip:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-
-/* the menu (the resolved end state) */
-.hero__menu {
-  position: relative; z-index: 3; justify-self: start;
-  display: grid; justify-items: start; gap: var(--space-2); text-align: left;
-  padding: var(--space-5) clamp(1.5rem, 9vw, 9rem);
-}
 .hero__mark {
-  font-family: var(--font-cinema); font-size: clamp(3.5rem, 13vw, 9rem); line-height: .95;
-  color: var(--cinema-cream); letter-spacing: -.01em;
-  opacity: 0; transition: opacity 540ms var(--ease-out); will-change: transform;
+  font: var(--type-display-xl);
+  font-size: clamp(56px, 11vw, 128px);
+  letter-spacing: var(--tracking-display);
+  color: var(--text-strong);
+  line-height: var(--leading-display);
 }
-.hero__menu.is-mark .hero__mark { opacity: 1; }
-.hero__eye { color: var(--blood); }  /* the o-acute echoes the red title */
+.hero__eye { color: var(--carnelian); }
 
-/* everything below the mark resolves on the second click-flash, staggered */
-.hero__tagline, .hero__menu > .action, .hero__byline, .hero__nav {
-  opacity: 0; transform: translateY(8px); pointer-events: none;
-  transition: opacity 480ms var(--ease-out), transform 480ms var(--ease-out);
+.hero__lead {
+  font: var(--type-body-lg);
+  color: var(--text-body);
+  max-width: 46ch;
+  margin-top: var(--space-5);
 }
-.hero__menu.is-on { pointer-events: auto; }
-.hero__menu.is-on .hero__tagline,
-.hero__menu.is-on > .action,
-.hero__menu.is-on .hero__byline,
-.hero__menu.is-on .hero__nav { opacity: 1; transform: none; pointer-events: auto; }
-.hero__menu.is-on .hero__tagline { transition-delay: 60ms; }
-.hero__menu.is-on > .action { transition-delay: 150ms; }
-.hero__menu.is-on .hero__byline { transition-delay: 230ms; }
-.hero__menu.is-on .hero__nav { transition-delay: 310ms; }
+.hero__actions { margin-top: var(--space-6); display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
+.hero__nav { display: flex; gap: var(--space-5); }
+/* text-muted, not text-subtle: stone-500 on paper is 3.6:1 and fails AA at this size. */
+.hero__byline { margin-top: var(--space-7); color: var(--text-muted); font: var(--type-body-sm); }
 
-.hero__tagline { color: color-mix(in oklab, var(--cinema-cream) 68%, transparent); font-size: 1rem; letter-spacing: .02em; max-width: 44ch; }
-.hero__byline { font-family: var(--font-cinema); font-style: italic; color: var(--gold); font-size: 1.05rem; }
-.hero__nav { display: flex; gap: var(--space-4); justify-content: flex-start; margin-top: var(--space-3); }
-.hero__nav .action--ghost { color: color-mix(in oklab, var(--cinema-cream) 58%, transparent); }
-.hero__nav .action--ghost:hover { color: var(--cinema-cream); }
-
-@media (prefers-reduced-motion: reduce) {
-  .reel { display: none; }
-  .flash { display: none; }
-  .intro__line, .intro__line.is-on,
-  .intro__title, .intro__title.is-on { transition: opacity 300ms ease; transform: none; filter: none; }
-  .intro__title.is-on .intro__champ { filter: none; }
-  .hero__mark { will-change: auto; }
-  .hero__tagline, .hero__menu > .action, .hero__byline, .hero__nav { transform: none; transition: opacity 220ms ease; }
+/* The four instruments, shown as a specimen drawer rather than described. */
+.hero__drawer {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px;
+  background: var(--border-hairline); border: 1px solid var(--border-hairline);
 }
+.hero__cell { background: var(--surface-card); padding: var(--space-5); display: grid; gap: var(--space-2); align-content: start; }
+/* The colour field is the study: a dominant block of the instrument's mineral wash,
+   with the mineral itself carried as the small accent on the dot below it. */
+.hero__cell-field { height: 48px; }
+[data-instrument='track']     .hero__cell-field { background: var(--instrument-track-wash); }
+[data-instrument='flick']     .hero__cell-field { background: var(--instrument-flick-wash); }
+[data-instrument='calibrate'] .hero__cell-field { background: var(--instrument-calibrate-wash); }
+[data-instrument='strike']    .hero__cell-field { background: var(--instrument-strike-wash); }
+.hero__cell-name { font: var(--type-heading-sm); color: var(--text-strong); }
+.hero__cell-note { font: var(--type-body-sm); color: var(--text-muted); }
 
-/* ─── Setup screen ─────────────────────────────────────────────────────────── */
-.setup__inner { max-width: 34rem; margin-inline: auto; padding: var(--space-6) 0; }
-.setup__title { font-size: 2rem; color: var(--text); }
-.setup__lead { color: var(--text-muted); }
-/* The returning visitor's fast path: their remembered calibration, one click from the hunt. */
-.setup__remembered { padding: var(--space-3); border: 1px solid var(--line-strong);
-  border-left: 2px solid var(--gold); background: var(--surface-raised); border-radius: 2px; }
-.setup__remembered .setup__lead { margin-bottom: var(--space-2); }
-.field { display: flex; flex-direction: column; gap: var(--space-1); font-size: .9rem; color: var(--text-muted); }
-.field input, .field select { font-size: 1rem; padding: .5rem .6rem; border: 1px solid var(--line-strong); background: var(--surface-raised); color: var(--text); border-radius: 2px; }
-.field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.setup__readout { font-size: 1.1rem; color: var(--text); }
-.setup__readout [data-readout] { color: var(--gold); font-weight: 700; font-size: 1.4rem; }
-.setup__goalhint { color: var(--text-muted); }
+/* ── Setup ───────────────────────────────────────────────────────────────── */
+.setup__inner { width: min(46rem, 100%); margin-inline: auto; padding: var(--space-9) var(--space-5); }
+.setup__title { font: var(--type-display-sm); letter-spacing: var(--tracking-tight); color: var(--text-strong); }
+.setup__lead { color: var(--text-muted); max-width: var(--measure-prose); margin-top: var(--space-3); }
+.setup__readout { margin-top: var(--space-5); }
+.setup__readout [data-readout] {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: var(--text-display-sm);
+  color: var(--text-strong);
+}
+.setup__goalhint { color: var(--text-muted); font: var(--type-body-sm); }
 
-/* ─── Gate screen ──────────────────────────────────────────────────────────── */
-.gate__inner { margin: auto; max-width: 36rem; text-align: center; padding: var(--space-6) 0; }
-.gate__lead { font-size: 1.2rem; color: var(--text); }
-.gate__inner .action { margin-top: var(--space-3); display: block; }
+/* ── Gate ────────────────────────────────────────────────────────────────── */
+.gate__inner { margin: auto; width: min(40rem, 100%); padding: var(--space-9) var(--space-5); }
+.gate__lead { font: var(--type-body-lg); color: var(--text-body); }
+.gate__inner .action { margin-top: var(--space-4); }
 
-/* ─── Session / arena screen ───────────────────────────────────────────────── */
-.session__canvas {
-  position: fixed; inset: 0; width: 100%; height: 100%;
-  display: block; cursor: none;
-}
+/* ── The chamber: session and range ───────────────────────────────────────
+   data-surface="chamber" re-points the semantic tokens at the inverse end of the
+   ramp, so every primitive above works here unchanged. */
+[data-surface='chamber'] { background: var(--surface-page); color: var(--text-body); }
 
-/* PSX Desert Eagle viewmodel - cosmetic overlay above the arena, below the HUD; never eats clicks. */
-.viewmodel {
-  position: fixed; inset: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-  z-index: 4;
-  image-rendering: pixelated;
-}
+.session__canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: none; }
 
-/* Miss tick - a brief ember "miss" that pops near the crosshair when a shot lands in no hitbox. */
-.shot-miss {
-  position: fixed; left: 50%; top: 53%;
-  transform: translate(-50%, -50%) scale(0.7);
-  z-index: 6;
-  pointer-events: none;
-  color: var(--c-strike);
-  font-weight: 700; font-size: clamp(14px, 2.1vw, 26px);
-  letter-spacing: 0.1em; text-transform: uppercase;
-  opacity: 0;
-  text-shadow: 0 0 8px color-mix(in oklab, var(--cinema-ink) 80%, transparent), 0 1px 0 var(--ink);
-}
-.shot-miss.is-on { animation: shot-miss-pop 0.5s ease-out forwards; }
-@keyframes shot-miss-pop {
-  0%   { opacity: 0; transform: translate(-50%, -44%) scale(0.7); }
-  16%  { opacity: 1; transform: translate(-50%, -54%) scale(1.1); }
-  100% { opacity: 0; transform: translate(-50%, -68%) scale(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .shot-miss.is-on { animation: none; opacity: 1; transform: translate(-50%, -54%) scale(1); }
-}
+/* The in-scene viewmodel sits above the arena and below the HUD, and never eats clicks. */
+.viewmodel { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
 
 .session__crosshair {
   position: fixed; left: 50%; top: 50%;
-  width: 6px; height: 6px; margin: -3px 0 0 -3px;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 1px var(--ink);
-  pointer-events: none;
-  z-index: 10;
+  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+  border-radius: var(--radius-round);
+  background: var(--stone-0);
+  /* A hairline ring so the dot holds its edge over a light target as well as a dark
+     one. It is an outline, not a shadow: nothing in this system glows. */
+  outline: 1px solid var(--stone-900);
+  pointer-events: none; z-index: 10;
 }
 
-.session__hud {
-  position: fixed; left: var(--space-4); top: var(--space-4);
+.session__hud, .range__hud {
+  position: fixed; left: var(--space-5); top: var(--space-5);
   display: flex; flex-direction: column; gap: var(--space-1);
-  font-size: .8rem; line-height: 1.5;
-  color: var(--text);
-  background: var(--scrim);
-  padding: .5rem .7rem;
-  border: 1px solid var(--line-strong);
-  z-index: 10;
-  pointer-events: none;
+  background: var(--surface-scrim);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-body);
+  padding: var(--space-3) var(--space-4);
+  z-index: 10; pointer-events: none;
+  font: var(--type-body-sm);
 }
+
+.range__hud .display {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: var(--text-display-sm);
+  line-height: 1;
+  color: var(--text-strong);
+}
+.range__hud .display small { font-size: var(--text-body-sm); color: var(--text-muted); font-family: var(--font-text); }
+.range__delta { font: var(--type-body-sm); color: var(--text-muted); font-variant-numeric: tabular-nums slashed-zero; }
 
 .session__plot {
-  position: fixed; right: var(--space-4); bottom: var(--space-4);
-  width: 360px; height: 200px;
-  background: var(--scrim);
-  border: 1px solid var(--line-strong);
-  padding: .5rem;
-  margin: 0;
-  z-index: 10;
+  position: fixed; right: var(--space-5); bottom: var(--space-5);
+  width: min(380px, 40vw);
+  background: var(--surface-scrim);
+  border: 1px solid var(--border-hairline);
+  padding: var(--space-3);
+  margin: 0; z-index: 10;
 }
-
-.session__plot svg[data-plot] {
-  display: block;
-  width: 360px;
-  height: 160px;
-}
-
+.session__plot svg[data-plot] { display: block; width: 100%; height: auto; }
 .session__plot figcaption {
-  font-size: .72rem;
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-caption);
   color: var(--text-muted);
-  margin-top: .25rem;
+  margin-top: var(--space-2);
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+/* Below this the plot and the HUD would collide, so the plot stands down. */
+@media (max-width: 60rem), (max-height: 34rem) { .session__plot { display: none; } }
+
+.range__bar {
+  position: fixed; left: 50%; bottom: var(--space-5); transform: translateX(-50%);
+  display: flex; gap: var(--space-4); align-items: center;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  padding: var(--space-3) var(--space-5);
+  z-index: 11; pointer-events: auto;
+}
+.range__hint {
+  position: fixed; left: 50%; bottom: calc(var(--space-5) + 4rem); transform: translateX(-50%);
+  font: var(--type-body-sm); color: var(--text-muted);
+  z-index: 10; pointer-events: none; white-space: nowrap;
+}
+
+/* A miss reads as a mark near the crosshair, in the danger mineral. */
+.shot-miss {
+  position: fixed; left: 50%; top: 53%;
+  transform: translate(-50%, -50%);
+  z-index: 6; pointer-events: none;
+  color: var(--color-danger);
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  opacity: 0;
+}
+.shot-miss.is-on { animation: shot-miss-fade var(--dur-slow) var(--ease-standard) forwards; }
+@keyframes shot-miss-fade {
+  0% { opacity: 0; transform: translate(-50%, -46%); }
+  25% { opacity: 1; transform: translate(-50%, -52%); }
+  100% { opacity: 0; transform: translate(-50%, -58%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shot-miss.is-on { animation: none; opacity: 1; transform: translate(-50%, -52%); }
 }
 
 .session__dialed {
   position: fixed; inset: 0; z-index: 20;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--space-2); text-align: center;
-  background: var(--scrim);
-  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
-  color: var(--text);
+  gap: var(--space-3); text-align: center;
+  background: var(--surface-scrim);
+  color: var(--text-body);
 }
 .session__dialed[hidden] { display: none; }
-.session__dialed-label { letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
-.session__dialed-num { font-size: clamp(40px, 9vw, 84px); line-height: 1; margin: 0; }
-.session__dialed-num small { font-size: .3em; opacity: .7; }
-.session__dialed-ci { opacity: .75; }
-.session__dialed-concord { max-width: 46ch; font-size: .82rem; color: var(--text-muted); margin: 0; }
-.session__dialed-concord[data-concord="tight"] { color: color-mix(in oklab, var(--gold) 70%, var(--text-muted)); }
-.session__dialed-concord[hidden] { display: none; }
-.session__dialed-budget { font-size: .72rem; color: var(--text-muted); margin: 0; }
-.session__dialed-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; justify-content: center; }
+.session__dialed-label {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.session__dialed-num {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: clamp(56px, 9vw, 96px); line-height: 1; margin: 0;
+  color: var(--text-strong);
+}
+.session__dialed-num small { font-size: 0.28em; color: var(--text-muted); font-family: var(--font-text); }
+.session__dialed-ci { color: var(--text-muted); }
+.session__dialed-actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; justify-content: center; }
 
-/* First-encounter / curtain title cards: a brief centered beat over the arena. Opacity-only
-   choreography (no layout motion); reduced motion never shows one (the HUD copy carries it). */
-.session__beat {
-  position: fixed; left: 50%; top: 26%; transform: translateX(-50%);
-  z-index: 15; text-align: center; pointer-events: none;
-  opacity: 0;
+/* ── Result: the specimen card ────────────────────────────────────────────
+   One dominant field, small accents. The number is warm ink on paper and the
+   composition carries the payoff, so nothing needs to glow to feel like an answer. */
+.result__inner { width: min(64rem, 100%); margin-inline: auto; padding: var(--space-9) var(--space-5); }
+.result__lead {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
 }
-.session__beat[hidden] { display: none; }
-.session__beat.is-on { animation: session-beat 2.4s ease both; }
-.session__beat-title { margin: 0; font-size: clamp(1.4rem, 4vw, 2.2rem); color: var(--cinema-cream);
-  text-transform: lowercase; letter-spacing: .04em; text-shadow: 0 1px 12px rgb(0 0 0 / .6); }
-.session__beat-sub { margin: .3em 0 0; font-size: .8rem; color: var(--text-muted);
-  text-shadow: 0 1px 8px rgb(0 0 0 / .6); }
-@keyframes session-beat {
-  0% { opacity: 0; }
-  12% { opacity: 1; }
-  78% { opacity: 1; }
-  100% { opacity: 0; }
+.result__number {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: clamp(72px, 15vw, 128px);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--text-strong);
+  margin-top: var(--space-3);
 }
+.result__number small { font-size: 0.16em; color: var(--text-muted); font-family: var(--font-text); letter-spacing: var(--tracking-label); }
+.result__ci {
+  color: var(--text-muted); margin-top: var(--space-3);
+  padding-top: var(--space-3); border-top: 1px solid var(--border-hairline);
+  max-width: 46ch;
+}
+.result__ci--tuned { color: var(--text-muted); }
+.result__credit { color: var(--text-subtle); font: var(--type-body-sm); margin-top: var(--space-2); }
 
-/* Pre-lock "begin" overlay + the Esc abort scrim share the calibrate scrim idiom: a translucent
-   full-bleed backing the arena reads through, centered copy, and ONE focusable primary action. The
-   pre-lock pulse reuses .cal-pulse to invite the start gesture. */
-.session__prelock,
-.session__abort {
-  position: fixed; inset: 0; z-index: 22;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--space-2); text-align: center;
-  padding: var(--space-5);
-  background: var(--scrim);
-  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
-  color: var(--text);
+/* The four facets, joined on the lattice, each marked by its mineral. */
+.result__breakdown {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1px; background: var(--border-hairline);
+  border: 1px solid var(--border-hairline);
+  margin: var(--space-7) 0;
 }
-.session__prelock[hidden], .session__abort[hidden] { display: none; }
-.session__prelock-label,
-.session__abort-label {
-  letter-spacing: .14em; text-transform: uppercase; color: var(--gold);
-  margin: var(--space-2) 0 0;
+.result__breakdown > div { background: var(--surface-card); padding: var(--space-4); display: grid; gap: var(--space-2); }
+.result__bk-label {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex; align-items: center; gap: var(--space-2);
 }
-.session__prelock-lead,
-.session__abort-lead {
-  max-width: 44ch; color: var(--text-muted); line-height: 1.5; margin: 0;
-}
-.session__prelock-sub { font-size: .85rem; opacity: .85; }
-.session__prelock-sub kbd {
-  font-family: var(--font-mono); font-size: .85em;
-  padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 4px;
-  background: color-mix(in oklab, var(--cinema-ink) 60%, transparent);
-}
-.session__prelock .action,
-.session__abort-actions { margin-top: var(--space-3); }
-.session__abort-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: center; }
-
-/* ─── Result screen ────────────────────────────────────────────────────────── */
-.result__inner { max-width: 40rem; margin-inline: auto; text-align: center; padding: var(--space-6) 0; }
-.result__lead { color: var(--text-muted); text-transform: lowercase; letter-spacing: .04em; }
-.result__number { font-size: clamp(4rem, 16vw, 9rem); color: var(--gold); }
-.result__number small { font-size: .18em; color: var(--text-muted); font-family: var(--font-mono); }
-.result__ci { color: var(--text-muted); }
-.result__concord { color: var(--text-muted); font-size: .82rem; max-width: 46ch; margin: var(--space-1) auto 0; }
-.result__concord[data-concord="tight"] { color: color-mix(in oklab, var(--gold) 70%, var(--text-muted)); }
-.result__lean { display: inline-block; margin-left: .4em; padding: 1px 6px; font-size: .68rem;
-  border: 1px solid var(--line-strong); border-radius: 999px; color: color-mix(in oklab, var(--gold) 55%, var(--text-muted));
-  text-transform: lowercase; letter-spacing: .02em; vertical-align: middle; }
-.result__lean-note { color: var(--text-muted); font-size: .72rem; font-style: italic; opacity: .85;
-  margin-top: var(--space-2); max-width: 52ch; }
-.result__credit { color: var(--text-muted); font-size: .8rem; font-style: italic; opacity: .85; margin-top: var(--space-1); }
-.result__tier { margin: var(--space-4) 0; text-align: left; }
-.result__tier-head { color: var(--text-muted); text-transform: lowercase; letter-spacing: .04em;
-  font-size: .78rem; margin-bottom: var(--space-2); }
-.result__tier[data-tier="origin"] .result__breakdown { grid-template-columns: 1fr; }
-.result__facets { margin: var(--space-3) 0 0; }
-.result__facets svg[data-facets] { display: block; width: 100%; height: auto; aspect-ratio: 360 / 96; }
-.result__facets figcaption { margin-top: var(--space-1); color: var(--text-muted); font-size: .78rem; }
-.result__facet-z { display: block; margin-top: 2px; color: var(--text); }
-.result__breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); text-align: left; margin: var(--space-4) 0; }
-.result__breakdown > div { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-strong); background: var(--surface-raised); border-radius: 2px; }
-.result__bk-label { color: var(--text-muted); font-size: .85rem; }
-.result__bk-label em { color: var(--text); font-style: italic; }
-.result__breakdown [data-breakdown] { font-size: 1.3rem; color: var(--text); }
-.result__games { width: 100%; border-collapse: collapse; margin-top: var(--space-3); }
-.result__games th, .result__games td { padding: .4rem .6rem; text-align: left; border-bottom: 1px solid var(--line-strong); }
-.result__games th { color: var(--text-muted); }
-.result__games [data-current="true"] { color: var(--text); background: color-mix(in oklab, var(--gold) 20%, transparent); }
-.result__actions { display: flex; gap: var(--space-4); justify-content: center; margin-top: var(--space-5); flex-wrap: wrap; }
-.result__ci--tuned { color: var(--text-muted); font-style: italic; }
-.result__plot { margin: var(--space-4) auto 0; width: min(100%, 420px); }
-.result__plot svg[data-plot] { display: block; width: 100%; height: auto; aspect-ratio: 360 / 200; }
-.result__plot figcaption { margin-top: var(--space-1); color: var(--text-muted); font-size: .78rem; text-align: center; }
-
-/* The color key the plots decode by: one chip per probe, in the same organism colors the marks use. */
-.plot-legend { display: inline-flex; gap: .9em; margin-left: .6em; vertical-align: middle; font-size: .72rem; }
-.plot-legend__item { display: inline-flex; align-items: center; gap: .35em; color: var(--text-muted); text-transform: lowercase; }
-.plot-legend__swatch { width: .6em; height: .6em; border-radius: 1px; display: inline-block; }
-
-/* A5 thesis block: the one-number claim, tested and reported per probe. */
-.result__thesis { margin: var(--space-3) 0 0; padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-strong); border-left: 2px solid var(--gold);
-  background: var(--surface-raised); border-radius: 2px; }
-.result__thesis[data-thesis-tier="divergent"] { border-left-color: var(--blood); }
-.result__thesis-line { margin: 0; font-size: .85rem; color: var(--text); max-width: 60ch; }
-.result__thesis-facets { margin: var(--space-1) 0 0; font-size: .74rem; color: var(--text-muted); }
-.result__thesis-note { margin: 2px 0 0; font-size: .68rem; color: var(--text-muted); font-style: italic; }
-
-/* Staged reveal: the number lands first, then the evidence around it. Opacity/transform only;
-   under reduced motion every block renders in place instantly (no stagger, no movement). */
-.result [data-reveal] { opacity: 0; transform: translateY(10px); }
-.result.is-revealed [data-reveal] {
-  opacity: 1; transform: none;
-  transition: opacity .55s ease, transform .55s ease;
-  transition-delay: calc(var(--reveal-i, 0) * 130ms);
-}
-@media (prefers-reduced-motion: reduce) {
-  .result [data-reveal] { opacity: 1; transform: none; }
-  .result.is-revealed [data-reveal] { transition: none; }
+.result__bk-label em { font-style: normal; color: var(--text-body); }
+.result__breakdown [data-breakdown] {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: var(--text-heading-lg);
+  color: var(--text-strong);
 }
 
-/* ─── Range (free-play) ────────────────────────────────────────────────────── */
-/* HUD: live cm/360 + delta, top-left, never eats clicks (the nudge keys work while locked). */
-.range__hud {
-  position: fixed; left: var(--space-4); top: var(--space-4);
-  display: flex; flex-direction: column; gap: 2px;
-  color: var(--text);
-  background: var(--scrim);
-  padding: .5rem .8rem;
-  border: 1px solid var(--line-strong);
-  z-index: 10;
-  pointer-events: none;
+.result__games { width: 100%; border-collapse: collapse; margin-top: var(--space-5); font: var(--type-body-sm); }
+.result__games th, .result__games td { padding: var(--space-2) var(--space-3); text-align: left; border-bottom: 1px solid var(--border-hairline); }
+.result__games th {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-muted);
 }
-.range__hud .display { font-family: var(--font-display); font-size: 2.4rem; line-height: 1; color: var(--gold); }
-.range__hud .display small { font-size: .9rem; color: var(--text-muted); font-family: var(--font-mono); }
-.range__delta { font-size: .75rem; color: var(--text-muted); font-family: var(--font-mono); }
-
-/* Control bar: bottom-centre, clickable (use after Esc releases the pointer lock). */
-.range__bar {
-  position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%);
-  display: flex; gap: var(--space-4); align-items: center;
-  background: var(--scrim);
-  border: 1px solid var(--line-strong);
-  padding: .5rem var(--space-4);
-  z-index: 11;
-  pointer-events: auto;
-}
-
-.range__hint {
-  position: fixed; left: 50%; bottom: calc(var(--space-4) + 3.4rem); transform: translateX(-50%);
-  font-size: .7rem; color: var(--text-muted);
-  z-index: 10; pointer-events: none; white-space: nowrap;
-}
+.result__games td { font-variant-numeric: tabular-nums slashed-zero; }
+.result__games [data-current='true'] { background: var(--color-primary-wash); color: var(--text-strong); }
+.result__actions { display: flex; gap: var(--space-4); align-items: center; margin-top: var(--space-7); flex-wrap: wrap; }

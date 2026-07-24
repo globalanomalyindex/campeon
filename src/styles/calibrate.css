@@ -1,70 +1,163 @@
-.calibrate__stage { position: relative; width: 100%; background: var(--cinema-ink);
-  border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+/* campeón — calibration
+   The sweep and the spin. Both measure, so both carry the calibrate mineral
+   (turquoise) as their signal colour. The canvas itself is a measuring surface,
+   so it sits on ink while the surrounding chrome stays on paper. */
+
+.calibrate__stage {
+  position: relative;
+  width: 100%;
+  background: var(--surface-inverse);
+  border: 1px solid var(--border-default);
+  overflow: hidden;
+}
 .calibrate__canvas { display: block; width: 100%; height: 360px; cursor: crosshair; }
-.calibrate__hint { position: absolute; inset: 0; display: flex; align-items: center;
-  justify-content: center; text-align: center; pointer-events: none; }
-.calibrate__hint span { background: var(--scrim); padding: 11px 18px; border-radius: 10px; }
-.calibrate__readouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
-.calibrate__ro { border: 1px solid var(--line, #26262e); border-radius: 12px; padding: 12px 14px; }
-.calibrate__ro .k { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; opacity: .65; }
-.calibrate__ro .v { font-size: 22px; margin-top: 5px; }
-.calibrate__progress { height: 8px; border: 1px solid var(--line, #26262e); border-radius: 999px;
-  overflow: hidden; margin: 10px 0; }
-.calibrate__progress > div { height: 100%; width: 0; background: var(--accent); }
-.calibrate__good { color: var(--ok); } .calibrate__warn { color: var(--warn); }
 
-/* ── guided cues: one step at a time ─────────────────────────────────────── */
-/* persistent 2-segment journey tracker, overlaid top-center across sweep + spin */
-.cal-progress { position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 10px; z-index: 30;
-  background: var(--scrim); border: 1px solid var(--line);
-  border-radius: 999px; padding: 6px 14px; font: 600 12px var(--font-mono, ui-monospace, monospace); }
-.cal-progress__seg { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted);
-  letter-spacing: .04em; }
-.cal-progress__seg[data-state="active"] { color: var(--gold); }
-.cal-progress__seg[data-state="done"] { color: var(--ok); }
-.cal-progress__num { display: inline-grid; place-items: center; width: 18px; height: 18px;
-  border-radius: 999px; border: 1px solid currentColor; font-size: 11px; }
-.cal-progress__arrow { color: var(--text-muted); }
+.calibrate__hint {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; pointer-events: none;
+  color: var(--text-inverse);
+}
+.calibrate__hint span {
+  background: color-mix(in oklab, var(--stone-900) 82%, transparent);
+  color: var(--stone-50);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--stone-50) 20%, transparent);
+}
 
-/* step / pass pill */
-.cal-step { display: inline-block; align-self: flex-start; padding: 4px 11px; border-radius: 999px;
-  border: 1px solid var(--gold, #ffc400); color: var(--gold, #ffc400);
-  font: 600 11px var(--font-mono, ui-monospace, monospace); letter-spacing: .06em; text-transform: uppercase; }
-.cal-step--done { border-color: var(--ok); color: var(--ok); }
+/* Three readouts, joined on the 1px lattice rather than floating apart. */
+.calibrate__readouts {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; margin-top: var(--space-4);
+  background: var(--border-hairline);
+  border: 1px solid var(--border-hairline);
+}
+.calibrate__ro { background: var(--surface-card); padding: var(--space-3) var(--space-4); }
+.calibrate__ro .k {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.calibrate__ro .v {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: var(--text-heading-md);
+  color: var(--text-strong);
+  margin-top: var(--space-1);
+}
 
-/* pulsing "click here" ring used inside the canvas hint overlay */
-.cal-pulse { position: relative; width: 64px; height: 64px; border-radius: 999px;
-  border: 2px solid var(--gold, #ffc400); display: grid; place-items: center; }
-/* override the generic .calibrate__hint span chip styling (higher specificity) so the pulse is a clean ring */
-.calibrate__hint .cal-pulse { background: none; padding: 0; border-radius: 999px; }
-.calibrate__hint .cal-pulse__dot { background: var(--gold, #ffc400); padding: 0; border-radius: 999px; }
-.cal-pulse::after { content: ''; position: absolute; inset: -2px; border-radius: 999px;
-  border: 2px solid var(--gold, #ffc400); animation: cal-ping 1.4s var(--ease-out, ease-out) infinite; }
-.cal-pulse__dot { width: 10px; height: 10px; border-radius: 999px; background: var(--gold, #ffc400); }
-@keyframes cal-ping { 0% { transform: scale(1); opacity: .8; } 100% { transform: scale(2.1); opacity: 0; } }
+.calibrate__progress {
+  height: 6px;
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-sunken);
+  overflow: hidden;
+  margin: var(--space-3) 0;
+}
+.calibrate__progress > div {
+  height: 100%; width: 0;
+  background: var(--instrument-calibrate);
+  transition: width var(--dur-fast) var(--ease-standard);
+}
+.calibrate__good { color: var(--color-success); }
+.calibrate__warn { color: var(--color-warning); }
 
-/* sub-instruction (lighter, demystifying line) */
-.cal-sub { font-size: 12px; opacity: .6; margin-top: 4px; }
+/* ── Guided cues: one step at a time ──────────────────────────────────────── */
 
-/* persistent helper card (e.g. out-of-room recovery on the spin) */
-.cal-helper { margin-top: 12px; border: 1px dashed var(--line, #26262e); border-radius: 12px;
-  padding: 10px 14px; font-size: 12px; opacity: .8; display: flex; gap: 10px; align-items: center; }
-.cal-helper b { color: var(--gold, #ffc400); }
+/* The two-segment journey tracker, held top centre across the sweep and the spin. */
+.cal-progress {
+  position: fixed; top: var(--space-4); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--space-3); z-index: 30;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  padding: var(--space-2) var(--space-4);
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+}
+.cal-progress__seg { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-muted); }
+.cal-progress__seg[data-state='active'] { color: var(--instrument-calibrate); }
+.cal-progress__seg[data-state='done'] { color: var(--color-success); }
+.cal-progress__num {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px;
+  border: 1px solid currentColor;
+  font-size: var(--text-caption); letter-spacing: 0;
+}
+.cal-progress__arrow { color: var(--text-subtle); }
 
-/* pace meter: a bar that turns green when the user's speed is in the right range */
-.cal-pace { height: 10px; border: 1px solid var(--line, #26262e); border-radius: 999px; overflow: hidden;
-  margin: 10px 0; position: relative; }
-.cal-pace__fill { height: 100%; width: 0; transition: width 90ms linear, background 140ms; background: var(--warn); }
-.cal-pace__fill[data-ok="true"] { background: var(--ok); }
-.cal-pace__label { font-size: 11px; opacity: .7; margin-top: -2px; }
+/* The step marker reads as a catalogue tag. */
+.cal-step {
+  display: inline-block; align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--instrument-calibrate);
+  color: var(--instrument-calibrate);
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+}
+.cal-step--done { border-color: var(--color-success); color: var(--color-success); }
 
-/* intro preview list */
-.cal-preview { list-style: none; padding: 0; margin: 4px 0 2px; display: grid; gap: 8px; }
-.cal-preview li { display: flex; gap: 10px; align-items: baseline; }
-.cal-preview .cal-preview__n { color: var(--gold, #ffc400); font: 600 13px var(--font-mono, ui-monospace, monospace); }
+/* The "start here" mark. A dot is a permitted circular affordance, and it breathes
+   on opacity alone: no scaling ping, which the system reads as noise. */
+.cal-pulse {
+  position: relative; width: 56px; height: 56px;
+  border: 1px solid var(--instrument-calibrate);
+  border-radius: var(--radius-round);
+  display: grid; place-items: center;
+}
+.calibrate__hint .cal-pulse { background: none; padding: 0; }
+.cal-pulse__dot {
+  width: 10px; height: 10px;
+  border-radius: var(--radius-round);
+  background: var(--instrument-calibrate);
+  animation: cal-breathe 2.4s var(--ease-standard) infinite;
+}
+.calibrate__hint .cal-pulse__dot { padding: 0; }
+@keyframes cal-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.cal-sub { font: var(--type-body-sm); color: var(--text-muted); margin-top: var(--space-1); }
+
+/* The recovery card, framed like a specimen note. */
+.cal-helper {
+  margin-top: var(--space-3);
+  border: 1px solid var(--border-hairline);
+  outline: 1px dashed var(--border-hairline);
+  outline-offset: -5px;
+  background: var(--surface-card);
+  padding: var(--space-3) var(--space-4);
+  font: var(--type-body-sm);
+  color: var(--text-muted);
+  display: flex; gap: var(--space-3); align-items: center;
+}
+.cal-helper b { color: var(--text-strong); font-weight: var(--weight-regular); }
+
+/* The pace meter: fills toward the right range and turns malachite when held. */
+.cal-pace {
+  height: 8px;
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-sunken);
+  overflow: hidden;
+  margin: var(--space-3) 0;
+  position: relative;
+}
+.cal-pace__fill {
+  height: 100%; width: 0;
+  background: var(--color-warning);
+  transition: width 90ms linear, background-color var(--dur-fast) var(--ease-standard);
+}
+.cal-pace__fill[data-ok='true'] { background: var(--color-success); }
+.cal-pace__label { font: var(--type-body-sm); color: var(--text-muted); }
+
+/* The two-step preview on the intro. */
+.cal-preview { list-style: none; padding: 0; margin: var(--space-2) 0; display: grid; gap: var(--space-2); }
+.cal-preview li { display: flex; gap: var(--space-3); align-items: baseline; }
+.cal-preview .cal-preview__n {
+  color: var(--instrument-calibrate);
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label);
+  min-width: 2ch;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .cal-pulse::after { animation: none; }
+  .cal-pulse__dot { animation: none; }
   .cal-pace__fill { transition: none; }
 }

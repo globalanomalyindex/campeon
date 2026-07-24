@@ -1,22 +1,73 @@
-.options__inner { max-width: 40rem; margin-inline: auto; padding: var(--space-6) 0; }
-.options__title { font-size: 2rem; color: var(--text); }
-.options__panel { border: 1px solid var(--line-strong);
-  padding: var(--space-3) var(--space-4); margin-top: var(--space-4); border-radius: 2px;
-  background: var(--surface-raised); }
-.options__h { font-family: var(--font-display); font-size: 1.15rem; color: var(--text);
-  display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
-.options__sub { color: var(--text-muted); font-size: .8rem; font-weight: 400; }
-.options__note { color: var(--text-muted); font-size: .85rem; margin: var(--space-1) 0; }
-.options__table { width: 100%; border-collapse: collapse; margin-top: var(--space-2); font-size: .9rem; }
-.options__table th, .options__table td { padding: .35rem .5rem; text-align: left; border-bottom: 1px solid var(--line-strong); }
-.options__table th { color: var(--text-muted); font-weight: 400; font-size: .8rem; }
-.options__yaw { width: 6.5rem; font-size: .9rem; padding: .25rem .4rem; border: 1px solid var(--line-strong);
-  background: var(--surface); color: var(--text); border-radius: 2px; }
+/* campeón — options
+   A settings sheet read as a specimen drawer: square panels butted onto a
+   hairline lattice, tabular figures on every number the user can change. */
+
+.options__inner {
+  width: min(56rem, 100%);
+  margin-inline: auto;
+  padding: var(--space-9) var(--space-5);
+}
+.options__title { font: var(--type-display-sm); letter-spacing: var(--tracking-tight); color: var(--text-strong); }
+
+.options__panel {
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-card);
+  padding: var(--space-5);
+  margin-top: var(--space-5);
+}
+.options__h {
+  font: var(--type-heading-md);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--space-3); margin-bottom: var(--space-3);
+}
+.options__sub {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.options__note { font: var(--type-body-sm); color: var(--text-muted); margin: var(--space-2) 0; max-width: var(--measure-prose); }
+
+.options__table { width: 100%; border-collapse: collapse; margin-top: var(--space-3); font: var(--type-body-sm); }
+.options__table th, .options__table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border-hairline);
+}
+.options__table th {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.options__table td { color: var(--text-body); }
+
+.options__yaw {
+  width: 7rem;
+  font: var(--type-body-sm);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
+  color: var(--text-strong);
+}
 .options__yaw:focus-visible,
 .options [data-bound]:focus-visible,
 .options [data-school]:focus-visible,
-.options [data-fov]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.options__bounds { display: flex; gap: var(--space-4); }
-.options__readout { color: var(--text); margin-top: var(--space-2); }
-.options__readout .mono { color: var(--gold); font-weight: 700; }
-[data-fov-block] .field { margin-top: var(--space-2); }
+.options [data-fov]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+
+.options__bounds { display: flex; gap: var(--space-5); flex-wrap: wrap; }
+.options__readout { color: var(--text-body); margin-top: var(--space-3); }
+.options__readout .mono {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: var(--text-heading-md);
+  color: var(--text-strong);
+}
+[data-fov-block] .field { margin-top: var(--space-3); }

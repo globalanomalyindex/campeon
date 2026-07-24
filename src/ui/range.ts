@@ -32,6 +32,7 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
 
       const root = document.createElement('section');
       root.className = 'screen screen--arena range';
+      root.dataset.surface = 'chamber';
       root.innerHTML = `
         <canvas class="session__canvas"></canvas>
         <div class="session__crosshair" aria-hidden="true"></div>

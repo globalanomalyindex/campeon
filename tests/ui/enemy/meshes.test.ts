@@ -74,7 +74,7 @@ describe('quarryMesh factory', () => {
       // It is emissive and gold (the crosshair-legible weak-spot anchor).
       const mat = ws.material as MeshStandardMaterial;
       expect(mat.emissiveIntensity).toBeGreaterThan(0);
-      expect(`#${mat.emissive.getHexString()}`.toLowerCase()).toBe(hex.gold.toLowerCase());
+      expect(`#${mat.emissive.getHexString()}`.toLowerCase()).toBe(hex.sulfur.toLowerCase());
     }
   });
 

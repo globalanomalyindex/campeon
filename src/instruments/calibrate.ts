@@ -72,6 +72,17 @@ export const calibrate = {
     };
 
     return new Promise<TrialResult>((resolve) => {
+      // A one-shot frame subscription, purely to learn the arena clock before the first
+      // target goes up. Stamping presentedAt with 0 made the opening shot's mt absorb the
+      // whole elapsed session, and calibrationCost squares meanMt, so a single inflated mt
+      // drove this instrument's score to nearly zero. See the note in flick.ts.
+      let offOpen: (() => void) | null = null;
+      offOpen = scene.onFrame((_dt, now) => {
+        offOpen?.();
+        offOpen = null;
+        present(now);
+      });
+
       const offFire = scene.onFire((now) => {
         if (!handle) return;
         const aim = scene.view();
@@ -86,13 +97,13 @@ export const calibrate = {
         scene.clearTargets();
         handle = null;
         if (shots.length >= SHOTS) {
+          offOpen?.();
           offFire();
           resolve({ ...analyzeCalibrate(shots, ctx), at: now });
         } else {
           present(now);
         }
       });
-      present(0);
     });
   },
 };

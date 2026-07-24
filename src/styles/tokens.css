@@ -1,69 +1,253 @@
+/* campeón — design tokens
+   The Chris Robin Fiore design system, applied to a measuring instrument.
+   Foundations (stone ramp, mineral collection, type, spacing, radii, shadows,
+   motion) are carried over as defined. Section 9 holds the campeón-specific
+   decisions: the four instrument minerals and the ink chamber.
+   See docs/design/canon.md. */
+
+/* ── 1. Webfonts: two families, Regular only ──────────────────────────────────
+   No bold cuts exist. Hierarchy comes from scale, case, colour and tracking,
+   never faux-bold. Subset to the Latin set this app uses and shipped as woff2
+   (55KB for both faces). */
 @font-face {
-  font-family: 'Bartine Disco';
-  src: url('./fonts/BartineDisco-Regular.otf') format('opentype');
+  font-family: 'Dessign Maison';
+  src: url('./fonts/DessignMaison-Regular.woff2') format('woff2');
   font-weight: 400; font-style: normal; font-display: swap;
 }
 @font-face {
-  font-family: 'Bartine Disco';
-  src: url('./fonts/BartineDisco-Italic.otf') format('opentype');
-  font-weight: 400; font-style: italic; font-display: swap;
+  font-family: 'Karrik';
+  src: url('./fonts/Karrik-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
 }
+
 :root {
-  /* ── the one cinematic world: a warm spaghetti-western film stock ──────────────
-     Every screen lives here. Surfaces are warm near-black; ink is aged cream; the
-     two accents are a western blood-red (identity) and brass gold (value/action). */
-  --cinema-ink: #0c0b09;     /* warm near-black film stock (never pure #000) */
-  --cinema-cream: #efe7d6;   /* aged-cream cinematic ink */
-  --blood: #c4251f;          /* western title red - identity accent */
-  --gold: #FFC400;           /* brass gold - value + primary action (matches the arena/calibrate canvases) */
+  /* ── 2. Stone: warm neutral ramp (hue ~80, low chroma) ───────────────────── */
+  --stone-0:   #FBFAF6;  /* card / raised paper           */
+  --stone-50:  #F4F0E7;  /* page                          */
+  --stone-100: #ECE7DB;  /* sunken / hover wash           */
+  --stone-200: #DED7C7;  /* hairline border               */
+  --stone-300: #C8BFAB;  /* default border                */
+  --stone-400: #A69C87;  /* strong border / disabled text */
+  --stone-500: #837A67;  /* subtle text                   */
+  --stone-600: #635B4B;  /* muted text                    */
+  --stone-700: #423C31;  /* body on dark surfaces         */
+  --stone-800: #2A251D;  /* strong body                   */
+  --stone-900: #17140F;  /* ink, warm near-black          */
 
-  /* surfaces: lifted panels are cream mixed into the film stock, so they never go cold */
-  --surface:        var(--cinema-ink);
-  --surface-raised: color-mix(in oklab, var(--cinema-cream) 7%, var(--cinema-ink));   /* inputs, panels */
-  --surface-sunk:   color-mix(in oklab, #050403 55%, var(--cinema-ink));              /* insets, figures, arena chrome */
-  --scrim:          color-mix(in oklab, var(--cinema-ink) 86%, transparent);          /* translucent HUD/overlay backing */
+  /* ── 3. The mineral collection: base + light wash ────────────────────────── */
+  --lapis:     #2B4B8F;  --lapis-wash:     #DDE2F1;  /* deep blue  (primary) */
+  --malachite: #1E7355;  --malachite-wash: #D7E7DF;  /* green      (success) */
+  --amethyst:  #6A49A0;  --amethyst-wash:  #E4DCF1;  /* purple     (accent)  */
+  --carnelian: #B8462C;  --carnelian-wash: #F1DBD1;  /* red-orange (danger)  */
+  --citrine:   #CE9126;  --citrine-wash:   #F5E8CC;  /* amber      (warning) */
+  --rose:      #C27C79;  --rose-wash:      #F1E0DE;  /* rose quartz          */
+  --turquoise: #2C8F93;  --turquoise-wash: #D4E9E9;  /* teal       (info)    */
+  --azurite:   #3363B0;  --azurite-wash:   #DBE4F4;  /* bright blue          */
+  --jade:      #7FA98C;  --jade-wash:      #E0EBE3;  /* pale green           */
+  --sulfur:    #E0C23F;  --sulfur-wash:    #F7EFC9;  /* bright yellow        */
+  --pyrite:    #97742E;  --pyrite-wash:    #EEE6D0;  /* brass                */
+  --hematite:  #6E4B44;  --hematite-wash:  #EADDD9;  /* oxide brown          */
 
-  /* ink (text) on the film stock */
-  --text:        var(--cinema-cream);
-  --text-muted:  color-mix(in oklab, var(--cinema-cream) 64%, transparent);
-  --text-faint:  color-mix(in oklab, var(--cinema-cream) 42%, transparent);
+  /* ── 4. Semantic surfaces ────────────────────────────────────────────────── */
+  --surface-page:    var(--stone-50);
+  --surface-card:    var(--stone-0);
+  --surface-sunken:  var(--stone-100);
+  --surface-hover:   var(--stone-100);
+  --surface-inverse: var(--stone-900);
+  --surface-scrim:   color-mix(in oklab, var(--stone-900) 55%, transparent);
 
-  /* hairlines + the calibrate/accent hooks (calibrate.css reads var(--line)/var(--accent) with fallbacks) */
-  --line:        color-mix(in oklab, var(--cinema-cream) 16%, transparent);
-  --line-strong: color-mix(in oklab, var(--cinema-cream) 30%, transparent);
-  --accent:      var(--blood);
-  --ok:   #6fc28a;   /* warmed status green (pace meter good) */
-  --warn: #e0a23a;   /* warmed status amber (pace meter warn) */
+  /* ── 5. Text ─────────────────────────────────────────────────────────────── */
+  --text-strong:     var(--stone-900);
+  --text-body:       var(--stone-800);
+  --text-muted:      var(--stone-600);
+  --text-subtle:     var(--stone-500);
+  --text-disabled:   var(--stone-400);
+  --text-inverse:    var(--stone-50);
+  --text-link:       var(--lapis);
+  --text-link-hover: color-mix(in oklab, var(--lapis) 78%, var(--stone-900));
 
-  /* legacy aliases - kept so existing rules resolve into the cinematic world.
-     bone = the page, ink = darkest surface, slate/slate-2 = muted cream + hairline. */
-  --bone: var(--surface);
-  --ink: var(--cinema-ink);
-  --parchment: var(--line);
-  --slate:   var(--text-muted);
-  --slate-2: var(--text-faint);
-  --cinema-cream-fixed: #efe7d6;
+  /* ── 6. Borders ──────────────────────────────────────────────────────────── */
+  --border-hairline: var(--stone-200);
+  --border-default:  var(--stone-300);
+  --border-strong:   var(--stone-400);
+  --border-inverse:  color-mix(in oklab, var(--stone-50) 22%, transparent);
 
-  /* organism accents (instrument identities in the arena + case study) */
-  --c-track: #7c93a3;     /* dragonfly/falcon - cool steel (kept cool: it is a per-organism signal, not chrome) */
-  --c-flick: var(--gold); /* spider/raptor - gold */
-  --c-calibrate: #7FA6B6; /* archerfish - water blue */
-  --c-strike: #E8702A;    /* mantis shrimp - strike ember */
+  /* ── 7. Interactive + status ─────────────────────────────────────────────── */
+  --color-primary:        var(--lapis);
+  --color-primary-hover:  color-mix(in oklab, var(--lapis) 88%, var(--stone-900));
+  --color-primary-active: color-mix(in oklab, var(--lapis) 78%, var(--stone-900));
+  --color-primary-wash:   var(--lapis-wash);
+  --text-on-primary:      var(--stone-0);
 
-  /* the title-sequence font, app-wide */
-  --font-cinema: 'Bartine Disco', serif;
+  --color-success: var(--malachite); --color-success-wash: var(--malachite-wash); --text-on-success: var(--stone-0);
+  --color-warning: var(--citrine);   --color-warning-wash: var(--citrine-wash);   --text-on-warning: var(--stone-900);
+  --color-danger:  var(--carnelian); --color-danger-wash:  var(--carnelian-wash); --text-on-danger:  var(--stone-0);
+  --color-info:    var(--turquoise); --color-info-wash:    var(--turquoise-wash); --text-on-info:    var(--stone-0);
+  --color-accent:  var(--amethyst);  --color-accent-wash:  var(--amethyst-wash);  --text-on-accent:  var(--stone-0);
 
-  /* type */
-  --font-display: 'Bartine Disco', system-ui, sans-serif;
-  --font-body: system-ui, -apple-system, sans-serif;
-  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  /* spacing scale (4px base) */
-  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 1rem;
-  --space-4: 1.5rem; --space-5: 2.5rem; --space-6: 4rem;
-  /* motion */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 140ms; --dur-med: 280ms;
+  --focus-ring: color-mix(in oklab, var(--lapis) 45%, transparent);
+  --focus-ring-width: 3px;
+
+  /* ── 8a. Type ────────────────────────────────────────────────────────────── */
+  --font-display: 'Dessign Maison', 'Futura', 'Century Gothic', system-ui, sans-serif;
+  --font-text:    'Karrik', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --weight-regular: 400;
+
+  --text-display-2xl: 128px;
+  --text-display-xl:  96px;
+  --text-display-lg:  72px;
+  --text-display-md:  56px;
+  --text-display-sm:  40px;
+  --text-heading-lg:  30px;
+  --text-heading-md:  23px;
+  --text-heading-sm:  18px;
+  --text-body-lg:     18px;
+  --text-body-md:     16px;
+  --text-body-sm:     14px;
+  --text-label:       12px;
+  --text-caption:     11px;
+
+  --leading-display: 0.98;
+  --leading-heading: 1.16;
+  --leading-snug:    1.32;
+  --leading-body:    1.55;
+  --leading-relaxed: 1.7;
+
+  --tracking-display: -0.02em;
+  --tracking-tight:   -0.01em;
+  --tracking-normal:  0;
+  --tracking-label:   0.14em;
+  --tracking-caption: 0.06em;
+
+  --features-display-alt:  'ss01' 1, 'ss02' 1;
+  --features-display-caps: 'case' 1;
+  --features-oldstyle:     'onum' 1;
+  --features-karrik-alt:   'ss01' 1, 'ss02' 1, 'ss03' 1;
+  --features-tabular:      'tnum' 1;
+  /* Karrik ships a slashed zero. Every measured number in this app uses it, so a
+     0 can never be misread as an O in a readout. */
+  --features-figures:      'tnum' 1, 'zero' 1;
+
+  --type-display-2xl: var(--weight-regular) var(--text-display-2xl)/var(--leading-display) var(--font-display);
+  --type-display-xl:  var(--weight-regular) var(--text-display-xl)/var(--leading-display) var(--font-display);
+  --type-display-lg:  var(--weight-regular) var(--text-display-lg)/var(--leading-display) var(--font-display);
+  --type-display-md:  var(--weight-regular) var(--text-display-md)/1.02 var(--font-display);
+  --type-display-sm:  var(--weight-regular) var(--text-display-sm)/1.05 var(--font-display);
+  --type-heading-lg:  var(--weight-regular) var(--text-heading-lg)/var(--leading-heading) var(--font-display);
+  --type-heading-md:  var(--weight-regular) var(--text-heading-md)/var(--leading-heading) var(--font-display);
+  --type-heading-sm:  var(--weight-regular) var(--text-heading-sm)/var(--leading-snug) var(--font-text);
+  --type-body-lg:     var(--weight-regular) var(--text-body-lg)/var(--leading-body) var(--font-text);
+  --type-body-md:     var(--weight-regular) var(--text-body-md)/var(--leading-body) var(--font-text);
+  --type-body-sm:     var(--weight-regular) var(--text-body-sm)/var(--leading-snug) var(--font-text);
+  --type-label:       var(--weight-regular) var(--text-label)/1 var(--font-text);
+
+  /* ── 8b. Spacing: 8px rhythm ─────────────────────────────────────────────── */
+  --space-0: 0;
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
+  --space-5: 24px;  --space-6: 32px;  --space-7: 48px;  --space-8: 64px;
+  --space-9: 96px;  --space-10: 128px; --space-11: 192px;
+
+  --pad-control-x: 16px;
+  --pad-control-y: 10px;
+  --pad-card: 24px;
+  --gap-inline: 8px;
+  --gap-stack: 16px;
+
+  --measure-prose: 64ch;
+  --container: 1200px;
+  --container-wide: 1440px;
+
+  /* ── 8c. Radii: sharp by rule ────────────────────────────────────────────── */
+  --radius-none: 0;
+  --radius-pill: 999px;  /* circular affordances only, never frames */
+  --radius-round: 50%;   /* dots, thumbs, swatches */
+  --radius-control: var(--radius-none);
+  --radius-card: var(--radius-none);
+
+  /* ── 8d. Elevation: matte, warm ink-tinted, faint ────────────────────────── */
+  --shadow-none: none;
+  --shadow-xs: 0 1px 1px rgba(23, 20, 15, 0.05);
+  --shadow-sm: 0 1px 2px rgba(23, 20, 15, 0.06), 0 2px 4px rgba(23, 20, 15, 0.04);
+  --shadow-md: 0 2px 4px rgba(23, 20, 15, 0.05), 0 6px 14px rgba(23, 20, 15, 0.07);
+  --shadow-lg: 0 8px 18px rgba(23, 20, 15, 0.09), 0 18px 40px rgba(23, 20, 15, 0.10);
+  --elevation-card: var(--shadow-sm);
+  --elevation-popover: var(--shadow-md);
+  --elevation-modal: var(--shadow-lg);
+
+  /* ── 8e. Motion: calm, no bounce, no overshoot ───────────────────────────── */
+  --dur-instant: 80ms;
+  --dur-fast: 120ms;
+  --dur-med: 200ms;
+  --dur-slow: 360ms;
+  --dur-slower: 560ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --transition-control:
+    color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+
+  /* ── 9. campeón: the four instruments as four minerals ───────────────────── */
+  /* Lapis is reserved for interactive meaning, so blue always means "you can act
+     on this" and never names an instrument. The four below are picked for maximum
+     hue separation inside one value band: they read as a set of specimens. */
+  --instrument-track:     var(--amethyst);  --instrument-track-wash:     var(--amethyst-wash);
+  --instrument-flick:     var(--citrine);   --instrument-flick-wash:     var(--citrine-wash);
+  --instrument-calibrate: var(--turquoise); --instrument-calibrate-wash: var(--turquoise-wash);
+  --instrument-strike:    var(--carnelian); --instrument-strike-wash:    var(--carnelian-wash);
 }
+
+/* ── 10. The ink chamber ──────────────────────────────────────────────────────
+   The arena is the one dark surface in the app, and it earns it: a precision
+   aiming task depends on target contrast and on the eye staying adapted for the
+   length of a drill. A paper field would change what we measure.
+   Rather than a parallel token set, this re-points the same semantic names at the
+   inverse end of the ramp, so every component works on either surface unchanged. */
+[data-surface='chamber'] {
+  --surface-page:   var(--stone-900);
+  --surface-card:   color-mix(in oklab, var(--stone-50) 6%, var(--stone-900));
+  --surface-sunken: color-mix(in oklab, #000 40%, var(--stone-900));
+  --surface-hover:  color-mix(in oklab, var(--stone-50) 10%, var(--stone-900));
+  --surface-scrim:  color-mix(in oklab, var(--stone-900) 82%, transparent);
+
+  --text-strong:  var(--stone-0);
+  --text-body:    var(--stone-50);
+  --text-muted:   color-mix(in oklab, var(--stone-50) 64%, transparent);
+  --text-subtle:  color-mix(in oklab, var(--stone-50) 46%, transparent);
+  --text-inverse: var(--stone-900);
+
+  --border-hairline: color-mix(in oklab, var(--stone-50) 14%, transparent);
+  --border-default:  color-mix(in oklab, var(--stone-50) 24%, transparent);
+  --border-strong:   color-mix(in oklab, var(--stone-50) 38%, transparent);
+
+  /* Lapis is too dark to carry an action against ink, so the primary lifts to
+     Azurite on this surface. Same meaning, readable value. */
+  --color-primary:       var(--azurite);
+  --color-primary-hover: color-mix(in oklab, var(--azurite) 82%, var(--stone-0));
+  --text-on-primary:     var(--stone-900);
+  --text-link:           var(--azurite);
+  --focus-ring:          color-mix(in oklab, var(--azurite) 60%, transparent);
+
+  /* The four instruments also lift, so each stays legible on ink while keeping
+     its identity. Literal hex here, not color-mix(), because src/palette.ts has to
+     mirror these exactly for the WebGL layer: a drift should show up as a diff. */
+  --instrument-track:     #9B82C4;  /* amethyst, lifted  */
+  --instrument-flick:     #CE9126;  /* citrine           */
+  --instrument-calibrate: #5CB6B9;  /* turquoise, lifted */
+  --instrument-strike:    #D9715A;  /* carnelian, lifted */
+
+  /* Status lifts the same way. */
+  --color-success: #3E9E77;  /* malachite, lifted */
+  --color-danger:  #D9715A;  /* carnelian, lifted */
+}
+
 @media (prefers-reduced-motion: reduce) {
-  :root { --dur-fast: 0ms; --dur-med: 0ms; }
+  :root {
+    --dur-instant: 0ms; --dur-fast: 0ms; --dur-med: 0ms;
+    --dur-slow: 0ms; --dur-slower: 0ms;
+  }
 }

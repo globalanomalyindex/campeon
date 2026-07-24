@@ -82,7 +82,12 @@ export const strike = {
     };
 
     return new Promise<TrialResult>((resolve) => {
+      // Present on the first frame so presentedAt carries the real arena clock. Stamping
+      // it 0 made tR (onsetTime - presentedAt) absorb the whole elapsed session on the
+      // opening shot of every trial. See the note in flick.ts.
+      let opened = false;
       const offFrame = scene.onFrame((_dt, now) => {
+        if (!opened) { opened = true; present(now); return; }
         if (handle) frames.push({ t: now, aim: scene.view(), target: handle.bearing(), targetRadius: handle.radiusDeg() });
       });
       const offFire = scene.onFire((now) => {
@@ -120,7 +125,6 @@ export const strike = {
           present(now);
         }
       });
-      present(0);
     });
   },
 };

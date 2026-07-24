@@ -4,9 +4,16 @@ import { describe, it, expect } from 'vitest';
 const css = readFileSync('src/styles/case-study.css', 'utf-8');
 
 describe('case-study.css', () => {
-  it('forces the lowercase editorial voice on the article, with data/demo opt-outs', () => {
-    expect(css).toMatch(/\.case\b[^{]*\{[^}]*text-transform:\s*lowercase/);
-    expect(css).toMatch(/\[data-demo\][^{]*\{[^}]*text-transform:\s*none/);
+  it('sets the article in sentence case, with tracked caps reserved for small labels', () => {
+    // The article used to force text-transform: lowercase on everything, which the
+    // adopted system reserves for nothing: sentence case for anything readable,
+    // tracked uppercase only for labels and captions.
+    expect(css).not.toMatch(/\.case\b[^{]*\{[^}]*text-transform:\s*lowercase/);
+    for (const label of ['.cs-eyebrow', '.cs-env-tag', '.cs-spec dt']) {
+      const block = css.slice(css.indexOf(label));
+      expect(block.slice(0, block.indexOf('}')), `${label} is a tracked-caps label`)
+        .toMatch(/text-transform:\s*uppercase/);
+    }
   });
   it('defines the brutalist-editorial chrome selectors', () => {
     for (const sel of ['.cs-grid', '.cs-numeral', '.cs-reg', '.cs-spine', '.cs-spec', '.cs-exo', '.cs-eyebrow']) {

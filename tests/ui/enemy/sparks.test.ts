@@ -34,7 +34,7 @@ describe('sparkBurst factory', () => {
     const shards = shardsOf(g);
     const mat = shards[0].material as MeshBasicMaterial;
     expect(mat).toBeInstanceOf(MeshBasicMaterial);
-    expect(`#${mat.color.getHexString()}`.toLowerCase()).toBe(hex.gold.toLowerCase());
+    expect(`#${mat.color.getHexString()}`.toLowerCase()).toBe(hex.sulfur.toLowerCase());
     expect(mat.transparent).toBe(true);
     expect(mat.opacity).toBe(0);
     expect(mat.blending).toBe(AdditiveBlending);

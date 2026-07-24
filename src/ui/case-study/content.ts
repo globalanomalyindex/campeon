@@ -17,8 +17,8 @@ export interface CaseSection {
 }
 
 const ACCENT_VAR: Record<CaseSection['accent'], string> = {
-  track: 'var(--c-track)', flick: 'var(--c-flick)', calibrate: 'var(--c-calibrate)',
-  strike: 'var(--c-strike)', slate: 'var(--slate)', gold: 'var(--gold)',
+  track: 'var(--instrument-track)', flick: 'var(--instrument-flick)', calibrate: 'var(--instrument-calibrate)',
+  strike: 'var(--instrument-strike)', slate: 'var(--text-muted)', gold: 'var(--color-primary)',
 };
 export const accentVar = (a: CaseSection['accent']): string => ACCENT_VAR[a];
 

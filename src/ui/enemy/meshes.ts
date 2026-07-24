@@ -103,11 +103,11 @@ function parseHex(h: string): number {
 export function createQuarryMaterials(): QuarryMaterials {
   return {
     hide: mkBody(parseHex(hex.hide)),
-    accent: mkBody(parseHex(hex.cream), 0.7, 0.1), // cream needs less floor - it catches real light
-    mark: mkBody(parseHex(hex.blood), 0.6, 0.3), // the threat mark SMOLDERS at range
+    accent: mkBody(parseHex(hex.paper), 0.7, 0.1), // cream needs less floor - it catches real light
+    mark: mkBody(parseHex(hex.strike), 0.6, 0.3), // the threat mark SMOLDERS at range
     weakspot: new MeshStandardMaterial({
-      color: parseHex(hex.gold),
-      emissive: parseHex(hex.gold),
+      color: parseHex(hex.sulfur),
+      emissive: parseHex(hex.sulfur),
       emissiveIntensity: 1.0,
       roughness: 0.4,
       metalness: 0.0,
@@ -358,7 +358,7 @@ const DUST_MOTES = 5;
  */
 export function dustPuff(): Group {
   const mat = new MeshStandardMaterial({
-    color: parseHex(hex.cream),
+    color: parseHex(hex.paper),
     roughness: 0.95,
     metalness: 0,
     flatShading: true,

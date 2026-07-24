@@ -1,39 +1,71 @@
-// Canvas / WebGL mirror of the cinematic palette in styles/tokens.css.
-// The DOM reads its colors from CSS custom properties; the <canvas> and three.js
-// draw layers cannot, so they read them here instead. Keep these in lockstep with
-// the matching tokens so the rendered instruments never drift off the film palette.
+// Canvas / WebGL mirror of the design tokens in styles/tokens.css.
+//
+// The DOM reads colour from CSS custom properties. The <canvas> and three.js draw
+// layers cannot, so they read it here instead. Every value below has a named twin
+// in tokens.css and the two must move together. The arena is the ink chamber, so
+// these mirror the [data-surface='chamber'] block, not the paper defaults.
+//
+// Values are literal hex on purpose. The chamber block in tokens.css also writes
+// these instrument colours as literal hex rather than color-mix() so that the two
+// sides stay byte-comparable and a drift is a visible diff, not a rounding guess.
 export const hex = {
-  ink: '#0c0b09',    // --cinema-ink (warm near-black film stock)
-  cream: '#efe7d6',  // --cinema-cream (aged-cream ink)
-  blood: '#c4251f',  // --blood (western identity red)
-  gold: '#FFC400',   // --gold (value / action)
-  ok: '#6fc28a',     // --ok (warmed status green)
-  warn: '#e0a23a',   // --warn (warmed status amber)
-  // Quarry hide: the dusty warm-leather mass of the 3D quarry. Deliberately a MID value, clearly
-  // above the cinema-ink backdrop - a foreground form must never be the background color (ink is the
-  // surface token, not a silhouette token), so the quarry reads against the dark arena.
-  hide: '#5b4d3f',     // dusty warm leather/taupe (reads against the ink backdrop, catches warm light)
-  // Western single-action revolver materials (in-scene 3D viewmodel). Warm-tinted neutrals so the
-  // gun reads as a film-lit prop under the same hemisphere/key light as the arena - no pure black/white.
-  gunmetal: '#574e45', // case-hardened steel frame/cylinder (warm mid-grey; low metalness reads w/o envmap)
-  wood: '#6b4a2f',     // walnut grip (warm brown)
-  brass: '#b08738',    // brass trigger-guard / hammer accents (catches the warm rim light)
+  // ── Stone ramp ────────────────────────────────────────────────────────────
+  ink: '#17140F', // --stone-900, the chamber field
+  paper: '#F4F0E7', // --stone-50, page + text on the chamber
+  alabaster: '#FBFAF6', // --stone-0, the crosshair and the brightest marks
+
+  // ── The four instruments, lifted for legibility on ink ────────────────────
+  // Base minerals are amethyst / citrine / turquoise / carnelian. On the chamber
+  // field each lifts toward alabaster so it keeps its identity at readable value.
+  track: '#9B82C4', // amethyst, lifted
+  flick: '#CE9126', // citrine, already legible on ink
+  calibrate: '#5CB6B9', // turquoise, lifted
+  strike: '#D9715A', // carnelian, lifted
+
+  // ── Status, lifted the same way ───────────────────────────────────────────
+  ok: '#3E9E77', // malachite, lifted (a hit)
+  warn: '#CE9126', // citrine
+  danger: '#D9715A', // carnelian, lifted (a miss)
+  action: '#3363B0', // azurite, the chamber's primary (lapis is too dark on ink)
+
+  // Hot light: the muzzle flash, impact sparks, the quarry weakspot and the sun
+  // disc in the environment map. The brightest mineral in the collection, kept as
+  // one token so every source of light in the scene agrees.
+  sulfur: '#E0C23F',
+
+  // ── Quarry ────────────────────────────────────────────────────────────────
+  // A foreground form must never sit at the background value, so the quarry mass
+  // is drawn from the middle of the stone ramp rather than an off-system brown.
+  hide: '#635B4B', // --stone-600, catches the warm key light and reads against ink
+
+  // ── Viewmodel materials ───────────────────────────────────────────────────
+  // Warm neutrals from the ramp plus two minerals, so the in-scene prop is lit by
+  // the same collection as everything else.
+  gunmetal: '#423C31', // --stone-700, the frame and cylinder
+  wood: '#6E4B44', // hematite, the grip
+  brass: '#97742E', // pyrite, the small metal accents
 } as const;
 
 const RGB: Record<keyof typeof hex, readonly [number, number, number]> = {
-  ink: [12, 11, 9],
-  cream: [239, 231, 214],
-  blood: [196, 37, 31],
-  gold: [255, 196, 0],
-  ok: [111, 194, 138],
-  warn: [224, 162, 58],
-  hide: [91, 77, 63],
-  gunmetal: [87, 78, 69],
-  wood: [107, 74, 47],
-  brass: [176, 135, 56],
+  ink: [23, 20, 15],
+  paper: [244, 240, 231],
+  alabaster: [251, 250, 246],
+  track: [155, 130, 196],
+  flick: [206, 145, 38],
+  calibrate: [92, 182, 185],
+  strike: [217, 113, 90],
+  ok: [62, 158, 119],
+  warn: [206, 145, 38],
+  danger: [217, 113, 90],
+  action: [51, 99, 176],
+  sulfur: [224, 194, 63],
+  hide: [99, 91, 75],
+  gunmetal: [66, 60, 49],
+  wood: [110, 75, 68],
+  brass: [151, 116, 46],
 };
 
-/** Translucent draw color: rgba(color, alpha) sourced from the locked palette. */
+/** Translucent draw colour: rgba(colour, alpha) sourced from the locked palette. */
 export const rgba = (c: keyof typeof hex, alpha: number): string => {
   const [r, g, b] = RGB[c];
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;

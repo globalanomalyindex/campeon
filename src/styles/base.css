@@ -1,14 +1,82 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+/* campeón — base
+   Light global defaults: the paper, the text face, links, selection.
+   Everything structural lives in shell.css and the per-screen sheets. */
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+
+html { height: 100%; -webkit-text-size-adjust: 100%; }
+
 body {
-  background: var(--bone);
-  color: var(--slate);
-  font-family: var(--font-body);
+  height: 100%;
+  background: var(--surface-page);
+  color: var(--text-body);
+  font: var(--type-body-md);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  text-wrap: pretty;
 }
+
 #app { min-height: 100%; display: flex; }
 
-/* Visually-hidden, still announced to assistive tech (the standard clip-rect pattern). */
+::selection { background: var(--lapis-wash); color: var(--stone-900); }
+
+a {
+  color: var(--text-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+a:hover { color: var(--text-link-hover); }
+
+hr { border: 0; border-top: 1px solid var(--border-hairline); margin: var(--space-5) 0; }
+
+:where(h1, h2, h3, h4) { margin: 0; color: var(--text-strong); font-weight: var(--weight-regular); }
+
+/* ── Type roles ──────────────────────────────────────────────────────────────
+   Named roles rather than ad-hoc sizes. Both faces ship Regular only, so weight
+   never appears here: hierarchy is scale, case, colour and tracking. */
+.t-display-2xl { font: var(--type-display-2xl); letter-spacing: var(--tracking-display); color: var(--text-strong); }
+.t-display-xl  { font: var(--type-display-xl);  letter-spacing: var(--tracking-display); color: var(--text-strong); }
+.t-display-lg  { font: var(--type-display-lg);  letter-spacing: var(--tracking-display); color: var(--text-strong); }
+.t-display-md  { font: var(--type-display-md);  letter-spacing: var(--tracking-display); color: var(--text-strong); }
+.t-display-sm  { font: var(--type-display-sm);  letter-spacing: var(--tracking-tight);   color: var(--text-strong); }
+.t-heading-lg  { font: var(--type-heading-lg);  letter-spacing: var(--tracking-tight);   color: var(--text-strong); }
+.t-heading-md  { font: var(--type-heading-md);  letter-spacing: var(--tracking-tight);   color: var(--text-strong); }
+.t-heading-sm  { font: var(--type-heading-sm);  color: var(--text-strong); }
+.t-body-lg     { font: var(--type-body-lg); }
+.t-body        { font: var(--type-body-md); }
+.t-body-sm     { font: var(--type-body-sm); }
+
+/* The museum tag. Small tracked caps, used for every label in the app. */
+.t-label {
+  font: var(--type-label);
+  font-family: var(--font-text);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Any measured number. Tabular figures so digits do not jitter as a live readout
+   updates, and a slashed zero so 0 cannot be misread as O. */
+.t-figure {
+  font-family: var(--font-display);
+  font-feature-settings: var(--features-figures);
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+}
+.t-figure-text { font-family: var(--font-text); font-feature-settings: var(--features-figures); }
+
+.t-alt  { font-feature-settings: var(--features-display-alt); }
+.t-caps { text-transform: uppercase; font-feature-settings: var(--features-display-caps); letter-spacing: 0.02em; }
+
+/* Prose blocks hold a comfortable measure. */
+.prose { max-width: var(--measure-prose); }
+.prose p + p { margin-top: var(--space-4); }
+
+/* Visually hidden, still announced to assistive tech (standard clip-rect). */
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
@@ -17,4 +85,13 @@ body {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

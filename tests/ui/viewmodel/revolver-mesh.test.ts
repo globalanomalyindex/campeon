@@ -83,7 +83,7 @@ describe('revolverMesh factory', () => {
   it('createRevolverMaterials includes a fourth additive-gold flash material in the disposal list', () => {
     const mats: RevolverMaterials = createRevolverMaterials();
     expect(mats.flash).toBeInstanceOf(MeshBasicMaterial);
-    expect(`#${mats.flash.color.getHexString()}`.toLowerCase()).toBe(hex.gold.toLowerCase());
+    expect(`#${mats.flash.color.getHexString()}`.toLowerCase()).toBe(hex.sulfur.toLowerCase());
     expect(mats.flash.transparent).toBe(true);
     expect(mats.flash.opacity).toBe(0);
     expect(mats.flash.blending).toBe(AdditiveBlending);
@@ -123,7 +123,7 @@ describe('muzzle flash group', () => {
     for (const m of meshes) {
       const mat = m.material as MeshBasicMaterial;
       expect(mat).toBeInstanceOf(MeshBasicMaterial);
-      expect(`#${mat.color.getHexString()}`.toLowerCase()).toBe(hex.gold.toLowerCase());
+      expect(`#${mat.color.getHexString()}`.toLowerCase()).toBe(hex.sulfur.toLowerCase());
       expect(mat.blending).toBe(AdditiveBlending);
       expect(mat.depthTest).toBe(false);
       expect(mat.depthWrite).toBe(false);

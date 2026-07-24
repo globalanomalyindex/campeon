@@ -35,7 +35,7 @@ describe('renderConvergencePlot', () => {
     const strike = svg.querySelector('[data-facet-peak="strike"]')!;
     expect(track).not.toBeNull();
     expect(strike).not.toBeNull();
-    expect(track.getAttribute('fill')).toContain('--c-track'); // filled: a real estimate of the latent
+    expect(track.getAttribute('fill')).toContain('--instrument-track'); // filled: a real estimate of the latent
     expect(strike.getAttribute('fill')).toBe('none'); // taste-conditioned: hollow...
     expect(strike.getAttribute('stroke-dasharray')).toBe('2 2'); // ...and dashed - excluded from the tier
     expect(svg.querySelectorAll('[data-facet-whisker]').length).toBe(2);
@@ -50,7 +50,7 @@ describe('renderConvergencePlot', () => {
       const item = legend.querySelector(`[data-legend="${id}"]`)!;
       expect(item, `${id} chip`).not.toBeNull();
       expect(item.textContent).toContain(id);
-      expect((item.querySelector('.plot-legend__swatch') as HTMLElement).style.background).toContain(`--c-${id}`);
+      expect((item.querySelector('.plot-legend__swatch') as HTMLElement).style.background).toContain(`--instrument-${id}`);
     }
   });
 

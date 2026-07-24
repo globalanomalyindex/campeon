@@ -73,26 +73,26 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
 
     ctx.globalAlpha = repositioning ? 0.4 : 1;
     ctx.lineWidth = 10; ctx.lineCap = 'round';
-    ctx.strokeStyle = rgba('cream', 0.14);
+    ctx.strokeStyle = rgba('paper', 0.14);
     ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
     const frac = Math.min(1, deg / 360);
-    ctx.strokeStyle = repositioning ? hex.warn : (near ? hex.ok : hex.gold);
+    ctx.strokeStyle = repositioning ? hex.warn : (near ? hex.ok : hex.calibrate);
     ctx.beginPath(); ctx.arc(cx, cy, rad, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
 
     // home marker + label (glows green once a full turn is reached)
     const glow = near && !repositioning;
     if (glow) { ctx.shadowColor = hex.ok; ctx.shadowBlur = 14; }
-    ctx.fillStyle = glow ? hex.ok : hex.blood;
+    ctx.fillStyle = glow ? hex.ok : hex.danger;
     ctx.beginPath(); ctx.arc(cx, cy - rad, 6, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = rgba('cream', 0.7); ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = rgba('paper', 0.7); ctx.font = '11px ui-monospace, monospace';
     ctx.textAlign = 'center'; ctx.fillText('home', cx, cy - rad - 12);
 
     // center readout
     ctx.globalAlpha = 1; ctx.textBaseline = 'middle';
     if (flashing) { ctx.fillStyle = hex.warn; ctx.font = '600 16px ui-monospace, monospace'; ctx.fillText('almost - keep turning', cx, cy); }
     else if (repositioning) { ctx.fillStyle = hex.warn; ctx.font = '600 20px ui-monospace, monospace'; ctx.fillText('paused', cx, cy); }
-    else { ctx.fillStyle = rgba('cream', 0.92); ctx.font = '600 26px ui-monospace, monospace'; ctx.fillText(Math.round(Math.min(360, deg)) + '°', cx, cy); }
+    else { ctx.fillStyle = rgba('paper', 0.92); ctx.font = '600 26px ui-monospace, monospace'; ctx.fillText(Math.round(Math.min(360, deg)) + '°', cx, cy); }
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 
     // cues
@@ -179,7 +179,7 @@ export function createSpinView(host: HTMLElement, opts: { dpi: number; onSeed: (
 function drawSideArrow(ctx: CanvasRenderingContext2D, ts: number, cx: number, y: number, half: number): void {
   const t = (Math.sin((ts % 1600) / 1600 * Math.PI * 2) + 1) / 2; // 0..1 ease
   const x = cx - half + t * half * 2;
-  ctx.strokeStyle = rgba('gold', 0.8); ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.strokeStyle = rgba('calibrate', 0.8); ctx.lineWidth = 3; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(cx - half, y); ctx.lineTo(cx + half, y); ctx.stroke();
   // moving chevron showing the drag head
   ctx.beginPath();

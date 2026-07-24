@@ -138,6 +138,7 @@ async function driveProjected(
   const c: TrialContext = { ...ctx(), rng: makeRng() };
   const order = presentationOrder(makeRng()); // same seed → same shuffle as inside run
   const p = flick.run(c, scene);
+  scene.tick(0); // the first target is presented on the first frame, so the stamp carries the arena clock
   const trueTaps: FlickTap[] = [];
   const oldTaps: FlickTap[] = [];
   const counts = new Map<string, number>();
@@ -260,6 +261,7 @@ describe('flick.run - A2 seam safety across the ±180 yaw wrap', () => {
     const c: TrialContext = { ...ctx(), rng: makeScripted() };
     const order = presentationOrder(() => 0); // shuffle draws are all 0 → same order as inside run
     const p = flick.run(c, scene);
+    scene.tick(0); // the first target is presented on the first frame (see clock-stamp.test.ts)
     const trueTaps: FlickTap[] = [];
     const naiveTaps: FlickTap[] = [];
     const counts = new Map<string, number>();

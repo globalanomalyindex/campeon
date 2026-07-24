@@ -105,7 +105,7 @@ const el = (name: string, attrs: Record<string, string>): SVGElement => {
   return node;
 };
 const ORGANISM_VAR: Record<InstrumentId, string> = {
-  track: 'var(--c-track)', flick: 'var(--c-flick)', calibrate: 'var(--c-calibrate)', strike: 'var(--c-strike)',
+  track: 'var(--instrument-track)', flick: 'var(--instrument-flick)', calibrate: 'var(--instrument-calibrate)', strike: 'var(--instrument-strike)',
 };
 
 /**
@@ -131,19 +131,19 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
   if (g.ciRectPx) {
     svg.appendChild(el('rect', {
       x: g.ciRectPx.x.toFixed(2), y: String(g.pad), width: g.ciRectPx.width.toFixed(2),
-      height: String(g.size.height - 2 * g.pad), fill: 'var(--gold)', 'fill-opacity': '0.12', 'data-ci': '',
+      height: String(g.size.height - 2 * g.pad), fill: 'var(--color-primary)', 'fill-opacity': '0.12', 'data-ci': '',
     }));
   }
   if (g.curvePath) {
     svg.appendChild(el('path', {
-      d: g.curvePath, fill: 'none', stroke: 'var(--cinema-cream)', 'stroke-width': '2',
+      d: g.curvePath, fill: 'none', stroke: 'var(--text-strong)', 'stroke-width': '2',
       'stroke-opacity': '0.7', 'data-curve': '',
     }));
   }
   if (g.peakPx !== null) {
     svg.appendChild(el('line', {
       x1: g.peakPx.toFixed(2), y1: String(g.pad), x2: g.peakPx.toFixed(2),
-      y2: String(g.size.height - g.pad), stroke: 'var(--gold)', 'stroke-width': '1.5', 'data-peak': '',
+      y2: String(g.size.height - g.pad), stroke: 'var(--color-primary)', 'stroke-width': '1.5', 'data-peak': '',
     }));
   }
   for (const m of g.marks) {
