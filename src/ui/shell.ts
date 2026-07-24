@@ -154,7 +154,12 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     current.mount();
     main.focus();
 
-    if (typeof document !== 'undefined') document.title = `${ROUTE_NAME[route]} · campeón`;
+    // The hero's route name IS the product name, so suffixing it there gives
+    // "campeón · campeón". Every other route reads as a page inside the product.
+    if (typeof document !== 'undefined') {
+      const name = ROUTE_NAME[route];
+      document.title = name === 'campeón' ? name : `${name} · campeón`;
+    }
     // Cleared first so re-entering the same route still counts as a change worth announcing.
     announcer.textContent = '';
     announcer.textContent = ROUTE_NAME[route];
