@@ -11,9 +11,9 @@ import type { CiConcord } from '../optimizer/result';
  * as a possibility list. A tight CI is the only one that earns a confident reading.
  */
 export const CONCORD_COPY: Record<CiConcord, string> = {
-  tight: 'the four views concur on a sharp answer',
-  moderate: 'the four views broadly agree; a few more trials would tighten this band',
-  wide: 'this band is wide - that could be short-session sampling noise, the facets disagreeing, or both; more trials would tell them apart',
+  tight: 'The four views concur on a sharp answer',
+  moderate: 'The four views broadly agree; a few more trials would tighten this band',
+  wide: 'This band is wide, which could be short-session sampling noise, the facets disagreeing, or both; more trials would tell them apart',
 };
 
 /**
@@ -23,11 +23,11 @@ export const CONCORD_COPY: Record<CiConcord, string> = {
  * the thesis being tested, not assumed.
  */
 export const THESIS_COPY: Record<Concordance, string> = {
-  concordant: "each probe's own peak lands on the same answer - the one-number thesis held this session",
-  'some-spread': "the probes' own peaks sit near one another without fully agreeing - a session this short cannot separate them further",
-  divergent: 'the probes genuinely disagree this session - the blend averages different bests; read the one number with that in mind',
+  concordant: "Each probe's own peak lands on the same answer; the one-number thesis held this session",
+  'some-spread': "The probes' own peaks sit near one another without fully agreeing; a session this short cannot separate them further",
+  divergent: 'The probes genuinely disagree this session; the blend averages different bests, so read the one number with that in mind',
 };
 
 /** No verdict when fewer than two facets could fit their own peak - said plainly, never a hidden pass. */
 export const THESIS_INCONCLUSIVE =
-  'too few per-probe fits to test agreement this session - no verdict either way';
+  'Too few per-probe fits to test agreement this session; no verdict either way';

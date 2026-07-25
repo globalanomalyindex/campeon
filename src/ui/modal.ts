@@ -9,7 +9,8 @@
  * user at the top of the document.
  *
  * Pure DOM orchestration over injected elements (no arena, no WebGL), so the whole
- * open -> Tab cycle -> Escape -> restore path unit-tests in jsdom.
+ * open -> Tab cycle -> Escape -> restore path unit-tests in jsdom. It does, in
+ * `tests/ui/modal.test.ts`.
  */
 
 const FOCUSABLE = [
@@ -44,10 +45,15 @@ function focusableWithin(root: HTMLElement): HTMLElement[] {
  */
 export function openModal(dialog: HTMLElement, opts: ModalOptions = {}): ModalHandle {
   const restoreTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const inerted = (opts.inert ?? []).filter((el): el is HTMLElement => !!el);
+  // Snapshot each region's own state, because some background content is aria-hidden in its own
+  // right (a decorative plot, say). Clearing the attribute on release would hand it to the reader
+  // as new content, so release restores what was there rather than removing.
+  const inerted = (opts.inert ?? [])
+    .filter((el): el is HTMLElement => !!el)
+    .map((el) => ({ el, hadInert: el.hasAttribute('inert'), ariaHidden: el.getAttribute('aria-hidden') }));
 
   dialog.setAttribute('aria-modal', 'true');
-  for (const el of inerted) {
+  for (const { el } of inerted) {
     el.setAttribute('inert', '');
     el.setAttribute('aria-hidden', 'true');
   }
@@ -84,9 +90,10 @@ export function openModal(dialog: HTMLElement, opts: ModalOptions = {}): ModalHa
       released = true;
       document.removeEventListener('keydown', onKeyDown, true);
       dialog.removeAttribute('aria-modal');
-      for (const el of inerted) {
-        el.removeAttribute('inert');
-        el.removeAttribute('aria-hidden');
+      for (const { el, hadInert, ariaHidden } of inerted) {
+        if (!hadInert) el.removeAttribute('inert');
+        if (ariaHidden === null) el.removeAttribute('aria-hidden');
+        else el.setAttribute('aria-hidden', ariaHidden);
       }
       // Restore only if the element is still in the document; a torn-down screen has none.
       if (restoreTo?.isConnected) restoreTo.focus();

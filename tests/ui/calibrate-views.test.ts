@@ -46,6 +46,20 @@ describe.each([
     expect(lead.getAttribute('aria-atomic')).toBe('true');
     view.dispose();
   });
+
+  it('renders exactly one h1 naming the step, with no revived "+" prefix', () => {
+    // The "+" motif was retired because a CSS-injected one read aloud as "plus"; as literal
+    // heading text it lands in the accessible name and the outline, which is strictly worse.
+    const host = document.createElement('div');
+    const view = mount(host);
+    const h1s = host.querySelectorAll('h1');
+    expect(h1s.length).toBe(1);
+    expect(host.querySelector('h2')).toBeNull();
+    const title = h1s[0]!.textContent!;
+    expect(title.startsWith('+')).toBe(false);
+    expect(title).toMatch(/^[A-Z]/); // sentence case, per the canon voice
+    view.dispose();
+  });
 });
 
 describe('sweep view: the exits are wired', () => {
@@ -101,5 +115,31 @@ describe('both views speak in the first person singular', () => {
     const spin = createSpinView(host2, spinOpts());
     expect(host2.textContent!).not.toMatch(/\bwe\b|\bwe'll\b|\bus\b/i);
     spin.dispose();
+  });
+
+  it('never writes the first-person pronoun as a lowercase "i"', () => {
+    const host = document.createElement('div');
+    const sweep = createSweepView(host, sweepOpts());
+    expect(host.textContent!).not.toMatch(/\bi\b/); // case-sensitive: a standalone lowercase i is the violation
+    sweep.dispose();
+    const host2 = document.createElement('div');
+    const spin = createSpinView(host2, spinOpts());
+    expect(host2.textContent!).not.toMatch(/\bi\b/);
+    spin.dispose();
+  });
+});
+
+describe('the guided instructions keep emphasis out of the caps', () => {
+  it.each([
+    ['sweep', 'src/ui/calibrate/sweep-view.ts'],
+    ['spin', 'src/ui/calibrate/spin-view.ts'],
+  ])('the %s view has no shouty mid-sentence caps in its copy strings', async (_name, path) => {
+    // The phase copy is rewritten at runtime behind a pointer lock jsdom cannot grant, so the
+    // strings are checked at the source: tracked uppercase is for small labels, never for
+    // emphasis inside a running sentence ("RIGHT edge", "slide FAST").
+    const fs = await import('node:fs/promises');
+    const src = await fs.readFile(path, 'utf8');
+    const copyLines = src.split('\n').filter((l) => !l.trimStart().startsWith('//') && !l.trimStart().startsWith('*'));
+    expect(copyLines.join('\n')).not.toMatch(/'[^']*\b(LEFT|RIGHT|FAST|SLOW)\b[^']*'/);
   });
 });

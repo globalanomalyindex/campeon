@@ -50,7 +50,7 @@ function thesisHtml(fc: FacetConcordance): string {
 // value carries NO measured-CI claim (honesty), so it is announced as tuned without a band.
 const srSummary = (r: Result, tuned: boolean): string =>
   tuned
-    ? `Your sensitivity, tuned by feel: ${fmt(r.optimalCm360)} centimetres per 360. This is a hand-picked value, not a measured optimum.`
+    ? `Your sensitivity, tuned by feel: ${fmt(r.optimalCm360)} centimetres per 360. It carries no measured interval.`
     : `Your most-evolved sensitivity is ${fmt(r.optimalCm360)} centimetres per 360, with a 90% confidence interval from ${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}.`;
 
 // Fixed viewBox: clientWidth is 0 before layout, so the geometry must use a constant design size.
@@ -130,7 +130,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
               <div><span class="result__bk-label">Hit rate</span><span data-breakdown="hitRate">${Number.isFinite(r.breakdown.hitRate) ? Math.round(r.breakdown.hitRate * 100) + '%' : '-'}</span></div>
             </div>
             ${lean !== undefined
-              ? `<p class="result__lean-note">Track, flick and calibrate are pure skill readings. The strike pair encodes the speed and accuracy lean you chose, so it reports a taste, not an optimum.</p>`
+              ? `<p class="result__lean-note">Track, flick and calibrate are pure skill readings. The strike pair encodes the speed and accuracy lean you chose, so it reports the balance you set.</p>`
               : ''}
           </div>
           <div class="reveal" data-reveal style="--reveal-i:8">

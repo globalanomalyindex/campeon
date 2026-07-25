@@ -12,9 +12,9 @@ describe('session-view helpers', () => {
   it('frames the loop as evolution - gene-pool seeding, then numbered generations testing a sensitivity', () => {
     // The thesis ("generations of sensitivities") must be visible: cold-start trials are Generation 0
     // (the initial gene pool); after that each trial is a numbered generation testing one cm/360.
-    expect(searchLabel(0, 18, 8, 20)).toBe('gen 0 · seeding the gene pool · trial 1 of 20 · testing 18.0 cm/360');
-    expect(searchLabel(8, 32.37, 8, 20)).toBe('generation 1 · trial 9 of 20 · testing 32.4 cm/360');
-    expect(searchLabel(11, 30, 8, 20)).toBe('generation 4 · trial 12 of 20 · testing 30.0 cm/360');
+    expect(searchLabel(0, 18, 8, 20)).toBe('Gen 0 · seeding the gene pool · trial 1 of 20 · testing 18.0 cm/360');
+    expect(searchLabel(8, 32.37, 8, 20)).toBe('Generation 1 · trial 9 of 20 · testing 32.4 cm/360');
+    expect(searchLabel(11, 30, 8, 20)).toBe('Generation 4 · trial 12 of 20 · testing 30.0 cm/360');
   });
 
   it('always carries a denominator, so the run never reads as open-ended', () => {
@@ -132,17 +132,29 @@ describe('session-view: assistive-tech narration (P4-3)', () => {
 
   it('announces a concise summary using " to " for the range, never an en-dash glyph', () => {
     expect(announceEstimate({ optimalCm360: 32.4, ci90: [29.1, 36.0] } as Report))
-      .toBe('dialed in around 32.4 cm/360, 90% CI 29.1 to 36.0');
+      .toBe('Dialed in around 32.4 cm/360, 90% CI 29.1 to 36.0');
     expect(announceEstimate({ optimalCm360: 32.4, ci90: [29.1, 36.0] } as Report)).not.toContain('–');
   });
 });
 
 describe('session-view: pre-lock begin state (P4-2)', () => {
-  it('opens on "click to begin" - never the lock-it-in commit copy', () => {
+  it('opens by pointing at the begin button (the real start gesture), never the retired canvas-click copy', () => {
     const { root, screen } = mountWithRunningSegment();
     const hud = root.querySelector('[data-hud="instruction"]')!;
-    expect(hud.textContent).toBe('click to begin');
+    expect(hud.textContent).toBe('Press begin to start');
+    expect(hud.textContent!.toLowerCase()).not.toContain('click'); // the canvas-click start is retired
     screen.unmount();
+  });
+
+  it('names the screen with an <h1> and labels the landmark from it, so arrival announces the title', () => {
+    const { host, root, screen } = mountWithRunningSegment();
+    const h1 = root.querySelector('h1') as HTMLHeadingElement;
+    expect(h1.textContent).toBe('The hunt');
+    // The shell focuses the <main> landmark after mount; aria-labelledby makes this h1 what a
+    // screen reader hears at that moment, instead of an unnamed region.
+    expect(host.getAttribute('aria-labelledby')).toBe(h1.id);
+    screen.unmount();
+    expect(host.getAttribute('aria-labelledby')).toBeNull(); // the label leaves with its target
   });
 
   it('exposes a single focusable begin button (pinned start gesture, not a canvas-click hybrid)', () => {
@@ -242,12 +254,12 @@ describe('session-view: abort scrim (P4-2)', () => {
 
     const scrim = root.querySelector('[data-abort]') as HTMLElement;
     expect(scrim.getAttribute('role')).toBe('dialog');
-    expect(scrim.getAttribute('aria-label')).toBe('session paused');
+    expect(scrim.getAttribute('aria-label')).toBe('Session paused');
     expect(scrim.getAttribute('aria-modal')).toBe('true');
     expect(document.activeElement).toBe(root.querySelector('[data-abort="resume"]'));
     expect((root.querySelector('[data-hud="bar"]') as HTMLElement).hasAttribute('inert')).toBe(true);
     // and it is announced, not just drawn
-    expect(root.querySelector('[data-hud="estimate"]')!.textContent).toBe('session paused');
+    expect(root.querySelector('[data-hud="estimate"]')!.textContent).toBe('Session paused');
     screen.unmount();
   });
 
@@ -445,7 +457,7 @@ describe('session-view: first-encounter beats + the seed curtain (Phase C)', () 
 
     cfg.onTrialStart('track', 8, 30); // the first evolved trial AND an instrument change - curtain wins
     expect(live.textContent).toBe(CURTAIN_LINE);
-    expect(root.querySelector('[data-beat-title]')!.textContent).toBe('evolution begins');
+    expect(root.querySelector('[data-beat-title]')!.textContent).toBe('Evolution begins');
 
     cfg.onTrialStart('calibrate', 9, 30); // later beats resume normal announcements
     expect(live.textContent).toBe(instructionFor('calibrate'));

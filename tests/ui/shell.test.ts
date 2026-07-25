@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createShell, type Screen, type AppContext } from '../../src/ui/shell';
+import { createShell, ROUTE_NAME, type Screen, type AppContext, type Route } from '../../src/ui/shell';
 
 const recordingScreen = (log: string[], name: string) => (host: HTMLElement, _ctx: AppContext): Screen => ({
   mount() { host.innerHTML = `<div data-screen="${name}">${name}</div>`; log.push(`mount:${name}`); },
@@ -33,7 +33,147 @@ describe('shell router', () => {
     expect(log).toEqual(['mount:hero', 'unmount:hero', 'mount:setup']);
   });
 
-  it('exposes a mutable draft with sensible defaults', () => {
+});
+
+// ── Navigation is announced, and focus lands somewhere named ───────────────────
+//
+// Navigation swaps the screen's markup, which is silent: no page load, no focus change a
+// screen reader reports on its own. The router owes a keyboard or screen-reader user two
+// things on every route change, and both used to be broken.
+
+describe('shell router: navigation is perceivable', () => {
+  beforeEach(() => { location.hash = ''; document.body.innerHTML = '<div id="app"></div>'; });
+
+  const twoScreens = () => ({
+    hero: recordingScreen([], 'hero'), setup: recordingScreen([], 'setup'),
+  } as never);
+
+  const settled = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+  it('keeps ONE live region attached across navigations instead of detaching it each time', async () => {
+    // The old render() cleared the root, which detached the region, re-appended it, and wrote to
+    // it in the same task. Assistive tech only reports a mutation inside a region it is already
+    // observing, so an announcement written into a freshly attached node is usually lost. The
+    // region must therefore be the SAME node before and after a navigation.
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, { screens: twoScreens() });
+    shell.start();
+
+    const live = root.querySelector('[aria-live="polite"]')!;
+    expect(live.getAttribute('aria-atomic')).toBe('true');
+    expect(live.className).toContain('sr-only');
+
+    shell.context.navigate('setup');
+    await settled();
+    const after = root.querySelectorAll('[aria-live]');
+    expect(after).toHaveLength(1);        // never duplicated
+    expect(after[0]).toBe(live);          // and never replaced: the same node throughout
+    expect(live.isConnected).toBe(true);  // still in the document
+  });
+
+  it('announces the route name, and only after the DOM change has settled', async () => {
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, { screens: twoScreens() });
+    shell.start();
+    await settled();
+    const live = root.querySelector('[aria-live="polite"]')!;
+    expect(live.textContent).toBe('campeón');
+
+    shell.context.navigate('setup');
+    // Synchronously the region is cleared, not yet rewritten: the text change has to be a
+    // separate event from the screen swap or there is nothing for the region to report.
+    expect(live.textContent).toBe('');
+    await settled();
+    expect(live.textContent).toBe('Set up the run');
+  });
+
+  it('re-entering the same route still announces it', async () => {
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, { screens: twoScreens() });
+    shell.start();
+    await settled();
+    const live = root.querySelector('[aria-live="polite"]')!;
+
+    shell.context.navigate('setup');
+    await settled();
+    shell.context.navigate('setup');
+    expect(live.textContent).toBe('');     // cleared, so the identical text reads as a change
+    await settled();
+    expect(live.textContent).toBe('Set up the run');
+  });
+
+  it('speaks only the route it landed on when navigations arrive back to back', async () => {
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, { screens: twoScreens() });
+    shell.start();
+    shell.context.navigate('setup');
+    shell.context.navigate('hero');
+    await settled();
+    expect(root.querySelector('[aria-live="polite"]')!.textContent).toBe('campeón');
+  });
+
+  it('moves focus into a NAMED landmark, so it is not "main" with nothing after it', async () => {
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, { screens: twoScreens() });
+    shell.start();
+
+    let main = root.querySelector('main')!;
+    expect(document.activeElement).toBe(main);
+    expect(main.getAttribute('aria-label')).toBe('campeón');
+    expect(main.tabIndex).toBe(-1);
+
+    shell.context.navigate('setup');
+    main = root.querySelector('main')!;
+    expect(document.activeElement).toBe(main);
+    expect(main.getAttribute('aria-label')).toBe('Set up the run');
+    expect(root.querySelectorAll('main')).toHaveLength(1); // the old landmark is gone, not stacked
+  });
+
+  it('titles the document with the route, and never doubles the product name on the hero', async () => {
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, { screens: twoScreens() });
+    shell.start();
+    expect(document.title).toBe('campeón');
+    shell.context.navigate('setup');
+    expect(document.title).toBe('Set up the run · campeón');
+  });
+});
+
+describe('ROUTE_NAME: user-visible copy, so it obeys the voice', () => {
+  // These strings name the landmark, get spoken on navigation, and become the document title.
+  // They were lowercase back when nothing read them aloud.
+  it('is sentence case everywhere except the wordmark itself', () => {
+    for (const [route, name] of Object.entries(ROUTE_NAME) as Array<[Route, string]>) {
+      if (route === 'hero') {
+        expect(name, 'the hero entry IS the product name; the title logic keys on it').toBe('campeón');
+        continue;
+      }
+      expect(name[0], `${route}: "${name}" must start with a capital`).toBe(name[0].toUpperCase());
+      // Sentence case, so no word after the first is capitalised. "I" is the pronoun and the
+      // one legitimate mid-sentence capital in this app's voice.
+      const titleCased = name.split(' ').slice(1).filter((w) => /^[A-Z]/.test(w) && w !== 'I');
+      expect(titleCased, `${route}: "${name}" is title-cased`).toEqual([]);
+    }
+  });
+
+  it('writes the first person pronoun as a capital I', () => {
+    expect(ROUTE_NAME['case-study']).toBe('How I built it');
+    for (const name of Object.values(ROUTE_NAME)) {
+      expect(name, `"${name}" carries a lowercase standalone i`).not.toMatch(/(^|\s)i(\s|$)/);
+    }
+  });
+
+  it('carries no dash of any kind', () => {
+    for (const name of Object.values(ROUTE_NAME)) {
+      expect(name, `"${name}"`).not.toMatch(/[—–]|--/);
+    }
+  });
+});
+
+describe('shell router: draft', () => {
+  beforeEach(() => { location.hash = ''; document.body.innerHTML = '<div id="app"></div>'; });
+
+  it('still exposes a mutable draft with sensible defaults', () => {
     const root = document.getElementById('app')!;
     const shell = createShell(root, { screens: { hero: recordingScreen([], 'hero') } as never });
     shell.start();

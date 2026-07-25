@@ -23,10 +23,10 @@ export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
 }
 
 const COPY: Record<InstrumentId, string> = {
-  track: 'track · the open-air intercept · hold your lead on the weaving prey (dragonfly, falcon)',
-  flick: 'flick · the ambush · break-cover targets to snap and lock (spider, raptor)',
-  calibrate: 'calibrate · shooting through the bend · learn the gap between aim and impact (archerfish)',
-  strike: 'strike · the strike window · commit the instant you see it, no settling (mantis shrimp)',
+  track: 'Track · the open-air intercept · hold your lead on the weaving prey (dragonfly, falcon)',
+  flick: 'Flick · the ambush · break-cover targets to snap and lock (spider, raptor)',
+  calibrate: 'Calibrate · shooting through the bend · learn the gap between aim and impact (archerfish)',
+  strike: 'Strike · the strike window · commit the instant you see it, no settling (mantis shrimp)',
 };
 export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 
@@ -37,8 +37,8 @@ export function instructionFor(id: InstrumentId): string { return COPY[id]; }
 export function searchLabel(index: number, cm360: number, coldStart: number, total: number): string {
   const where = `trial ${index + 1} of ${total} · testing ${cm360.toFixed(1)} cm/360`;
   return index < coldStart
-    ? `gen 0 · seeding the gene pool · ${where}`
-    : `generation ${index - coldStart + 1} · ${where}`;
+    ? `Gen 0 · seeding the gene pool · ${where}`
+    : `Generation ${index - coldStart + 1} · ${where}`;
 }
 
 /** What the visitor is committing to when they press begin. Derived from the same constants the
@@ -50,28 +50,28 @@ export function segmentShape(minTrials: number, maxTrials: number): string {
 /** Concise spoken summary for the estimate live region (P4-3). The CI range is spelled " to " so a
  *  screen reader never voices a raw en-dash glyph; announced only at segment-meaningful moments. */
 export function announceEstimate(report: Pick<Report, 'optimalCm360' | 'ci90'>): string {
-  return `dialed in around ${report.optimalCm360.toFixed(1)} cm/360, 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
+  return `Dialed in around ${report.optimalCm360.toFixed(1)} cm/360, 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
 }
 
 /** The curtain line: announced ONCE, at the trial where the search leaves Generation 0 - the moment
  *  the gene pool stops seeding and evolution proper begins (a segment-meaningful live-region beat). */
-export const CURTAIN_LINE = 'gene pool seeded - evolution begins';
+export const CURTAIN_LINE = 'Gene pool seeded · evolution begins';
 
 /** First-encounter title cards: the beat shown the FIRST time each environment appears. Purely
  *  narrative framing over the schedule the optimizer already chose - it names what the probe does
  *  and which organisms tuned it, and never claims anything the copy in COPY does not. */
 export const ENV_BEATS: Record<InstrumentId, { title: string; sub: string }> = {
-  track: { title: 'the open-air intercept', sub: 'hold your lead on the weaving prey · dragonfly + falcon' },
-  flick: { title: 'the ambush', sub: 'break-cover targets to snap and lock · spider + raptor' },
-  calibrate: { title: 'shooting through the bend', sub: 'learn the gap between aim and impact · archerfish' },
-  strike: { title: 'the strike window', sub: 'commit the instant you see it · mantis shrimp' },
+  track: { title: 'The open-air intercept', sub: 'Hold your lead on the weaving prey · dragonfly and falcon' },
+  flick: { title: 'The ambush', sub: 'Break-cover targets to snap and lock · spider and raptor' },
+  calibrate: { title: 'Shooting through the bend', sub: 'Learn the gap between aim and impact · archerfish' },
+  strike: { title: 'The strike window', sub: 'Commit the instant you see it · mantis shrimp' },
 };
 
 /** The dialed-in panel's budget line: plain facts the lock/refine choice actually turns on - trials
  *  spent against the hard cap, and what "keep refining" would really do (run more, or lock at cap). */
 export function dialedBudget(used: number, max: number, refineGens: number): string {
   return used >= max
-    ? `${used} of ${max} trials used - the budget is spent, so refining would lock this in`
+    ? `${used} of ${max} trials used · the budget is spent, so refining would lock this in`
     : `${used} of ${max} trials used · refining runs up to ${refineGens} more generations`;
 }
 
@@ -96,10 +96,10 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       root.className = 'screen screen--arena session';
       root.dataset.surface = 'chamber';
       root.innerHTML = `
-        <h1 class="sr-only">the hunt</h1>
+        <h1 class="sr-only" id="session-title">The hunt</h1>
         <canvas class="session__canvas"></canvas>
         <div class="session__crosshair" aria-hidden="true"></div>
-        <header class="session__hud mono" data-hud="bar"><span data-hud="instruction">click to begin</span>
+        <header class="session__hud mono" data-hud="bar"><span data-hud="instruction">Press begin to start</span>
           <span data-hud="progress"></span></header>
         <figure class="session__plot" data-plot-fig><svg data-plot aria-hidden="true"></svg>
           ${plotLegendHtml()}
@@ -107,58 +107,61 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
           <figcaption class="mono" data-hud="estimate" aria-live="polite" aria-atomic="true"></figcaption></figure>
         <div class="session__prelock" data-prelock>
           <span class="cal-pulse"><span class="cal-pulse__dot"></span></span>
-          <p class="mono session__prelock-label">the hunt</p>
-          <p class="session__prelock-lead" data-prelock-lead>watch the prey break cover, then snap on and fire. each
+          <p class="mono session__prelock-label">The hunt</p>
+          <p class="session__prelock-lead" data-prelock-lead>Watch the prey break cover, then snap on and fire. Each
             round tests one sensitivity; the search evolves toward your sharpest cm/360.</p>
-          <p class="session__prelock-lead session__prelock-sub">${segmentShape(MIN_TRIALS, FIRST_SEGMENT)} when the
-            search settles you can lock it in or keep refining. press <kbd>Esc</kbd> any time to pause.</p>
+          <p class="session__prelock-lead session__prelock-sub">${segmentShape(MIN_TRIALS, FIRST_SEGMENT)} When the
+            search settles you can lock it in or keep refining. Press <kbd>Esc</kbd> any time to pause.</p>
           <div class="session__prelock-actions">
-            <button class="action action--primary" data-prelock="begin">begin</button>
-            <button class="action action--ghost" data-prelock="back">back to setup</button>
+            <button class="action action--primary" data-prelock="begin">Begin</button>
+            <button class="action action--ghost" data-prelock="back">Back to setup</button>
           </div>
         </div>
         <div class="session__beat" data-beat aria-hidden="true" hidden>
           <p class="session__beat-title" data-beat-title></p>
           <p class="mono session__beat-sub" data-beat-sub></p>
         </div>
-        <div class="session__dialed" data-panel role="dialog" aria-label="dialed in" hidden>
-          <p class="mono session__dialed-label">dialed in</p>
+        <div class="session__dialed" data-panel role="dialog" aria-label="Dialed in" hidden>
+          <p class="mono session__dialed-label">Dialed in</p>
           <p class="display session__dialed-num"><span data-dialed="num"></span><small> cm/360</small></p>
           <p class="mono session__dialed-ci">90% CI <span data-dialed="ci"></span></p>
           <p class="session__dialed-concord" data-dialed="concord" hidden></p>
           <p class="mono session__dialed-budget" data-dialed="budget"></p>
           <div class="session__dialed-actions">
-            <button class="action action--primary" data-dialed="lock">lock it in</button>
-            <button class="action action--ghost" data-dialed="refine">keep refining</button>
+            <button class="action action--primary" data-dialed="lock">Lock it in</button>
+            <button class="action action--ghost" data-dialed="refine">Keep refining</button>
           </div>
         </div>
-        <div class="session__abort" data-abort role="dialog" aria-label="session paused" hidden>
-          <p class="mono session__abort-label">paused</p>
-          <p class="session__abort-lead">the run is held right here. resume puts the cursor back and carries on from
+        <div class="session__abort" data-abort role="dialog" aria-label="Session paused" hidden>
+          <p class="mono session__abort-label">Paused</p>
+          <p class="session__abort-lead">The run is held right here. Resume puts the cursor back and carries on from
             the same trial.</p>
           <p class="session__abort-note" data-abort="note" hidden></p>
           <div class="session__abort-actions" data-abort="choices">
-            <button class="action action--primary" data-abort="resume">resume</button>
-            <button class="action action--ghost" data-abort="quit">quit and discard this run</button>
+            <button class="action action--primary" data-abort="resume">Resume</button>
+            <button class="action action--ghost" data-abort="quit">Quit and discard this run</button>
           </div>
           <div data-abort="confirm" hidden>
-            <p class="session__abort-lead">quitting throws away every trial in this run. nothing is saved, and the
+            <p class="session__abort-lead">Quitting throws away every trial in this run. Nothing is saved, and the
               next run starts the search from scratch.</p>
             <div class="session__abort-actions">
-              <button class="action action--primary" data-abort="confirm-quit">discard the run and quit</button>
-              <button class="action action--ghost" data-abort="cancel">keep the run</button>
+              <button class="action action--primary" data-abort="confirm-quit">Discard the run and quit</button>
+              <button class="action action--ghost" data-abort="cancel">Keep the run</button>
             </div>
           </div>
         </div>
-        <div class="session__abort" data-error role="dialog" aria-label="the run stopped" hidden>
-          <p class="mono session__abort-label">the run stopped</p>
-          <p class="session__abort-lead">something went wrong mid-run, so I stopped rather than score a trial I
-            can't trust. nothing was saved.</p>
+        <div class="session__abort" data-error role="dialog" aria-label="The run stopped" hidden>
+          <p class="mono session__abort-label">The run stopped</p>
+          <p class="session__abort-lead">Something went wrong mid-run. I stopped before scoring a trial I can't
+            trust, and nothing was saved.</p>
           <div class="session__abort-actions">
-            <button class="action action--primary" data-error="quit">back to the menu</button>
+            <button class="action action--primary" data-error="quit">Back to the menu</button>
           </div>
         </div>`;
       host.appendChild(root);
+      // The screen's own <h1> names the landmark: the shell moves focus onto <main> after mount,
+      // so labelling it from the title is what a screen reader hears on arrival.
+      host.setAttribute('aria-labelledby', 'session-title');
 
       const canvas = root.querySelector('canvas') as HTMLCanvasElement;
       const svg = root.querySelector('[data-plot]') as unknown as SVGElement;
@@ -227,7 +230,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         renderConvergencePlot(svg, g, 'blended score');
         // Per-trial visual readout only (aria-hidden): the live region stays quiet until a meaningful
         // moment. Range spelled " to " so no en-dash glyph ever reaches assistive tech.
-        hudEstimateVisual.textContent = `most-evolved · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
+        hudEstimateVisual.textContent = `Most-evolved · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
       };
 
       const runSegment = async (maxTrials: number, ciStopWidth: number | undefined): Promise<void> => {
@@ -262,7 +265,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
               if (i === COLD_START && !curtainDropped) {
                 curtainDropped = true;
                 hudEstimate.textContent = CURTAIN_LINE;
-                showBeat('evolution begins', 'the gene pool is seeded - each round now tests one mutated sensitivity');
+                showBeat('Evolution begins', 'The gene pool is seeded · each round now tests one mutated sensitivity');
               }
               stage.setEnemyEnvironment(id); // skin this trial's targets with the environment's prey
               stage.arena.clearTargets();
@@ -341,7 +344,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         abort.hidden = !show;
         if (show) {
           quitConfirm.hidden = true; quitChoices.hidden = false; abortNote.hidden = true;
-          hudEstimate.textContent = 'session paused';
+          hudEstimate.textContent = 'Session paused';
           closeModal();
           modal = openModal(abort, { initialFocus: $a('resume'), onEscape: () => resume(), inert: behind });
         } else {
@@ -357,7 +360,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
           () => { if (alive) setAbort(false); },
           () => {
             if (!alive) return;
-            abortNote.textContent = "your browser hasn't handed the cursor back yet. wait a second, then press resume again.";
+            abortNote.textContent = "Your browser hasn't handed the cursor back yet. Wait a second, then press resume again.";
             abortNote.hidden = false;
           },
         );
@@ -372,7 +375,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         closeModal();
         panel.hidden = true;
         errorEl.hidden = false;
-        hudEstimate.textContent = 'the run stopped before it could finish';
+        hudEstimate.textContent = 'The run stopped before it could finish';
         modal = openModal(errorEl, { initialFocus: root.querySelector('[data-error="quit"]') as HTMLButtonElement, inert: behind });
       };
 
@@ -425,9 +428,9 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         prelock.hidden = false;
         // Starting the measurement without the lock would be an arena with no aim and no way out,
         // so nothing runs: the card comes back and says what happened.
-        prelockLead.textContent = "your browser wouldn't hide the cursor, so I haven't started anything. that usually "
-          + 'means the last Esc is still cooling down, or the page is embedded without pointer lock. press begin to try again.';
-        beginBtn.textContent = 'try again';
+        prelockLead.textContent = "Your browser wouldn't hide the cursor, so I haven't started anything. That usually "
+          + 'means the last Esc is still cooling down, or the page is embedded without pointer lock. Press begin to try again.';
+        beginBtn.textContent = 'Try again';
         beginBtn.focus();
       };
       beginBtn.addEventListener('click', () => {
@@ -445,6 +448,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         if (beatTimer !== null) clearTimeout(beatTimer);
         closeModal();
         document.removeEventListener('pointerlockchange', syncAbort);
+        host.removeAttribute('aria-labelledby'); // the label's target leaves with the screen
         stage.dispose();
       };
     },

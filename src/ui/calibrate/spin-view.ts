@@ -18,7 +18,7 @@ const TAP_MS = 220;           // press shorter than this (with little movement) 
 const TAP_MOVE_MAX = 40;      // counts of movement during a press still considered "still" (a tap)
 const MIN_DONE_DEG = 270;     // must have swept >= this (at the provisional rate) for a tap to complete
 
-const LEAD_START = 'this step measures one full turn. click the box to begin.';
+const LEAD_START = 'This step measures one full turn. Click the box to begin.';
 
 export function createSpinView(
   host: HTMLElement,
@@ -35,19 +35,19 @@ export function createSpinView(
   host.innerHTML = `
     <section class="screen screen--shell fade-in">
       <div class="wrap stack">
-        <span class="cal-step" data-spin="step">step 2 of 2 - the spin</span>
-        <h2 class="display">+ the spin</h2>
+        <span class="cal-step" data-spin="step">Step 2 of 2 · the spin</span>
+        <h1 class="display">The spin</h1>
         <p class="gate__lead" data-spin="lead" aria-live="polite" aria-atomic="true">${LEAD_START}</p>
         <p class="cal-sub" data-spin="sub"></p>
         <div class="calibrate__stage">
           <canvas class="calibrate__canvas" data-spin="canvas"></canvas>
           <div class="calibrate__hint" data-spin="hint"><span class="cal-pulse"><span class="cal-pulse__dot"></span></span></div>
         </div>
-        <div class="cal-helper"><span><b>out of room?</b> hold the button, slide your mouse back, then let go.</span></div>
-        <p class="cal-method mono" data-spin="seed">the spin gives a starting guess for the search.</p>
+        <div class="cal-helper"><span><b>Out of room?</b> Hold the button, slide your mouse back, then let go.</span></div>
+        <p class="cal-method mono" data-spin="seed">The spin gives a starting guess for the search.</p>
         <div class="cal-exit">
-          <button type="button" class="action action--ghost" data-spin="back">back</button>
-          <button type="button" class="action action--ghost" data-spin="manual">type the numbers instead</button>
+          <button type="button" class="action action--ghost" data-spin="back">Back</button>
+          <button type="button" class="action action--ghost" data-spin="manual">Type the numbers instead</button>
         </div>
       </div>
     </section>`;
@@ -108,12 +108,12 @@ export function createSpinView(
       ctx.beginPath(); ctx.arc(cx, cy - rad, 11, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.fillStyle = rgba('paper', 0.7); ctx.font = '11px ui-monospace, monospace';
-    ctx.textAlign = 'center'; ctx.fillText('home', cx, cy - rad - 12);
+    ctx.textAlign = 'center'; ctx.fillText('Home', cx, cy - rad - 12);
 
     // center readout (Regular weight only, per the type rules)
     ctx.globalAlpha = 1; ctx.textBaseline = 'middle';
-    if (flashing) { ctx.fillStyle = hex.warn; ctx.font = '16px ui-monospace, monospace'; ctx.fillText('almost, keep turning', cx, cy); }
-    else if (repositioning) { ctx.fillStyle = hex.warn; ctx.font = '20px ui-monospace, monospace'; ctx.fillText('paused', cx, cy); }
+    if (flashing) { ctx.fillStyle = hex.warn; ctx.font = '16px ui-monospace, monospace'; ctx.fillText('Almost, keep turning', cx, cy); }
+    else if (repositioning) { ctx.fillStyle = hex.warn; ctx.font = '20px ui-monospace, monospace'; ctx.fillText('Paused', cx, cy); }
     else { ctx.fillStyle = rgba('paper', 0.92); ctx.font = '26px ui-monospace, monospace'; ctx.fillText(Math.round(Math.min(360, deg)) + '°', cx, cy); }
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 
@@ -148,7 +148,7 @@ export function createSpinView(
       // boundsFromSeed (a guess to search around, not the answer).
       const seed = cm360FromTurnCounts(acc.pathLength(), opts.dpi);
       // Prescribe-not-readout: name the seed as a starting point, never a measured result.
-      $('seed').textContent = `the search starts near ${seed.toFixed(1)} cm/360 and hunts from there.`;
+      $('seed').textContent = `The search starts near ${seed.toFixed(1)} cm/360 and hunts from there.`;
       opts.onSeed(seed);
       return;
     }
@@ -162,14 +162,14 @@ export function createSpinView(
     $('hint').style.display = locked ? 'none' : 'flex';
     if (!locked) { $('lead').textContent = LEAD_START; $('sub').textContent = ''; return; }
     if (repositioning) {
-      $('lead').textContent = 'slide your mouse back to the middle of your pad.';
-      $('sub').textContent = "let go when you're set - the ring stays put while you hold."; return;
+      $('lead').textContent = 'Slide your mouse back to the middle of your pad.';
+      $('sub').textContent = "Let go when you're set. The ring stays put while you hold."; return;
     }
     if (progressDeg() >= MIN_DONE_DEG) {
-      $('lead').textContent = 'facing forward again? quick-click to finish.';
-      $('sub').textContent = "just a quick click - don't move the mouse."; return;
+      $('lead').textContent = 'Facing forward again? Quick-click to finish.';
+      $('sub').textContent = 'Just a quick click, keeping the mouse still.'; return;
     }
-    $('lead').textContent = "drag your mouse sideways to turn - keep going until you're facing forward again.";
+    $('lead').textContent = "Drag your mouse sideways to turn, and keep going until you're facing forward again.";
     $('sub').textContent = '';
   }
 
@@ -179,7 +179,7 @@ export function createSpinView(
   const onCanvasClick = (): void => {
     if (pointer.isLocked()) return;
     void pointer.request().catch(() => {
-      $('lead').textContent = 'your browser blocked the pointer lock, so the spin cannot read your mouse. use "type the numbers instead" below.';
+      $('lead').textContent = 'Your browser blocked the pointer lock, so the spin cannot read your mouse. Use "Type the numbers instead" below.';
     });
   };
   // The two ways out, reachable by Tab even mid-turn. Both release the lock before leaving.

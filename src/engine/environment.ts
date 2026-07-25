@@ -94,10 +94,12 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 // smoothly falling off to zero by about 0.35 rad angular distance from SUN_DIR.
 const SUN_CORE_RAD = 0.12;
 const SUN_EDGE_RAD = 0.35;
-// Warm white-gold hotspot color: an even mix of cream + gold. Both anchors already carry a channel
-// at/near 255 (cream.r=239, gold.g=196 but gold.r=255), so the 50/50 mix peaks near 255 without
-// any extra scaling - a real specular ping for metals (gunmetal/brass viewmodel) without blowing
-// past the 0-255 texel range.
+// Warm white-gold hotspot color: an even mix of paper and sulfur. This comment used to claim both
+// anchors carry a channel at or near 255, which was true of the retired cream/gold pair and is not
+// true of these: paper is (244, 240, 231) and sulfur is (224, 194, 63), so the 50/50 mix lands at
+// (234, 217, 147). The reason for skipping any extra scaling is now the plain one, that the mix is
+// already inside the 0-255 texel range with room to spare, and 234 in the red channel is a bright
+// enough specular ping on the metals (gunmetal/brass viewmodel) without clipping.
 const SUN_COLOR: Vec3 = lerp(PAPER, SUN, 0.5);
 
 /**
@@ -110,8 +112,8 @@ function shadeTexel(dir: Vec3): Vec3 {
   let color: Vec3;
   const isSky = dir[1] >= 0;
   if (isSky) {
-    // Sky: vertical gradient from a dim warm horizon glow (cream * 0.35) up to a darker warm zenith
-    // (cream * 0.10), keyed on |y| (0 at horizon, 1 at zenith).
+    // Sky: vertical gradient from a dim warm horizon glow (paper * 0.35) up to a darker warm zenith
+    // (paper * 0.10), keyed on |y| (0 at horizon, 1 at zenith).
     const t = clamp(dir[1], 0, 1);
     const horizonColor = scale(PAPER, 0.35);
     const zenithColor = scale(PAPER, 0.1);

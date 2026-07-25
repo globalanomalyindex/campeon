@@ -30,7 +30,43 @@ const SLOTS: RangeSlot[] = [
 const ENVS: InstrumentId[] = ['track', 'flick', 'calibrate', 'strike'];
 const fmt = (v: number): string => v.toFixed(1);
 
-export function range(host: HTMLElement, ctx: AppContext): Screen {
+/** The step both the buttons and an unshifted bracket key take, in cm/360. */
+export const STEP_CM360 = 0.5;
+/** The step a shifted bracket key takes. */
+export const FINE_STEP_CM360 = 0.1;
+
+/**
+ * What the nudge controls actually do, spoken. The buttons carry a "+" and a "−" glyph, but what
+ * they move is cm/360, and a HIGHER cm/360 is a LOWER sensitivity. Saying "increase sensitivity"
+ * on the "+" would tell a screen-reader user the inverse of what happens, so the name states the
+ * unit that changes and then the direction the feel moves.
+ */
+export const stepLabel = (dir: 1 | -1): string =>
+  dir > 0
+    ? `Increase cm/360 by ${STEP_CM360}, a lower sensitivity`
+    : `Decrease cm/360 by ${STEP_CM360}, a higher sensitivity`;
+
+/**
+ * The spoken form of the live readout. The visible HUD is a mono glyph composition ("32.4 cm/360",
+ * "+1.5 from your number"); this is the same fact as a sentence, with the unit spelled out and the
+ * comparison to the measured number stated in cm/360, which is the thing that moved.
+ */
+export function announceCm360(current: number, measured: number): string {
+  const d = current - measured;
+  if (Math.abs(d) < 0.05) return `${fmt(current)} centimetres per 360. This is your measured value.`;
+  const dir = d > 0 ? 'above' : 'below';
+  return `${fmt(current)} centimetres per 360, ${fmt(Math.abs(d))} ${dir} your measured ${fmt(measured)}.`;
+}
+
+/** Thin-shell injection seam, as in session-view: production builds the real WebGL stage, a jsdom
+ *  test swaps in a fake so the shell's wiring and its accessible names are testable. */
+export interface RangeDeps {
+  createStage: typeof createArenaStage;
+}
+
+const DEFAULT_DEPS: RangeDeps = { createStage: createArenaStage };
+
+export function range(host: HTMLElement, ctx: AppContext, deps: RangeDeps = DEFAULT_DEPS): Screen {
   let alive = true;
   let cleanup: (() => void) | null = null;
 
@@ -41,7 +77,7 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
       if (!carried || !sessionId) { ctx.navigate('hero'); return; }
       // Re-read the MEASURED record rather than trusting whatever we arrived carrying: on a second
       // visit ctx.lastResult holds the tuned value, and reading that would label a hand-picked
-      // number "your measured sweet spot" and make "reset to measured" reset to it.
+      // number "Your measured sweet spot" and make "Reset to measured" reset to it.
       const measuredId = measuredIdOf(sessionId);
       const measured = ctx.storage.loadResults?.()[measuredId] ?? carried;
       const tunedId = `${measuredId}${TUNED_ID_SUFFIX}`;
@@ -54,49 +90,62 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
       root.className = 'screen screen--arena range';
       root.dataset.surface = 'chamber';
       root.innerHTML = `
-        <h1 class="sr-only">the range</h1>
+        <h1 class="sr-only">The range</h1>
         <canvas class="session__canvas"></canvas>
         <div class="session__crosshair" aria-hidden="true"></div>
         <header class="range__hud mono" aria-live="polite" aria-atomic="true">
-          <span class="display"><span data-range="cm360">${fmt(current)}</span><small> cm/360</small></span>
-          <span class="range__delta" data-range="delta"></span>
+          <span class="display" aria-hidden="true"><span data-range="cm360">${fmt(current)}</span><small> cm/360</small></span>
+          <span class="range__delta" data-range="delta" aria-hidden="true"></span>
+          <span class="sr-only" data-range="announce"></span>
         </header>
-        <footer class="range__bar">
-          <button class="action action--ghost range__step" data-range="down" aria-label="decrease sensitivity by 0.5">−</button>
-          <button class="action action--ghost range__step" data-range="up" aria-label="increase sensitivity by 0.5">+</button>
-          <button class="action action--primary" data-range="adopt">adopt this feel</button>
-          <button class="action action--ghost" data-range="reset">reset to measured</button>
-          <button class="action action--ghost" data-range="exit">back to result</button>
+        <footer class="range__bar" role="group" aria-label="Sensitivity controls" aria-describedby="range-keys">
+          <button class="action action--ghost range__step" data-range="down" aria-label="${stepLabel(-1)}" aria-keyshortcuts="[ Shift+[">−</button>
+          <button class="action action--ghost range__step" data-range="up" aria-label="${stepLabel(1)}" aria-keyshortcuts="] Shift+]">+</button>
+          <button class="action action--primary" data-range="adopt">Adopt this feel</button>
+          <button class="action action--ghost" data-range="reset">Reset to measured</button>
+          <button class="action action--ghost" data-range="exit">Back to result</button>
         </footer>
-        <p class="range__hint">click the arena to lock the cursor. bracket keys nudge the sensitivity, hold shift for a
-          fine step, and Esc releases the cursor.</p>
+        <p class="range__hint" id="range-keys">Click the arena to lock the cursor. The bracket keys nudge cm/360, hold
+          Shift for a fine step, and Esc releases the cursor.</p>
         <div class="range__confirm" data-confirm role="dialog" aria-labelledby="range-confirm-title" hidden>
-          <p class="mono range__confirm-label" id="range-confirm-title">adopt this feel</p>
-          <p class="range__confirm-lead">this saves <span data-confirm="num"></span> cm/360 as a number you picked by
-            hand. it carries no measured CI, so the result screen drops the convergence plot and the four facets.
-            your measured <span data-confirm="measured"></span> cm/360 stays saved, and reset brings it back.</p>
+          <p class="mono range__confirm-label" id="range-confirm-title">Adopt this feel</p>
+          <p class="range__confirm-lead">This saves <span data-confirm="num"></span> cm/360 as a number you picked by
+            hand. It carries no measured CI, so I drop the convergence plot and the four facets from the result screen.
+            Your measured <span data-confirm="measured"></span> cm/360 stays saved, and reset brings it back.</p>
           <div class="range__confirm-actions">
-            <button class="action action--primary" data-confirm="adopt">adopt it</button>
-            <button class="action action--ghost" data-confirm="cancel">keep tuning</button>
+            <button class="action action--primary" data-confirm="adopt">Adopt it</button>
+            <button class="action action--ghost" data-confirm="cancel">Keep tuning</button>
           </div>
         </div>`;
       host.appendChild(root);
 
       const canvas = root.querySelector('canvas') as HTMLCanvasElement;
       const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const stage = createArenaStage(root, { canvas, cm360: current, dpi, reducedMotion: reduced });
+      const stage = deps.createStage(root, { canvas, cm360: current, dpi, reducedMotion: reduced });
 
       const cmEl = root.querySelector('[data-range="cm360"]')!;
       const deltaEl = root.querySelector('[data-range="delta"]')!;
+      const announceEl = root.querySelector('[data-range="announce"]')!;
+      // The visible readout is aria-hidden and this sr-only span carries it as a sentence, so the
+      // polite region voices the change once instead of reading the glyphs twice. Rewritten only
+      // when the shown value actually moves: a nudge that clamps at a bound changes nothing, and
+      // re-announcing the same number would be noise.
+      let announced: string | null = null;
       const refresh = (): void => {
-        cmEl.textContent = fmt(current);
+        const shown = fmt(current);
+        cmEl.textContent = shown;
         const d = current - measuredCm360;
-        deltaEl.textContent = Math.abs(d) < 0.05 ? 'your measured sweet spot' : `${d > 0 ? '+' : ''}${d.toFixed(1)} from your number`;
+        deltaEl.textContent = Math.abs(d) < 0.05 ? 'Your measured sweet spot' : `${d > 0 ? '+' : ''}${d.toFixed(1)} from your number`;
+        if (shown !== announced) {
+          announced = shown;
+          announceEl.textContent = announceCm360(current, measuredCm360);
+        }
       };
       refresh();
 
       const applyCm = (next: number): void => { current = next; stage.setCm360(current); refresh(); };
-      const nudge = (dir: number, fine: boolean): void => applyCm(nudgeCm360(current, dir * (fine ? 0.1 : 0.5), bounds));
+      const nudge = (dir: number, fine: boolean): void =>
+        applyCm(nudgeCm360(current, dir * (fine ? FINE_STEP_CM360 : STEP_CM360), bounds));
 
       root.querySelector('[data-range="down"]')!.addEventListener('click', () => nudge(-1, false));
       root.querySelector('[data-range="up"]')!.addEventListener('click', () => nudge(1, false));
@@ -112,6 +161,14 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
       // first and says what it costs.
       const confirmEl = root.querySelector('[data-confirm]') as HTMLElement;
       const $c = (s: string) => root.querySelector(`[data-confirm="${s}"]`) as HTMLElement;
+      // The HUD, the control bar and the key-bindings hint are the only background content behind
+      // the confirm. All three leave the tab order and the accessibility tree while it is open, so
+      // the dialog is the whole room and the live HUD does not narrate over it.
+      const behind = [
+        root.querySelector('.range__hud') as HTMLElement,
+        root.querySelector('.range__bar') as HTMLElement,
+        root.querySelector('.range__hint') as HTMLElement,
+      ];
       let confirmModal: ModalHandle | null = null;
       const closeConfirm = (): void => {
         confirmEl.hidden = true;
@@ -122,7 +179,7 @@ export function range(host: HTMLElement, ctx: AppContext): Screen {
         $c('num').textContent = fmt(current);
         $c('measured').textContent = fmt(measuredCm360);
         confirmEl.hidden = false;
-        confirmModal = openModal(confirmEl, { initialFocus: $c('adopt'), onEscape: closeConfirm });
+        confirmModal = openModal(confirmEl, { initialFocus: $c('adopt'), onEscape: closeConfirm, inert: behind });
       });
       $c('cancel').addEventListener('click', closeConfirm);
       $c('adopt').addEventListener('click', () => {

@@ -89,7 +89,7 @@ describe('options screen', () => {
 
   // Setup reads "prefs exist" as "this visitor has calibrated". Saving from here before a
   // calibration would fabricate one, and send them into the hunt on a made-up DPI.
-  it('does NOT write prefs when no calibration exists, and says so', () => {
+  it('does NOT write prefs when no calibration exists', () => {
     const store = storage(null);
     const c = ctx(store);
     const { host, screen } = mount(c);
@@ -98,7 +98,36 @@ describe('options screen', () => {
     expect(store.saved).toHaveLength(0);
     expect(store.loadPrefs!()).toBeNull();
     expect(c.draft.bounds).toEqual([15, 60]);                     // still applied to this visit
-    expect(host.querySelector('[data-bounds-status]')!.textContent).toContain('once you calibrate');
+    screen.unmount();
+  });
+
+  // An uncalibrated visitor's only route into a run is the sweep and the spin (or typed
+  // numbers), and setup.ts sets draft.bounds from what it measures on both of those paths.
+  // So the window they just applied is overwritten before the optimizer ever searches it.
+  // The old message said "Applied for this visit", which promised exactly the thing that
+  // does not happen. It has to name the calibration, and it must not imply a save.
+  it('an uncalibrated visitor is told the calibration will replace the window, not that it is kept', () => {
+    const { host, screen } = mount(ctx(storage(null)));
+    host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
+    const said = host.querySelector('[data-bounds-status]')!.textContent!;
+
+    expect(said).toContain('15 to 60');
+    expect(said.toLowerCase()).toContain('calibration');
+    expect(said.toLowerCase()).toContain('replace');
+    expect(said).not.toMatch(/^Saved/);           // nothing was written
+    expect(said).not.toContain('for this visit'); // and it does not last the visit either
+    screen.unmount();
+  });
+
+  // The mirror case. Prefs exist, so the write lands and the claim of a save is true.
+  it('a calibrated visitor is told it is saved, and it is', () => {
+    const store = storage(PREFS);
+    const { host, screen } = mount(ctx(store));
+    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '45';
+    host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
+
+    expect(host.querySelector('[data-bounds-status]')!.textContent).toBe('Saved. I search 15 to 45 cm/360.');
+    expect(store.loadPrefs!()!.bounds).toEqual([15, 45]);
     screen.unmount();
   });
 

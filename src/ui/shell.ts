@@ -38,15 +38,20 @@ const ROUTE_HASH: Record<Route, string> = {
 };
 const HASH_ROUTE = new Map<string, Route>(Object.entries(ROUTE_HASH).map(([r, h]) => [h, r as Route]));
 
-/** What each route is called out loud. Announced on navigation and used as the page title. */
+/**
+ * What each route is called out loud. This string is user-visible three ways over: it names the
+ * <main> landmark, it is spoken on navigation, and it is the document title. So it is written as
+ * copy, in sentence case. `hero` stays exactly the product name, which the title logic below
+ * special-cases so the front door never reads "campeón · campeón".
+ */
 export const ROUTE_NAME: Record<Route, string> = {
   hero: 'campeón',
-  setup: 'set up the run',
-  session: 'the hunt',
-  result: 'your result',
-  'case-study': 'how I built it',
-  options: 'options',
-  range: 'the range',
+  setup: 'Set up the run',
+  session: 'The hunt',
+  result: 'Your result',
+  'case-study': 'How I built it',
+  options: 'Options',
+  range: 'The range',
 };
 
 function defaultDraft(): SessionDraft {
@@ -99,13 +104,23 @@ const GUARDS: Partial<Record<Route, (ctx: AppContext) => Route | null>> = {
 export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void; context: AppContext } {
   let current: Screen | null = null;
 
-  // One live region for the whole app. Navigation replaces the entire document body, which is
-  // silent to a screen reader, so the route name is spoken here instead. Re-appended on every
-  // render because replaceChildren() clears it along with the old screen.
+  // One live region for the whole app. Navigation swaps the screen's markup, which is silent to a
+  // screen reader, so the route name is spoken here instead.
+  //
+  // It is created and attached ONCE, and render() never touches it. The old code cleared the whole
+  // root and re-appended the region on every navigation, then wrote to it in the same synchronous
+  // task: assistive tech has to have a live region attached and registered BEFORE its content
+  // changes to report the change, so a detach/attach/write inside one task lost the announcement
+  // most of the time. Only the <main> beside it is replaced now.
   const announcer = document.createElement('p');
   announcer.className = 'sr-only';
   announcer.setAttribute('aria-live', 'polite');
   announcer.setAttribute('aria-atomic', 'true');
+  root.appendChild(announcer);
+
+  /** The screen landmark currently mounted, replaced in place so the announcer stays attached. */
+  let landmark: HTMLElement | null = null;
+  let pendingAnnounce: ReturnType<typeof setTimeout> | undefined;
 
   const storage = deps.storage ?? inMemoryStorage();
   const prefs = storage.loadPrefs?.() ?? null;
@@ -136,18 +151,25 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     const guard = GUARDS[route]?.(context) ?? null;
     if (guard) { context.navigate(guard); return; }
     current?.unmount();
-    root.replaceChildren();
     context.route = route;
+    const name = ROUTE_NAME[route];
 
     // Each screen gets its own landmark, and focus moves into it once it is mounted. Without
     // this, navigation removes the element that had focus and the browser drops focus back on
     // <body>: a keyboard or screen-reader user lands at the top of the document every time and
     // has no idea the screen changed. tabindex="-1" makes the landmark a programmatic target
     // only, so it never joins the tab order.
+    //
+    // The landmark carries the route name, so focus lands on "Set up the run, main" rather than
+    // on an anonymous region. It replaces its predecessor in place, which leaves the live region
+    // attached beside it.
     const main = document.createElement('main');
     main.tabIndex = -1;
     main.dataset.route = route;
-    root.append(main, announcer);
+    main.setAttribute('aria-label', name);
+    if (landmark) landmark.replaceWith(main);
+    else root.insertBefore(main, announcer);
+    landmark = main;
 
     const factory = deps.screens[route];
     current = factory(main, context);
@@ -157,12 +179,22 @@ export function createShell(root: HTMLElement, deps: ShellDeps): { start(): void
     // The hero's route name IS the product name, so suffixing it there gives
     // "campeón · campeón". Every other route reads as a page inside the product.
     if (typeof document !== 'undefined') {
-      const name = ROUTE_NAME[route];
       document.title = name === 'campeón' ? name : `${name} · campeón`;
     }
-    // Cleared first so re-entering the same route still counts as a change worth announcing.
+    announce(name);
+  }
+
+  /**
+   * Speak the new route. Cleared synchronously so re-entering the same route still reads as a
+   * change worth announcing, then written in a later task so the screen change and the text change
+   * are two separate events: written in the same task as the DOM swap, the text is often already in
+   * place by the time assistive tech observes the region, and nothing is reported. A superseded
+   * announcement is cancelled so a fast back/forward run speaks only where it landed.
+   */
+  function announce(name: string): void {
+    clearTimeout(pendingAnnounce);
     announcer.textContent = '';
-    announcer.textContent = ROUTE_NAME[route];
+    pendingAnnounce = setTimeout(() => { announcer.textContent = name; }, 0);
   }
 
   function start(): void {

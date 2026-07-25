@@ -91,12 +91,11 @@ function buildFigure(): HTMLElement {
     screen: 'fig. 01 · the convergence plot',
     demo: 'worked example · invented numbers',
     art: svg,
-    caption:
-      'nothing here was measured. i drew a converged sweep by hand so the shape is legible before you have played a session, and the real plot is the same code with your trials in it. four instruments, each z-scored across its own sweep, converging on one peak.',
+    caption: 'Nothing here was measured. I drew a converged sweep by hand so the shape is legible before you have played a session, and the real plot is the same code with your trials in it. Four instruments, each z-scored across its own sweep, converging on one peak.',
     notes: [
-      { n: 1, text: 'the band around the peak is the 90% ci. it widens with measurement noise and with facet disagreement, so a wide band is the honest output of a thin session.' },
-      { n: 2, text: `the four marks along the top are each faculty's own peak, which is the one-number thesis being tested rather than assumed. drawn as they sit here, the shipped readout would say: ${THESIS_COPY['some-spread']}.` },
-      { n: 3, text: 'strike is drawn hollow because its peak is conditioned on your goal slider, so it is a labelled marker rather than a fourth estimate of the same constant.' },
+      { n: 1, text: 'The band around the peak is the 90% ci. It widens with measurement noise and with facet disagreement, so a wide band is the honest output of a thin session.' },
+      { n: 2, text: `The four marks along the top are each faculty's own peak, which is the one-number thesis being tested and not assumed. Drawn as they sit here, the shipped readout would say: ${THESIS_COPY['some-spread']}.` },
+      { n: 3, text: 'Strike is drawn hollow because its peak is conditioned on your goal slider, so it is a labelled marker rather than a fourth estimate of the same constant.' },
     ],
   });
 }
@@ -106,11 +105,11 @@ function buildRepairFigure(): HTMLElement {
     screen: 'fig. 02 · the two repairs',
     art: codeCompare(
       {
-        label: 'before', file: 'the tuned constant',
+        label: 'Before', file: 'the tuned constant',
         lines: ['// strike: "measured" uncertainty', 'const se = sigmaTheta / 1.0; // deg', '', '// flick: endpoint sign', 'const err = radial * signOf(yawOrder);'],
       },
       {
-        label: 'after', file: 'src/instruments/strike.ts · flick.ts',
+        label: 'After', file: 'src/instruments/strike.ts · flick.ts',
         lines: [
           '// strike: the hit rate\'s own binomial SE,',
           '// carried through the delta method',
@@ -122,11 +121,10 @@ function buildRepairFigure(): HTMLElement {
         ],
       },
     ),
-    caption:
-      'the two lines the adversarial review took apart, and what replaced them. the left column is reconstructed from the change, the right column is what ships today. both files are linked in the colophon so you can read the rest of the context.',
+    caption: 'The two lines the adversarial review took apart, and what replaced them. The left column is reconstructed from the change, the right column is what ships today. Both files are linked in the colophon so you can read the rest of the context.',
     notes: [
-      { n: 1, text: 'the hand-picked one-degree divisor produced a number that looked measured and was not. the binomial standard error is the score\'s own functional form, so nothing unmeasured enters the nugget.' },
-      { n: 2, text: 'signing the total radial miss by yaw order meant a near-vertical reach had its sign set by horizontal wobble, which inflated We and cancelled real bias out of Ae.' },
+      { n: 1, text: 'The hand-picked one-degree divisor produced a number that looked measured and was not. The binomial standard error is the score\'s own functional form, so nothing unmeasured enters the nugget.' },
+      { n: 2, text: 'Signing the total radial miss by yaw order meant a near-vertical reach had its sign set by horizontal wobble, which inflated We and cancelled real bias out of Ae.' },
     ],
   });
 }
@@ -135,20 +133,19 @@ function buildGateFigure(): HTMLElement {
   return figure({
     screen: 'fig. 03 · setup, calibration blocked',
     art: screenSketch({
-      heading: 'mouse acceleration detected',
+      heading: 'Mouse acceleration detected',
       lines: [
-        'the sweep says your mouse speeds up the faster you move, which makes one true turn distance impossible to pin down.',
-        'turn off enhance pointer precision, or your driver\'s acceleration, then run it again.',
+        'The sweep says your mouse speeds up the faster you move, which makes one true turn distance impossible to pin down.',
+        'Turn off enhance pointer precision, or your driver\'s acceleration, then run it again.',
       ],
-      actions: [{ label: 'try again', primary: true }, { label: 'i\'ll type my numbers instead' }],
-      footnote: 'typed numbers seed the search. they are never the answer.',
+      actions: [{ label: 'Try again', primary: true }, { label: 'I\'ll type my numbers instead' }],
+      footnote: 'Typed numbers seed the search. They are never the answer.',
     }),
-    caption:
-      'a redraw of the screen a blocked calibration lands on. the decision worth defending is the second button: i keep the escape hatch, and i label what it costs you rather than hiding it behind the gate.',
+    caption: 'A redraw of the screen a blocked calibration lands on. The decision worth defending is the second button: I keep the escape hatch, and I label what it costs you rather than hiding it behind the gate.',
     notes: [
-      { n: 1, text: 'the primary action is the one that keeps the session measurable, so it is the only lapis control on the screen.' },
-      { n: 2, text: 'the ghost button next to it is the honest admission that a browser can refuse pointer lock outright, in which case there is no measured path to offer.' },
-      { n: 3, text: 'the footnote is the same sentence on both screens that expose this button, because the claim it protects is the one a reader would otherwise carry away wrong.' },
+      { n: 1, text: 'The primary action is the one that keeps the session measurable, so it is the only lapis control on the screen.' },
+      { n: 2, text: 'The ghost button next to it is the honest admission that a browser can refuse pointer lock outright, in which case there is no measured path to offer.' },
+      { n: 3, text: 'The footnote states what the escape hatch costs, because a typed number seeds the search and a reader who skipped that would carry away the one wrong idea this tool cannot afford.' },
     ],
   });
 }
@@ -166,15 +163,14 @@ function buildResultCardFigure(): HTMLElement {
         { instrument: 'calibrate', label: 'calibrate', value: '29.2' },
         { instrument: 'strike', label: 'strike', value: '33.0' },
       ],
-      note: 'the four views broadly agree; a few more trials would tighten this band.',
+      note: 'The four views broadly agree; a few more trials would tighten this band.',
     }),
-    caption:
-      'the payoff screen, at reading scale, with invented numbers. one dominant field and small accents, which is the same composition the rest of the app is built on.',
+    caption: 'The payoff screen, at reading scale, with invented numbers. One dominant field and small accents, which is the same composition the rest of the app is built on.',
     notes: [
-      { n: 1, text: 'the number is warm ink on paper rather than a coloured headline. the composition carries the payoff, so colour is left free to mean something.' },
-      { n: 2, text: 'the 90% ci is a hairline rule under the number rather than a badge, because it is a property of the measurement rather than a status.' },
-      { n: 3, text: 'the four facets are a mineral-coded rail read as a museum tag. lapis is missing from it on purpose: blue is reserved for things you can act on.' },
-      { n: 4, text: 'a number you hand-tuned in the range renders this card with no ci at all. a tuned value has no measured interval, so it gets none.' },
+      { n: 1, text: 'The number is warm ink on paper rather than a coloured headline. The composition carries the payoff, so colour is left free to mean something.' },
+      { n: 2, text: 'The 90% ci is a hairline rule under the number rather than a badge, because it is a property of the measurement rather than a status.' },
+      { n: 3, text: 'The four facets are a mineral-coded rail read as a museum tag. Lapis is missing from it on purpose: blue is reserved for things you can act on.' },
+      { n: 4, text: 'A number you hand-tuned in the range renders this card with no ci at all. A tuned value has no measured interval, so it gets none.' },
     ],
   });
 }
@@ -229,10 +225,18 @@ export function caseStudy(host: HTMLElement, ctx: AppContext): Screen {
       article.className = 'case fade-in';
       if (animate) article.setAttribute('data-reveal-active', '');
 
+      // The article's one h1. It is sr-only because the piece opens on section i's own
+      // heading by design, and a visible second title would compete with it. Without an h1
+      // the whole document outline started at h2 and the screen had no name.
+      const title = document.createElement('h1');
+      title.className = 'sr-only';
+      title.textContent = 'How I built it';
+      article.appendChild(title);
+
       const back = document.createElement('button');
       back.className = 'action action--ghost cs-back';
       back.setAttribute('data-action', 'back');
-      back.textContent = 'back';
+      back.textContent = 'Back';
       back.addEventListener('click', () => ctx.navigate('hero'));
       article.appendChild(back);
 

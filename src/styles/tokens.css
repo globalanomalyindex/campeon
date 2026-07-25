@@ -1,8 +1,13 @@
 /* campeón: design tokens
    The Chris Robin Fiore design system, applied to a measuring instrument.
-   Foundations (stone ramp, mineral collection, type, spacing, radii, shadows,
-   motion) are carried over as defined. Section 9 holds the campeón-specific
-   decisions: the four instrument minerals and the ink chamber.
+   Foundations (stone ramp, mineral collection, type, spacing, radii, motion) are
+   carried over as defined. Section 9 holds the campeón-specific decisions: the four
+   instrument minerals and the ink chamber.
+
+   The system's elevation set is not carried over. Nothing in this app is raised:
+   every surface is separated by a hairline or by the 1px lattice, and the one
+   overlay uses a scrim. A --shadow-* / --elevation-* ladder that no rule reads is a
+   suggestion that the design does not make, so it is absent rather than unused.
    See docs/design/canon.md. */
 
 /* ── 1. Webfonts: two families, Regular only ──────────────────────────────────
@@ -73,9 +78,13 @@
   --border-hairline: var(--stone-200);
   --border-default:  var(--stone-300);
   --border-strong:   var(--stone-400);
-  --border-inverse:  color-mix(in oklab, var(--stone-50) 22%, transparent);
 
   /* ── 7. Interactive + status ─────────────────────────────────────────────── */
+  /* The status triples (colour, wash, on-colour) are carried whole even where this app
+     reads only the colour. The canon fixes the mappings (success Malachite, warning
+     Citrine, danger Carnelian, info Turquoise) and a test holds them, so the canon is
+     the consumer. The mineral collection above is kept for the same reason: twelve
+     specimens is the collection, not a list of things in use. */
   --color-primary:        var(--lapis);
   --color-primary-hover:  color-mix(in oklab, var(--lapis) 88%, var(--stone-900));
   --color-primary-active: color-mix(in oklab, var(--lapis) 78%, var(--stone-900));
@@ -86,7 +95,9 @@
   --color-warning: var(--citrine);   --color-warning-wash: var(--citrine-wash);   --text-on-warning: var(--stone-900);
   --color-danger:  var(--carnelian); --color-danger-wash:  var(--carnelian-wash); --text-on-danger:  var(--stone-0);
   --color-info:    var(--turquoise); --color-info-wash:    var(--turquoise-wash); --text-on-info:    var(--stone-0);
-  --color-accent:  var(--amethyst);  --color-accent-wash:  var(--amethyst-wash);  --text-on-accent:  var(--stone-0);
+  /* There is no --color-accent. The source system aliased it to Amethyst, and in campeón
+     Amethyst already means one thing: the track instrument. A second name for it would let a
+     generic accent land on a colour that is supposed to identify a facet. */
 
   /* Solid, not a 45% mix. Composited against paper that mix measured 2.15:1, and WCAG 2.2
      SC 1.4.11 wants 3:1 for a focus indicator. Buttons carry only this ring, so a
@@ -123,18 +134,16 @@
 
   --tracking-display: -0.02em;
   --tracking-tight:   -0.01em;
-  --tracking-normal:  0;
   --tracking-label:   0.14em;
   --tracking-caption: 0.06em;
 
-  --features-display-alt:  'ss01' 1, 'ss02' 1;
-  --features-display-caps: 'case' 1;
-  --features-oldstyle:     'onum' 1;
-  --features-karrik-alt:   'ss01' 1, 'ss02' 1, 'ss03' 1;
-  --features-tabular:      'tnum' 1;
-  /* Karrik ships a slashed zero. Every measured number in this app uses it, so a
-     0 can never be misread as an O in a readout. */
-  --features-figures:      'tnum' 1, 'zero' 1;
+  /* One font-feature token, because there is one thing worth switching on. Karrik ships a
+     slashed zero and tabular figures; every measured number in this app takes both, so a 0
+     can never be misread as an O and a live readout never jitters as digits change.
+     The stylistic-set and old-style-figure tokens that used to sit here are gone: both faces
+     are subset for this app, so a feature nobody had applied was also a feature nobody had
+     confirmed the shipped font even carries. */
+  --features-figures: 'tnum' 1, 'zero' 1;
 
   --type-display-2xl: var(--weight-regular) var(--text-display-2xl)/var(--leading-display) var(--font-display);
   --type-display-xl:  var(--weight-regular) var(--text-display-xl)/var(--leading-display) var(--font-display);
@@ -150,47 +159,35 @@
   --type-label:       var(--weight-regular) var(--text-label)/1 var(--font-text);
 
   /* ── 8b. Spacing: 8px rhythm ─────────────────────────────────────────────── */
-  --space-0: 0;
   --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
   --space-5: 24px;  --space-6: 32px;  --space-7: 48px;  --space-8: 64px;
   --space-9: 96px;  --space-10: 128px; --space-11: 192px;
 
   --pad-control-x: 16px;
   --pad-control-y: 10px;
-  --pad-card: 24px;
-  --gap-inline: 8px;
-  --gap-stack: 16px;
 
   --measure-prose: 64ch;
   --container: 1200px;
-  --container-wide: 1440px;
 
   /* ── 8c. Radii: sharp by rule ────────────────────────────────────────────── */
+  /* Two values, and only two. There was also a --radius-pill (999px) and a pair of
+     semantic aliases pointing at --radius-none; nothing read any of them, and a pill
+     token is a standing invitation to round a frame, which the canon forbids. */
   --radius-none: 0;
-  --radius-pill: 999px;  /* circular affordances only, never frames */
   --radius-round: 50%;   /* dots, thumbs, swatches */
-  --radius-control: var(--radius-none);
-  --radius-card: var(--radius-none);
 
-  /* ── 8d. Elevation: matte, warm ink-tinted, faint ────────────────────────── */
-  --shadow-none: none;
-  --shadow-xs: 0 1px 1px rgba(23, 20, 15, 0.05);
-  --shadow-sm: 0 1px 2px rgba(23, 20, 15, 0.06), 0 2px 4px rgba(23, 20, 15, 0.04);
-  --shadow-md: 0 2px 4px rgba(23, 20, 15, 0.05), 0 6px 14px rgba(23, 20, 15, 0.07);
-  --shadow-lg: 0 8px 18px rgba(23, 20, 15, 0.09), 0 18px 40px rgba(23, 20, 15, 0.10);
-  --elevation-card: var(--shadow-sm);
-  --elevation-popover: var(--shadow-md);
-  --elevation-modal: var(--shadow-lg);
-
-  /* ── 8e. Motion: calm, no bounce, no overshoot ───────────────────────────── */
+  /* ── 8d. Motion: calm, no bounce, no overshoot ───────────────────────────── */
   --dur-instant: 80ms;
   --dur-fast: 120ms;
   --dur-med: 200ms;
   --dur-slow: 360ms;
   --dur-slower: 560ms;
+  /* A looping cue breathes far slower than anything transitional, so it needs a step of
+     its own well above the interaction ramp. Deliberately outside the reduced-motion
+     override below: its one consumer switches the animation off outright under reduce,
+     and a 0ms infinite loop is not a calmer version of a breath. */
+  --dur-ambient: 2400ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --transition-control:
     color var(--dur-fast) var(--ease-standard),
     background-color var(--dur-fast) var(--ease-standard),
@@ -231,11 +228,14 @@
   --border-default:  color-mix(in oklab, var(--stone-50) 24%, transparent);
   --border-strong:   color-mix(in oklab, var(--stone-50) 38%, transparent);
 
-  /* Lapis is too dark to carry an action against ink, so the primary lifts to
-     Azurite on this surface. Same meaning, readable value. */
-  --color-primary:       var(--azurite);
-  --color-primary-hover: color-mix(in oklab, var(--azurite) 82%, var(--stone-0));
-  --text-on-primary:     var(--stone-900);
+  /* Lapis is too dark to carry an action against ink, so the primary lifts to Azurite on this
+     surface. Same meaning, readable value. Hover and press both lift further toward paper here,
+     the mirror of the paper surface where they deepen toward ink, so the settle reads the same
+     way on either field. */
+  --color-primary:        var(--azurite);
+  --color-primary-hover:  color-mix(in oklab, var(--azurite) 82%, var(--stone-0));
+  --color-primary-active: color-mix(in oklab, var(--azurite) 70%, var(--stone-0));
+  --text-on-primary:      var(--stone-900);
   --text-link:           var(--azurite);
   /* Azurite itself is only 2.81:1 on the chamber card, so the ring lifts to a brighter cut of
      the same mineral: 6.43:1 on ink, 5.82:1 on a card, 6.84:1 on a sunken panel. It stays in

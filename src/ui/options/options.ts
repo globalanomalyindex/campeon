@@ -48,12 +48,12 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
         </div>
 
         <div class="wrap options__inner">
-          <h2 class="options__title">Options</h2>
-          <p class="options__lead">Two things live here. The window I search for your number, and a converter for carrying a number between fields of view.</p>
+          <h1 class="t-display-sm">Options</h1>
+          <p class="t-body-lg options__lead">Two things live here. The window I search for your number, and a converter for carrying a number between fields of view.</p>
 
-          <section class="options__panel" data-panel="bounds">
-            <h3 class="options__h">The search window <span class="options__sub">cm/360</span></h3>
-            <p class="options__note">This is the range I search while you play the drills. A wider window covers more of the scale and takes longer to settle. Running a new calibration replaces it with a window around whatever I measure.</p>
+          <section class="panel options__panel" data-panel="bounds">
+            <h3 class="t-heading-md options__h">The search window <span class="t-label options__sub">cm/360</span></h3>
+            <p class="t-body-sm options__note">This is the range I search while you play the drills. A wider window covers more of the scale and takes longer to settle. Running a new calibration replaces it with a window around whatever I measure.</p>
             <div class="options__row">
               <label class="field"><span>Lowest</span><input type="number" data-bound="lo" value="${lo}" min="5" max="150"></label>
               <label class="field"><span>Highest</span><input type="number" data-bound="hi" value="${hi}" min="5" max="150"></label>
@@ -61,13 +61,13 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
             <p class="options__readout">Searching <span class="t-figure options__figure" data-bounds-out>${lo} to ${hi}</span> cm/360</p>
             <div class="options__commit">
               <button class="action action--primary" data-action="apply-bounds">Apply this window</button>
-              <p class="options__status" data-bounds-status role="status" aria-live="polite"></p>
+              <p class="t-body-sm options__status" data-bounds-status role="status" aria-live="polite"></p>
             </div>
           </section>
 
-          <section class="options__panel" data-panel="games">
-            <h3 class="options__h">Game yaw <span class="options__sub">at <span data-mid-sub>${mid}</span> cm/360</span></h3>
-            <p class="options__note">These are the community-derived yaw constants I use to turn cm/360 into a native in-game number. The sensitivity column is what each game would want at the middle of the window above, on ${ctx.draft.dpi} dpi. I show them read only, since they are reference rather than a setting.</p>
+          <section class="panel options__panel" data-panel="games">
+            <h3 class="t-heading-md options__h">Game yaw <span class="t-label options__sub">at <span data-mid-sub>${mid}</span> cm/360</span></h3>
+            <p class="t-body-sm options__note">These are the community-derived yaw constants I use to turn cm/360 into a native in-game number. The sensitivity column is what each game would want at the middle of the window above, on ${ctx.draft.dpi} dpi. I show them read only, since they are reference rather than a setting.</p>
             <div class="options__scroll">
               <table class="options__table">
                 <thead><tr><th>Game</th><th>Yaw, degrees per count</th><th>Sensitivity</th><th>Note</th></tr></thead>
@@ -76,9 +76,9 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
             </div>
           </section>
 
-          <section class="options__panel" data-panel="fov">
-            <h3 class="options__h">Field of view converter</h3>
-            <p class="options__note">campeón measures cm/360, which does not depend on your field of view. If you want the same on-screen travel after changing FOV, this is the number that holds it. Screen fraction is how far across the half screen you are flicking, where 0 is a small correction near the centre.</p>
+          <section class="panel options__panel" data-panel="fov">
+            <h3 class="t-heading-md options__h">Field of view converter</h3>
+            <p class="t-body-sm options__note">campeón measures cm/360, which does not depend on your field of view. If you want the same on-screen travel after changing FOV, this is the number that holds it. Screen fraction is how far across the half screen you are flicking, where 0 is a small correction near the centre.</p>
             <div class="options__row">
               <label class="field"><span>From cm/360</span><input type="number" data-fov="from" value="${measured !== undefined ? measured.toFixed(1) : mid}" min="1" max="200" step="0.1"></label>
               <label class="field"><span>Source FOV</span><input type="number" data-fov="source" value="103" min="60" max="140"></label>
@@ -86,7 +86,7 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
               <label class="field"><span>Screen fraction</span><input type="number" data-fov="fraction" value="0" min="0" max="1" step="0.1"></label>
             </div>
             <p class="options__readout">Same feel at <span class="t-figure options__figure" data-fov-out>-</span> cm/360</p>
-            ${measured !== undefined ? `<p class="options__caption">Starting from your last result.</p>` : ''}
+            ${measured !== undefined ? `<p class="t-body-sm options__caption">Starting from your last result.</p>` : ''}
           </section>
         </div>`;
 
@@ -132,7 +132,12 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
           rememberPrefs(ctx);
           status.textContent = `Saved. I search ${nlo} to ${nhi} cm/360.`;
         } else {
-          status.textContent = `Applied for this visit. I search ${nlo} to ${nhi} cm/360, and I start saving the window once you calibrate.`;
+          // "Applied for this visit" was not true for a visitor who has never calibrated. Their only
+          // way into a run is the sweep and the spin (or typed numbers), and both of those set the
+          // window from what they measure, so this one is replaced before it is ever searched. Only
+          // "start from your saved calibration" carries a stored window forward, and that path needs
+          // a calibration to exist. So the message names the calibration as what happens next.
+          status.textContent = `Set to ${nlo} to ${nhi} cm/360. Calibration comes before your first run and it sets the window from what it measures, so it will replace this one. After you have calibrated, a window you set here is saved.`;
         }
       });
 

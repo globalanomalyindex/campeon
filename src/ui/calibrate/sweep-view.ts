@@ -23,7 +23,7 @@ const FAST_MIN = 3.5;     // counts/ms at or above = a good "fast" pace
 
 // Esc unlocks and resets the current pass (see onLock), so the honest promise is "stop and start
 // over", not "stop". Held in one place because the idle copy is re-set on every unlock.
-const SUB_START = 'click here to begin. it hides the cursor so i can read your mouse\'s raw motion. press Esc to stop, and the pass starts over when you click back in.';
+const SUB_START = 'Click here to begin. It hides the cursor so I can read your mouse\'s raw motion. Press Esc to stop, and the pass starts over when you click back in.';
 
 export function createSweepView(
   host: HTMLElement,
@@ -42,9 +42,9 @@ export function createSweepView(
   host.innerHTML = `
     <section class="screen screen--shell fade-in">
       <div class="wrap stack">
-        <span class="cal-step" data-sweep="step">step 1 of 2 - the sweep</span>
-        <h2 class="display">+ the sweep</h2>
-        <p class="gate__lead" data-sweep="lead" aria-live="polite" aria-atomic="true">lay any card flat on your desk, next to your mouse.</p>
+        <span class="cal-step" data-sweep="step">Step 1 of 2 · the sweep</span>
+        <h1 class="display">The sweep</h1>
+        <p class="gate__lead" data-sweep="lead" aria-live="polite" aria-atomic="true">Lay any card flat on your desk, next to your mouse.</p>
         <p class="cal-sub" data-sweep="sub">${SUB_START}</p>
         <div class="calibrate__stage">
           <canvas class="calibrate__canvas" data-sweep="canvas"></canvas>
@@ -52,15 +52,15 @@ export function createSweepView(
         </div>
         <div class="cal-pace" data-sweep="pacewrap" hidden><div class="cal-pace__fill" data-sweep="pace"></div></div>
         <p class="cal-pace__label" data-sweep="pacelabel" aria-hidden="true"></p>
-        <p class="cal-method mono" data-sweep="method">card sweeps land within about 3 to 5 percent, so i search a window around it.</p>
+        <p class="cal-method mono" data-sweep="method">Card sweeps land within about 3 to 5 percent, so I search a window around it.</p>
         <div class="calibrate__readouts">
-          <div class="calibrate__ro"><div class="k">step</div><div class="v mono" data-sweep="pass">pass 1 of 2 - slow</div></div>
-          <div class="calibrate__ro"><div class="k">counts</div><div class="v mono" data-sweep="counts">0</div></div>
-          <div class="calibrate__ro"><div class="k">measured dpi</div><div class="v mono" data-sweep="dpi">-</div></div>
+          <div class="calibrate__ro"><div class="k">Step</div><div class="v mono" data-sweep="pass">Pass 1 of 3 · slow</div></div>
+          <div class="calibrate__ro"><div class="k">Counts</div><div class="v mono" data-sweep="counts">0</div></div>
+          <div class="calibrate__ro"><div class="k">Measured DPI</div><div class="v mono" data-sweep="dpi">-</div></div>
         </div>
         <div class="cal-exit">
-          <button type="button" class="action action--ghost" data-sweep="back">back</button>
-          <button type="button" class="action action--ghost" data-sweep="manual">type the numbers instead</button>
+          <button type="button" class="action action--ghost" data-sweep="back">Back</button>
+          <button type="button" class="action action--ghost" data-sweep="manual">Type the numbers instead</button>
         </div>
       </div>
     </section>`;
@@ -161,7 +161,7 @@ export function createSweepView(
     if (idleTimer !== null) { clearTimeout(idleTimer); idleTimer = null; }
     phase = next; updateUi();
   }
-  function nudge(): void { $('lead').textContent = 'keep going, all the way to your card\'s RIGHT edge.'; }
+  function nudge(): void { $('lead').textContent = 'Keep going, all the way to the right edge of your card.'; }
   // One action at a time on an idle pass: show "position your mouse" first, then swap to "click" once
   // they have had a beat to settle (clicking works the whole time - this only paces the guidance).
   function armIdleHint(): void {
@@ -178,8 +178,8 @@ export function createSweepView(
     const ok = fast() ? pace >= FAST_MIN : pace <= SLOW_MAX;
     fillEl.dataset['ok'] = ok ? 'true' : 'false';
     $('pacelabel').textContent = fast()
-      ? (ok ? 'good - nice and quick' : 'a bit faster')
-      : (ok ? 'good - slow and steady' : 'ease off, a little slower');
+      ? (ok ? 'Good, nice and quick' : 'A bit faster')
+      : (ok ? 'Good, slow and steady' : 'Ease off, a little slower');
   }
 
   function updateUi(): void {
@@ -188,28 +188,28 @@ export function createSweepView(
     const totalPasses = SLOW_PASSES + 1;
     $('hint').style.display = locked ? 'none' : 'flex';
     $('pass').textContent = fast()
-      ? `pass ${totalPasses} of ${totalPasses} - fast`
-      : `pass ${slowPassNum} of ${totalPasses} - slow`;
-    $('step').textContent = fast() ? 'step 1 of 2 - the sweep (checking acceleration)' : 'step 1 of 2 - the sweep';
+      ? `Pass ${totalPasses} of ${totalPasses} · fast`
+      : `Pass ${slowPassNum} of ${totalPasses} · slow`;
+    $('step').textContent = fast() ? 'Step 1 of 2 · the sweep · acceleration check' : 'Step 1 of 2 · the sweep';
     if (!locked) {
-      $('lead').textContent = 'lay any card flat on your desk, next to your mouse.';
+      $('lead').textContent = 'Lay any card flat on your desk, next to your mouse.';
       $('sub').textContent = SUB_START;
     } else if (phase === 'idle-slow') {
       const again = slowPassCounts.length > 0;
       $('lead').textContent = idleClickReady
-        ? 'lined up? click once to start sliding.'
-        : (again ? 'one more slow pass - line up with the LEFT edge again.' : 'now line your mouse up with the LEFT edge of your card.');
-      $('sub').textContent = again && !idleClickReady ? 'two slow passes let me cross-check the reading.' : '';
+        ? 'Lined up? Click once to start sliding.'
+        : (again ? 'One more slow pass. Line up at the left edge again.' : 'Now line your mouse up at the left edge of your card.');
+      $('sub').textContent = again && !idleClickReady ? 'Two slow passes let me cross-check the reading.' : '';
     } else if (phase === 'running-slow') {
       $('lead').textContent = ready
-        ? `reached the right edge? click to finish slow pass ${slowPassNum}.`
-        : 'slowly slide your mouse across the card to its RIGHT edge.';
+        ? `Reached the right edge? Click to finish slow pass ${slowPassNum}.`
+        : 'Slide your mouse across the card to its right edge, slow and even.';
       $('sub').textContent = '';
     } else if (phase === 'idle-fast') {
-      $('lead').textContent = idleClickReady ? 'click to start a quick second pass.' : 'bring your mouse back to the card\'s LEFT edge.';
-      $('sub').textContent = idleClickReady ? 'this one just checks your mouse moves steadily.' : '';
+      $('lead').textContent = idleClickReady ? 'Click to start a quick second pass.' : 'Bring your mouse back to the left edge of the card.';
+      $('sub').textContent = idleClickReady ? 'This one just checks your mouse moves steadily.' : '';
     } else if (phase === 'running-fast') {
-      $('lead').textContent = ready ? 'click to finish.' : 'now slide FAST to the card\'s RIGHT edge, one quick motion.';
+      $('lead').textContent = ready ? 'Click to finish.' : 'Now slide to the right edge in one quick motion, as fast as feels natural.';
       $('sub').textContent = '';
     }
     updatePace();
@@ -220,7 +220,7 @@ export function createSweepView(
     // CONSISTENCY indicator (spreadPct) and an agreement flag (never a measured CI).
     const passes = dpiFromPasses(slowPassCounts, opts.referenceWidthCm);
     const dpi = passes.dpi;
-    $('dpi').textContent = isPlausibleSweepDpi(dpi) ? Math.round(dpi).toString() : 'invalid';
+    $('dpi').textContent = isPlausibleSweepDpi(dpi) ? Math.round(dpi).toString() : 'Invalid';
     if (!isPlausibleSweepDpi(dpi)) { pointer.exit(); opts.onInvalid(); return; }
     // Passes that disagree beyond threshold get the gentle redo (same path as an implausible DPI).
     if (!passes.agreed) { pointer.exit(); opts.onInvalid(); return; }

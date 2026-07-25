@@ -4,7 +4,10 @@
    See docs/design/canon.md. */
 
 /* ── Scaffolding ─────────────────────────────────────────────────────────── */
-#app { display: block; min-height: 100%; }
+/* A column, so the screen landmark can take the remaining height. base.css used to
+   declare display: flex here and this sheet declared display: block; block won on
+   import order and `flex: 1` below did nothing. One rule now, in this sheet. */
+#app { display: flex; flex-direction: column; min-height: 100%; }
 /* Every route mounts inside its own landmark, and the router moves focus here on
    navigation. tabindex="-1" makes it a programmatic target only, so it never joins
    the tab order and never needs a ring of its own. */
@@ -18,18 +21,24 @@
 .stack > * + * { margin-top: var(--space-4); }
 
 /* ── The panel ────────────────────────────────────────────────────────────
-   One primitive for every raised surface: HUD, plot, control bar, card. Square,
-   hairline, matte. Padding is inner, so panels butt against each other cleanly. */
+   One primitive for every raised surface: card, plot, control bar. Square,
+   hairline, matte. Padding is inner, so panels butt against each other cleanly.
+   A screen adds only what it changes (the options sheet, for one, sits on a wider
+   inner pad). The --tight and --sunk modifiers are gone: nothing ever called them. */
 .panel {
   background: var(--surface-card);
   border: 1px solid var(--border-hairline);
   padding: var(--space-4);
 }
-.panel--tight { padding: var(--space-3); }
-.panel--sunk { background: var(--surface-sunken); }
 
-/* Grids that join on the 1px lattice rather than floating apart. */
-.lattice {
+/* Grids that join on the 1px lattice rather than floating apart. Every joined grid in
+   the app is this pattern, so the frame is declared once and the per-screen rules add
+   only their columns and their cell padding. The calibrate readouts are named here for
+   the same reason: three hand-copies of four declarations is three chances to drift. */
+.lattice,
+.hero__drawer,
+.result__breakdown,
+.calibrate__readouts {
   display: grid; gap: 1px;
   background: var(--border-hairline);
   border: 1px solid var(--border-hairline);
@@ -72,7 +81,11 @@
 }
 .action--ghost:hover { color: var(--text-strong); }
 
+/* Press settles: it deepens the fill and nudges down a pixel. The nudge shipped without the
+   deepening, so --color-primary-active was defined and never read. */
 .action:active { transform: translateY(1px); }
+.action--primary:active { background: var(--color-primary-active); border-color: var(--color-primary-active); }
+.action--secondary:active { background: var(--surface-sunken); }
 .action:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: 2px;
@@ -141,7 +154,9 @@
 /* ── Reveal ───────────────────────────────────────────────────────────────
    A calm settle: opacity plus a small translation. No bounce anywhere. */
 .reveal { opacity: 0; transform: translateY(6px); animation: reveal var(--dur-slow) var(--ease-standard) forwards; }
-.reveal[data-reveal] { animation-delay: calc(var(--reveal-i, 0) * 70ms); }
+/* The stagger step is the shortest motion token, so reduced motion collapses the whole
+   sequence to zero along with everything else. It used to be a bare 70ms. */
+.reveal[data-reveal] { animation-delay: calc(var(--reveal-i, 0) * var(--dur-instant)); }
 @keyframes reveal { to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; animation: none; } }
 
@@ -181,11 +196,9 @@
 /* text-muted, not text-subtle: stone-500 on paper is 3.6:1 and fails AA at this size. */
 .hero__byline { margin-top: var(--space-7); color: var(--text-muted); font: var(--type-body-sm); }
 
-/* The four instruments, shown as a specimen drawer rather than described. */
-.hero__drawer {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px;
-  background: var(--border-hairline); border: 1px solid var(--border-hairline);
-}
+/* The four instruments, shown as a specimen drawer rather than described. The lattice frame
+   comes from the primitive above; this only sets the columns. */
+.hero__drawer { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .hero__cell { background: var(--surface-card); padding: var(--space-5); display: grid; gap: var(--space-2); align-content: start; }
 /* The colour field is the study: a dominant block of the instrument's mineral wash,
    with the mineral itself carried as the small accent on the dot below it. */
@@ -201,15 +214,21 @@
 .setup__inner { width: min(46rem, 100%); margin-inline: auto; padding: var(--space-9) var(--space-5); }
 .setup__title { font: var(--type-display-sm); letter-spacing: var(--tracking-tight); color: var(--text-strong); }
 .setup__lead { color: var(--text-muted); max-width: var(--measure-prose); margin-top: var(--space-3); }
-.setup__readout { margin-top: var(--space-5); }
-.setup__readout [data-readout] {
-  font-family: var(--font-display);
-  font-feature-settings: var(--features-figures);
-  font-variant-numeric: tabular-nums slashed-zero;
-  font-size: var(--text-display-sm);
-  color: var(--text-strong);
+
+/* The returning visitor's fast path. It is the one offer on this screen that carries a
+   measurement already made, so it is framed as a panel and sits apart from the two steps. */
+.setup__remembered {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-left: 2px solid var(--color-primary);
+  padding: var(--space-4);
+  display: grid; gap: var(--space-3); justify-items: start;
 }
-.setup__goalhint { color: var(--text-muted); font: var(--type-body-sm); }
+.setup__remembered .setup__lead { margin-top: 0; color: var(--text-body); }
+
+/* The footnote under "I'll type my numbers instead". A caption, so it reads as smaller
+   than the choice it qualifies. */
+.setup__manual-note { font: var(--type-body-sm); margin-top: var(--space-2); }
 
 /* ── Gate ────────────────────────────────────────────────────────────────── */
 .gate__inner { margin: auto; width: min(40rem, 100%); padding: var(--space-9) var(--space-5); }
@@ -222,9 +241,6 @@
 [data-surface='chamber'] { background: var(--surface-page); color: var(--text-body); }
 
 .session__canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: none; }
-
-/* The in-scene viewmodel sits above the arena and below the HUD, and never eats clicks. */
-.viewmodel { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
 
 .session__crosshair {
   position: fixed; left: 50%; top: 50%;
@@ -261,7 +277,8 @@
 
 .session__plot {
   position: fixed; right: var(--space-5); bottom: var(--space-5);
-  width: min(380px, 40vw);
+  /* Two of the ramp's top step. It was 380px, a hand-picked number four off it. */
+  width: min(calc(var(--space-11) * 2), 40vw);
   background: var(--surface-scrim);
   border: 1px solid var(--border-hairline);
   padding: var(--space-3);
@@ -294,10 +311,12 @@
   text-align: center;
 }
 
-/* The instruction that tells you how to START the range. It is read as well as seen,
-   so it sits at body size and holds a measure rather than one nowrap line. */
+/* The instruction that tells you how to START the range. It is read as well as seen, so it
+   sits at body size and holds a measure rather than one nowrap line, and it is held clear of
+   the control bar below: the bar's own offset plus enough height to clear its 44px step
+   buttons and padding. Both terms are on the ramp; it used to add a bare 5rem. */
 .range__hint {
-  position: fixed; left: 50%; bottom: calc(var(--space-5) + 5rem); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(var(--space-5) + var(--space-9)); transform: translateX(-50%);
   width: min(46ch, 88vw); text-align: center;
   font: var(--type-body-sm); color: var(--text-body);
   background: var(--surface-scrim);
@@ -433,11 +452,11 @@
 .result__ci--tuned { color: var(--text-muted); }
 .result__credit { color: var(--text-muted); font: var(--type-body-sm); margin-top: var(--space-2); }
 
-/* The four facets, joined on the lattice, each marked by its mineral. */
+/* The four facets, joined on the lattice, each marked by its mineral. The track width is the
+   top of the spacing ramp, so four facets sit in one row on a desktop and fold in pairs below
+   about 800px. It was 190px, two off the ramp for no reason. */
 .result__breakdown {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 1px; background: var(--border-hairline);
-  border: 1px solid var(--border-hairline);
+  grid-template-columns: repeat(auto-fit, minmax(var(--space-11), 1fr));
   margin: var(--space-7) 0;
 }
 .result__breakdown > div { background: var(--surface-card); padding: var(--space-4); display: grid; gap: var(--space-2); }

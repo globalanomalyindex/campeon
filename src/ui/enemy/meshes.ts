@@ -70,11 +70,11 @@ export function quarryWorldHeight(dist: number, radiusDeg: number): number {
 export interface QuarryMaterials {
   /** The dark hide / mass of the quarry. */
   hide: MeshStandardMaterial;
-  /** The lighter accent (chitin / underbelly / horn) that catches the rim light. */
+  /** The lighter PAPER accent (chitin / underbelly / horn) that catches the rim light. */
   accent: MeshStandardMaterial;
-  /** The blood-red warning markings (poise / threat). */
+  /** The CARNELIAN warning markings (poise / threat). */
   mark: MeshStandardMaterial;
-  /** The emissive GOLD weak-spot - the crosshair-legible kill point at the hitbox center. */
+  /** The emissive SULFUR weak-spot - the crosshair-legible kill point at the hitbox center. */
   weakspot: MeshStandardMaterial;
 }
 
@@ -103,7 +103,7 @@ function parseHex(h: string): number {
 export function createQuarryMaterials(): QuarryMaterials {
   return {
     hide: mkBody(parseHex(hex.hide)),
-    accent: mkBody(parseHex(hex.paper), 0.7, 0.1), // cream needs less floor - it catches real light
+    accent: mkBody(parseHex(hex.paper), 0.7, 0.1), // paper needs less floor - it catches real light
     mark: mkBody(parseHex(hex.strike), 0.6, 0.3), // the threat mark SMOLDERS at range
     weakspot: new MeshStandardMaterial({
       color: parseHex(hex.sulfur),
@@ -135,7 +135,7 @@ export function materialList(m: QuarryMaterials): readonly MeshStandardMaterial[
   return [m.hide, m.accent, m.mark, m.weakspot];
 }
 
-/** A small emissive gold polyhedron at LOCAL ORIGIN - the weak-spot anchor on every quarry. */
+/** A small emissive sulfur polyhedron at LOCAL ORIGIN - the weak-spot anchor on every quarry. */
 function weakspot(mat: MeshStandardMaterial): Mesh {
   const m = new Mesh(new IcosahedronGeometry(0.12, 0), mat);
   m.name = WEAKSPOT_NAME;
@@ -184,8 +184,8 @@ function assemble(m: QuarryMaterials, parts: Object3D[]): QuarryMesh {
 // SCULPTED low-poly forms (still pure primitives, flat-shaded, on-palette, origin-anchored).
 // Design language: every quarry FACES +x (the camera mostly sees targets in PROFILE, and a profile
 // is where a silhouette is most legible), carries one continuous GESTURE line (coil-to-hood arc,
-// dart streak, bench line, wedge hump), and zones its materials so the cream accent catches the
-// rim light while the blood mark flags the threat. Dimensions in group-unit space (~1.0 tall);
+// dart streak, bench line, wedge hump), and zones its materials so the paper accent catches the
+// rim light while the carnelian mark flags the threat. Dimensions in group-unit space (~1.0 tall);
 // the layer scales the whole group to the hitbox.
 
 /** track → slender airborne DARTING form: a swift - swept fuselage, long back-swept wings. */
@@ -216,7 +216,7 @@ function buildTrack(m: QuarryMaterials): QuarryMesh {
     o.position.set(-0.02, 0.05, -0.24);
   });
   wingR.name = 'part-wing-r';
-  // Forked tail: one flattened blood cone, wide and shallow - the kite silhouette that flags it.
+  // Forked tail: one flattened carnelian cone, wide and shallow - the kite silhouette that flags it.
   const tail = part(new ConeGeometry(0.11, 0.3, 3), m.mark, (o) => {
     o.rotation.z = -Math.PI / 2;
     o.rotation.x = Math.PI / 2; // flatten the 3-gon horizontal
@@ -254,7 +254,7 @@ function buildFlick(m: QuarryMaterials): QuarryMesh {
     o.position.set(0.2, 0.34, 0);
   });
   hood.name = 'part-hood';
-  // Bared fang under the hood's chin - small, cream, catching the rim.
+  // Bared fang under the hood's chin - small, paper, catching the rim.
   const fang = part(new ConeGeometry(0.035, 0.12, 4), m.accent, (o) => {
     o.rotation.z = Math.PI - 0.35; // apex down-forward
     o.position.set(0.26, 0.22, 0);
@@ -302,7 +302,7 @@ function buildStrike(m: QuarryMaterials): QuarryMesh {
     o.position.set(0.1, 0.14, 0);
     o.rotation.z = -0.08; // wedge line falling toward the head
   });
-  // Pads in HIDE: the family rule is dark mass + ONE blood mark + ONE cream anchor per quarry
+  // Pads in HIDE: the family rule is dark mass + ONE carnelian mark + ONE paper anchor per quarry
   // (here: plate + horn), so no second bright surface competes with the threat read.
   const shoulderL = part(new BoxGeometry(0.2, 0.26, 0.14), m.hide, (o) => {
     o.position.set(0.06, 0.05, 0.27);
@@ -314,13 +314,13 @@ function buildStrike(m: QuarryMaterials): QuarryMesh {
     o.rotation.x = -0.12;
   });
   shoulderR.name = 'part-shoulder-r';
-  // Brow plate: blood armor slab raked over the face - the threat you aim past.
+  // Brow plate: carnelian armor slab raked over the face - the threat you aim past.
   const plate = part(new BoxGeometry(0.3, 0.1, 0.4), m.mark, (o) => {
     o.position.set(0.3, 0.16, 0);
     o.rotation.z = -0.35; // raked down over the brow
   });
   plate.name = 'part-plate';
-  // Horn: a short cream spike off the brow, forward-down - catches the rim at 20m.
+  // Horn: a short paper spike off the brow, forward-down - catches the rim at 20m.
   const horn = part(new ConeGeometry(0.045, 0.18, 5), m.accent, (o) => {
     o.rotation.z = -Math.PI / 2 - 0.5;
     o.position.set(0.44, 0.06, 0);
@@ -351,7 +351,7 @@ export function quarryMesh(id: InstrumentId, materials: QuarryMaterials = create
 const DUST_MOTES = 5;
 
 /**
- * Build ONE pooled dust-puff group: a small cluster of faceted cream motes around the local origin.
+ * Build ONE pooled dust-puff group: a small cluster of faceted paper motes around the local origin.
  * It carries its OWN material (so its opacity tween never stomps a quarry) and is reused across kills
  * by the layer's pool - call this only `pool size` times, never per kill. Cosmetic only: no scored API,
  * pure THREE, safe to unit-test. The layer positions it at the fallen quarry's feet and fades it out.

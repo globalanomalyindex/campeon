@@ -31,12 +31,12 @@ describe('setup (guided calibration orchestrator)', () => {
 
   it('the progress tracker marks the active step and checks off a finished one', () => {
     const onSweep = calibrationProgress('sweep');
-    expect(onSweep).toContain('the sweep');
-    expect(onSweep).toContain('the spin');
-    expect(onSweep).toMatch(/data-state="active"[^>]*><span[^>]*>1<\/span>the sweep/); // sweep active on the sweep step
+    expect(onSweep).toContain('The sweep');
+    expect(onSweep).toContain('The spin');
+    expect(onSweep).toMatch(/data-state="active"[^>]*><span[^>]*>1<\/span>The sweep/); // sweep active on the sweep step
     const onSpin = calibrationProgress('spin');
-    expect(onSpin).toMatch(/data-state="done"[^>]*><span[^>]*>✓<\/span>the sweep/); // sweep checked once on the spin
-    expect(onSpin).toMatch(/data-state="active"[^>]*>.*the spin/);
+    expect(onSpin).toMatch(/data-state="done"[^>]*><span[^>]*>✓<\/span>The sweep/); // sweep checked once on the spin
+    expect(onSpin).toMatch(/data-state="active"[^>]*>.*The spin/);
   });
 
   it('rewords the typed fork so it stops inviting the read-my-sens misconception, with a starting-point note (P4-3)', () => {
@@ -82,6 +82,28 @@ describe('setup (guided calibration orchestrator)', () => {
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();
     expect(host.textContent!).not.toMatch(/\bwe\b|\bwe'll\b|\bus\b/i);
+  });
+
+  // The canon voice: sentence case, capital "I", one <h1> naming the screen, and no revived "+"
+  // motif (it was retired because screen readers announced "plus" before every heading).
+  it.each(['intro', 'manual'] as const)('the %s step renders exactly one h1, sentence case, no "+" prefix', (step) => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    if (step === 'manual') (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
+    const h1s = host.querySelectorAll('h1');
+    expect(h1s.length).toBe(1);
+    expect(host.querySelector('h2')).toBeNull(); // the screen name is the h1 now, no orphan h2
+    const title = h1s[0]!.textContent!;
+    expect(title.startsWith('+')).toBe(false);
+    expect(title).toMatch(/^[A-Z]/);
+  });
+
+  it('never writes the first-person pronoun as a lowercase "i"', () => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    expect(host.textContent!).not.toMatch(/\bi\b/); // case-sensitive: a standalone lowercase i is the violation
+    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
+    expect(host.textContent!).not.toMatch(/\bi\b/);
   });
 });
 
@@ -271,6 +293,22 @@ describe('setup: the sweep and the spin can be left', () => {
     cap.spin().onBack();
     expect(host.querySelector('[data-action="start-guided"]')).toBeTruthy();
     expect(ctx.nav).toEqual([]); // leaving the spin commits nothing
+  });
+
+  it('gives the blocked step an h1 for each block reason (accel and invalid)', () => {
+    // The blocked screen used to render leads with no heading at all, leaving the document
+    // outline empty exactly where a visitor most needs orientation.
+    const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    cap.sweep().onInvalid();
+    expect(host.querySelectorAll('h1').length).toBe(1);
+    expect(host.querySelector('h1')!.textContent).toBe("That sweep didn't take");
+
+    (host.querySelector('[data-action="retry"]') as HTMLButtonElement).click();
+    cap.sweep().onResult({ dpi: 1600, accelerated: true });
+    expect(host.querySelectorAll('h1').length).toBe(1);
+    expect(host.querySelector('h1')!.textContent).toBe('Mouse acceleration is on');
   });
 
   it.each([true, false])('passes prefers-reduced-motion (%s) into both guided views', (reduce) => {

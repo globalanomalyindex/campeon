@@ -10,8 +10,12 @@
   background: var(--surface-page);
   border-bottom: 1px solid var(--border-hairline);
 }
+/* Same box as .options__inner, to the character: the two used different width formulas
+   (92vw here against 100% below), so the way out never lined up with the panels it
+   belongs to. At 896px wide it sat 36px inside them and drifted from there. */
 .options__bar-inner {
-  width: min(56rem, 92vw);
+  width: min(56rem, 100%);
+  margin-inline: auto;
   padding: var(--space-3) var(--space-5);
 }
 .options__back { display: inline-flex; align-items: center; gap: var(--space-2); }
@@ -22,34 +26,24 @@
   margin-inline: auto;
   padding: var(--space-8) var(--space-5) var(--space-9);
 }
-.options__title { font: var(--type-display-sm); letter-spacing: var(--tracking-tight); color: var(--text-strong); }
-.options__lead {
-  font: var(--type-body-lg); color: var(--text-body);
-  max-width: var(--measure-prose); margin-top: var(--space-4);
-}
+/* Type comes from the .t-* roles in base.css (.t-display-sm on the title, .t-heading-md on
+   each panel head, .t-label on its unit, .t-body-lg / .t-body-sm on the copy). What is left
+   here is only what this screen adds: measure, rhythm, and the panel's own padding. */
+.options__lead { max-width: var(--measure-prose); margin-top: var(--space-4); }
 
-.options__panel {
-  border: 1px solid var(--border-hairline);
-  background: var(--surface-card);
-  padding: var(--space-5);
-  margin-top: var(--space-6);
-}
+/* The .panel primitive carries the surface, the hairline and the square corner. The sheet's
+   own panels sit on a wider inner pad and a --space-6 rhythm between them. */
+.options__panel { padding: var(--space-5); margin-top: var(--space-6); }
 .options__h {
-  font: var(--type-heading-md);
-  letter-spacing: var(--tracking-tight);
-  color: var(--text-strong);
   display: flex; justify-content: space-between; align-items: baseline;
   gap: var(--space-3); margin-bottom: var(--space-3);
 }
 .options__sub {
-  font: var(--type-label); font-family: var(--font-text);
-  letter-spacing: var(--tracking-label); text-transform: uppercase;
   font-feature-settings: var(--features-figures);
-  color: var(--text-muted);
   white-space: nowrap;
 }
-.options__note { font: var(--type-body-sm); color: var(--text-muted); margin: var(--space-2) 0; max-width: var(--measure-prose); }
-.options__caption { font: var(--type-body-sm); color: var(--text-muted); margin-top: var(--space-2); }
+.options__note { color: var(--text-muted); margin: var(--space-2) 0; max-width: var(--measure-prose); }
+.options__caption { color: var(--text-muted); margin-top: var(--space-2); }
 
 .options__row { display: flex; gap: var(--space-5); flex-wrap: wrap; margin-top: var(--space-4); }
 .options__row .field input { width: 10rem; max-width: 100%; }
@@ -64,7 +58,7 @@
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-hairline);
 }
-.options__status { font: var(--type-body-sm); color: var(--text-muted); max-width: 44ch; }
+.options__status { color: var(--text-muted); max-width: 44ch; }
 
 /* The reference table can outgrow a phone, so it scrolls inside the panel
    rather than pushing the page sideways. */

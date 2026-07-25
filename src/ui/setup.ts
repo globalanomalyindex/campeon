@@ -27,9 +27,9 @@ export function calibrationProgress(step: 'sweep' | 'spin'): string {
   const seg = (n: string, label: string, st: 'done' | 'active' | 'todo'): string =>
     `<span class="cal-progress__seg" data-state="${st}"><span class="cal-progress__num">${st === 'done' ? '✓' : n}</span>${label}</span>`;
   return `<div class="cal-progress" data-cal-progress>${
-    seg('1', 'the sweep', step === 'sweep' ? 'active' : 'done')
-  }<span class="cal-progress__arrow">→</span>${
-    seg('2', 'the spin', step === 'spin' ? 'active' : 'todo')
+    seg('1', 'The sweep', step === 'sweep' ? 'active' : 'done')
+  }<span class="cal-progress__arrow" aria-hidden="true">→</span>${
+    seg('2', 'The spin', step === 'spin' ? 'active' : 'todo')
   }</div>`;
 }
 
@@ -120,25 +120,25 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       const remembered = stored !== null && isValidDpi(stored.dpi) ? stored : null;
       const rememberedBlock = remembered
         ? `<div class="setup__remembered" data-remembered>
-            <p class="setup__lead">you've calibrated before. <span class="mono">${remembered.dpi} dpi</span>, searching ${remembered.bounds[0]} to ${remembered.bounds[1]} cm/360.</p>
-            <button class="action action--primary" data-action="use-saved">start from your saved calibration</button>
+            <p class="setup__lead">You've calibrated before. <span class="mono">${remembered.dpi} dpi</span>, searching ${remembered.bounds[0]} to ${remembered.bounds[1]} cm/360.</p>
+            <button class="action action--primary" data-action="use-saved">Start from your saved calibration</button>
           </div>`
         : '';
       return `
       <div class="wrap stack setup__inner">
-        <h2 class="display setup__title">+ calibrate</h2>
+        <h1 class="display setup__title">Calibrate</h1>
         ${rememberedBlock}
-        <p class="setup__lead">two quick steps, no numbers to look up. the sweep and the spin read how your hand actually moves.</p>
+        <p class="setup__lead">Two quick steps, no numbers to look up. The sweep and the spin read how your hand actually moves.</p>
         <ol class="cal-preview">
-          <li><span class="cal-preview__n">1</span><span>the sweep. drag a card's width, which measures your mouse.</span></li>
-          <li><span class="cal-preview__n">2</span><span>the spin. turn all the way around once.</span></li>
+          <li><span class="cal-preview__n">1</span><span>The sweep. Drag a card's width, which measures your mouse.</span></li>
+          <li><span class="cal-preview__n">2</span><span>The spin. Turn all the way around once.</span></li>
         </ol>
-        <p class="setup__lead">first, grab any card from your wallet: bank card, gym card, hotel key. they're all exactly the same size.</p>
-        ${reduced ? `<p class="setup__lead mono">reduced motion is on, so the guided steps draw their cues as still marks.</p>` : ''}
-        <button class="action ${remembered ? 'action--ghost' : 'action--primary'}" data-action="start-guided">${remembered ? "recalibrate, i've got a card" : "i've got a card, start"}</button>
-        <button class="action action--ghost" data-action="start-manual">i'll type my numbers instead</button>
-        <p class="setup__lead setup__manual-note mono">typed numbers are the starting point the search works out from.</p>
-        <button class="action action--ghost" data-action="to-hero">back</button>
+        <p class="setup__lead">First, grab any card from your wallet: bank card, gym card, hotel key. They're all exactly the same size.</p>
+        ${reduced ? `<p class="setup__lead mono">Reduced motion is on, so the guided steps draw their cues as still marks.</p>` : ''}
+        <button class="action ${remembered ? 'action--ghost' : 'action--primary'}" data-action="start-guided">${remembered ? "Recalibrate, I've got a card" : "I've got a card, start"}</button>
+        <button class="action action--ghost" data-action="start-manual">I'll type my numbers instead</button>
+        <p class="setup__lead setup__manual-note mono">Typed numbers are the starting point the search works out from.</p>
+        <button class="action action--ghost" data-action="to-hero">Back</button>
       </div>`;
     }
     if (state.step === 'blocked') {
@@ -146,26 +146,28 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       return `
       <div class="wrap stack gate__inner">
         ${accel
-          ? `<p class="gate__lead">looks like your mouse speeds up the faster you move. that's "mouse acceleration", and it makes one true turn distance impossible to pin down.</p>
-             <p>turn off "enhance pointer precision" (windows) or your mouse driver's acceleration, then try again.</p>`
-          : `<p class="gate__lead">that sweep didn't quite register, probably a little too short or uneven.</p>
-             <p>line the card up, rest your mouse at its left edge, and slide smoothly all the way to the right edge.</p>`}
-        <button class="action action--primary" data-action="retry">try again</button>
-        <button class="action action--ghost" data-action="manual">i'll type my numbers instead</button>
-        <p class="setup__lead setup__manual-note mono">typed numbers are the starting point the search works out from.</p>
-        <button class="action action--ghost" data-action="back">back</button>
+          ? `<h1 class="display setup__title">Mouse acceleration is on</h1>
+             <p class="gate__lead">Your mouse speeds up the faster you move, which makes one true turn distance impossible to pin down.</p>
+             <p>Turn off "enhance pointer precision" (Windows) or your mouse driver's acceleration, then try again.</p>`
+          : `<h1 class="display setup__title">That sweep didn't take</h1>
+             <p class="gate__lead">Probably a little too short or uneven, which happens.</p>
+             <p>Line the card up, rest your mouse at its left edge, and slide smoothly all the way to the right edge.</p>`}
+        <button class="action action--primary" data-action="retry">Try again</button>
+        <button class="action action--ghost" data-action="manual">I'll type my numbers instead</button>
+        <p class="setup__lead setup__manual-note mono">Typed numbers are the starting point the search works out from.</p>
+        <button class="action action--ghost" data-action="back">Back</button>
       </div>`;
     }
     if (state.step === 'manual') return `
       <div class="wrap stack setup__inner">
-        <h2 class="display setup__title">+ your numbers</h2>
-        <label class="field">mouse dpi<input class="mono" type="number" min="${MIN_DPI}" max="${MAX_DPI}" step="50" data-field="dpi" value="${ctx.draft.dpi}" aria-describedby="setup-error"></label>
-        <label class="field">current game<select data-field="game">${gameOptions(ctx.draft.currentGame)}</select></label>
-        <label class="field">in-game sensitivity<input class="mono" type="number" min="0.01" step="0.01" data-field="sens" value="${ctx.draft.currentSens}" aria-describedby="setup-error"></label>
-        <label class="field">goal, precision to speed<input type="range" min="0" max="1" step="0.01" data-field="goal" value="${ctx.draft.profile.speedAccuracy}"></label>
+        <h1 class="display setup__title">Your numbers</h1>
+        <label class="field">Mouse DPI<input class="mono" type="number" min="${MIN_DPI}" max="${MAX_DPI}" step="50" data-field="dpi" value="${ctx.draft.dpi}" aria-describedby="setup-error"></label>
+        <label class="field">Current game<select data-field="game">${gameOptions(ctx.draft.currentGame)}</select></label>
+        <label class="field">In-game sensitivity<input class="mono" type="number" min="0.01" step="0.01" data-field="sens" value="${ctx.draft.currentSens}" aria-describedby="setup-error"></label>
+        <label class="field">Goal, precision to speed<input type="range" min="0" max="1" step="0.01" data-field="goal" value="${ctx.draft.profile.speedAccuracy}"></label>
         <p class="field__error" id="setup-error" data-error role="alert"></p>
-        <button class="action action--primary" data-action="manual-begin">begin</button>
-        <button class="action action--ghost" data-action="back">back</button>
+        <button class="action action--primary" data-action="manual-begin">Begin</button>
+        <button class="action action--ghost" data-action="back">Back</button>
       </div>`;
     return ''; // 'spin' returns early in render(); no other steps reach here
   }
@@ -207,9 +209,9 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
 
     const problem = (): { field: 'dpi' | 'sens'; msg: string } | null => {
       const dpi = parseDpi(val('dpi'));
-      if (!isValidDpi(dpi)) return { field: 'dpi', msg: `mouse dpi needs to be a number between ${MIN_DPI} and ${MAX_DPI}. you'll find it in your mouse software.` };
+      if (!isValidDpi(dpi)) return { field: 'dpi', msg: `Mouse DPI needs to be a number between ${MIN_DPI} and ${MAX_DPI}. You'll find it in your mouse software.` };
       const sens = Number(val('sens'));
-      if (!Number.isFinite(sens) || sens <= 0) return { field: 'sens', msg: 'in-game sensitivity needs to be a number above zero.' };
+      if (!Number.isFinite(sens) || sens <= 0) return { field: 'sens', msg: 'In-game sensitivity needs to be a number above zero.' };
       return null;
     };
     const show = (p: ReturnType<typeof problem>): void => {

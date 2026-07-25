@@ -17,7 +17,8 @@ body {
   text-wrap: pretty;
 }
 
-#app { min-height: 100%; display: flex; }
+/* #app is laid out in shell.css, which owns the scaffolding. It used to be declared in
+   both sheets, with conflicting display values. */
 
 ::selection { background: var(--lapis-wash); color: var(--stone-900); }
 
@@ -36,17 +37,17 @@ hr { border: 0; border-top: 1px solid var(--border-hairline); margin: var(--spac
 
 /* ── Type roles ──────────────────────────────────────────────────────────────
    Named roles rather than ad-hoc sizes. Both faces ship Regular only, so weight
-   never appears here: hierarchy is scale, case, colour and tracking. */
-.t-display-2xl { font: var(--type-display-2xl); letter-spacing: var(--tracking-display); color: var(--text-strong); }
-.t-display-xl  { font: var(--type-display-xl);  letter-spacing: var(--tracking-display); color: var(--text-strong); }
-.t-display-lg  { font: var(--type-display-lg);  letter-spacing: var(--tracking-display); color: var(--text-strong); }
-.t-display-md  { font: var(--type-display-md);  letter-spacing: var(--tracking-display); color: var(--text-strong); }
+   never appears here: hierarchy is scale, case, colour and tracking.
+
+   The full scale lives in tokens.css and stays whole: that is the system, and a
+   scale with steps missing is not one. These roles are the product's shorthand for
+   the steps it actually sets, so a role exists only where something calls it. Every
+   large figure in this app (the wordmark, the result number) is a fluid clamp rather
+   than a fixed step, which is why the big display roles are absent. Body md needs no
+   role either: <body> already carries it. A test holds both halves of this. */
 .t-display-sm  { font: var(--type-display-sm);  letter-spacing: var(--tracking-tight);   color: var(--text-strong); }
-.t-heading-lg  { font: var(--type-heading-lg);  letter-spacing: var(--tracking-tight);   color: var(--text-strong); }
 .t-heading-md  { font: var(--type-heading-md);  letter-spacing: var(--tracking-tight);   color: var(--text-strong); }
-.t-heading-sm  { font: var(--type-heading-sm);  color: var(--text-strong); }
 .t-body-lg     { font: var(--type-body-lg); }
-.t-body        { font: var(--type-body-md); }
 .t-body-sm     { font: var(--type-body-sm); }
 
 /* The museum tag. Small tracked caps, used for every label in the app. */
@@ -68,13 +69,6 @@ hr { border: 0; border-top: 1px solid var(--border-hairline); margin: var(--spac
   color: var(--text-strong);
 }
 .t-figure-text { font-family: var(--font-text); font-feature-settings: var(--features-figures); }
-
-.t-alt  { font-feature-settings: var(--features-display-alt); }
-.t-caps { text-transform: uppercase; font-feature-settings: var(--features-display-caps); letter-spacing: 0.02em; }
-
-/* Prose blocks hold a comfortable measure. */
-.prose { max-width: var(--measure-prose); }
-.prose p + p { margin-top: var(--space-4); }
 
 /* Visually hidden, still announced to assistive tech (standard clip-rect). */
 .sr-only {
