@@ -49,7 +49,7 @@
   white-space: nowrap;
 }
 .options__note { font: var(--type-body-sm); color: var(--text-muted); margin: var(--space-2) 0; max-width: var(--measure-prose); }
-.options__caption { font: var(--type-body-sm); color: var(--text-subtle); margin-top: var(--space-2); }
+.options__caption { font: var(--type-body-sm); color: var(--text-muted); margin-top: var(--space-2); }
 
 .options__row { display: flex; gap: var(--space-5); flex-wrap: wrap; margin-top: var(--space-4); }
 .options__row .field input { width: 10rem; max-width: 100%; }

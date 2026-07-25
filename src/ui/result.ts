@@ -92,21 +92,21 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       // evidence around it - the payoff reads as a reveal, not a data dump.
       root.innerHTML = `
         <div class="wrap stack result__inner">
-          <p class="result__lead" data-reveal style="--reveal-i:0">Your number</p>
-          <h1 class="display result__number" data-reveal style="--reveal-i:1"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
+          <p class="result__lead reveal" data-reveal style="--reveal-i:0">Your number</p>
+          <h1 class="display result__number reveal" data-reveal style="--reveal-i:1"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
           <p class="result__sr-summary sr-only">${srSummary(r, tuned)}</p>
           ${tuned
-            ? `<p class="result__ci result__ci--tuned" data-reveal style="--reveal-i:2">You picked this one by feel, so it carries no measured interval.</p>`
-            : `<p class="result__ci" data-reveal style="--reveal-i:2">90% confidence interval <span data-result="ci">${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}</span> cm/360</p>`}
+            ? `<p class="result__ci result__ci--tuned reveal" data-reveal style="--reveal-i:2">You picked this one by feel, so it carries no measured interval.</p>`
+            : `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% confidence interval <span data-result="ci">${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}</span> cm/360</p>`}
           ${concord
-            ? `<p class="result__concord" data-result="concord" data-concord="${concord}" data-reveal style="--reveal-i:3">${CONCORD_COPY[concord]}</p>`
+            ? `<p class="result__concord reveal" data-result="concord" data-concord="${concord}" data-reveal style="--reveal-i:3">${CONCORD_COPY[concord]}</p>`
             : ''}
           ${!tuned && r.curve && r.bounds
-            ? `<figure class="result__plot" data-reveal style="--reveal-i:4"><svg data-plot aria-hidden="true"></svg>
+            ? `<figure class="result__plot reveal" data-reveal style="--reveal-i:4"><svg data-plot aria-hidden="true"></svg>
                 <figcaption>The four probes converging on your one number. ${plotLegendHtml()}</figcaption></figure>`
             : ''}
-          <p class="result__credit" data-reveal style="--reveal-i:5">Measured across four environments and six organisms: dragonfly, falcon, spider, raptor, archerfish, mantis shrimp.</p>
-          <div class="result__tier" data-tier="origin" data-reveal style="--reveal-i:6">
+          <p class="result__credit reveal" data-reveal style="--reveal-i:5">Measured across four environments and six organisms: dragonfly, falcon, spider, raptor, archerfish, mantis shrimp.</p>
+          <div class="result__tier reveal" data-tier="origin" data-reveal style="--reveal-i:6">
             <p class="result__tier-head t-label">Where the number comes from</p>
             <div class="result__breakdown">
               <div><span class="result__bk-label"><span class="dot dot--calibrate"></span> Bias zero <em>archerfish</em></span><span data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
@@ -122,7 +122,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
                     <span class="result__facet-z"><span class="dot dot--track"></span> track <span data-breakdown="trackContribZ">${fmtZ(bk.trackContribZ)}</span> · <span class="dot dot--flick"></span> flick <span data-breakdown="flickContribZ">${fmtZ(bk.flickContribZ)}</span></span></figcaption></figure>`
               : ''}
           </div>
-          <div class="result__tier" data-tier="readings" data-reveal style="--reveal-i:7">
+          <div class="result__tier reveal" data-tier="readings" data-reveal style="--reveal-i:7">
             <p class="result__tier-head t-label">Readings at that sensitivity</p>
             <div class="result__breakdown">
               <div><span class="result__bk-label">Precision floor</span><span data-breakdown="precisionFloorDeg">${fmt(r.breakdown.precisionFloorDeg, 2)}°</span></div>
@@ -133,13 +133,13 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
               ? `<p class="result__lean-note">Track, flick and calibrate are pure skill readings. The strike pair encodes the speed and accuracy lean you chose, so it reports a taste, not an optimum.</p>`
               : ''}
           </div>
-          <div data-reveal style="--reveal-i:8">
+          <div class="reveal" data-reveal style="--reveal-i:8">
             <label class="field result__game-pick"><span>Your game</span>
               <select data-action="your-game">${GAME_YAW.map((g) => `<option value="${g.id}"${g.id === ctx.draft.currentGame ? ' selected' : ''}>${g.label}</option>`).join('')}</select></label>
             <table class="result__games"><thead><tr><th>Game</th><th>Sensitivity</th></tr></thead><tbody>${rows}</tbody></table>
             <p class="result__saved">Saved locally. Nothing leaves your machine.</p>
           </div>
-          <div class="result__actions" data-reveal style="--reveal-i:9">
+          <div class="result__actions reveal" data-reveal style="--reveal-i:9">
             <button class="action action--primary" data-action="range">Step into the range</button>
             <button class="action action--secondary" data-action="case-study">Read how this works</button>
             <button class="action action--ghost" data-action="again">Run again</button>

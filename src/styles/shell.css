@@ -431,7 +431,7 @@
   max-width: 46ch;
 }
 .result__ci--tuned { color: var(--text-muted); }
-.result__credit { color: var(--text-subtle); font: var(--type-body-sm); margin-top: var(--space-2); }
+.result__credit { color: var(--text-muted); font: var(--type-body-sm); margin-top: var(--space-2); }
 
 /* The four facets, joined on the lattice, each marked by its mineral. */
 .result__breakdown {
@@ -465,3 +465,86 @@
 .result__games td { font-variant-numeric: tabular-nums slashed-zero; }
 .result__games [data-current='true'] { background: var(--color-primary-wash); color: var(--text-strong); }
 .result__actions { display: flex; gap: var(--space-4); align-items: center; margin-top: var(--space-7); flex-wrap: wrap; }
+
+/* ── Result: the evidence under the number ────────────────────────────────────
+   These blocks were all emitted by result.ts and styled by nothing, so the payoff
+   screen, which the canon calls the specimen card, rendered as unstyled prose. */
+
+/* A calm cross-fade on mount. Used by several screens and previously undefined. */
+.fade-in { animation: fade-in var(--dur-slow) var(--ease-standard); }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } }
+
+/* Two tiers of evidence: where the number came from, and what was read at it. */
+.result__tier { margin-top: var(--space-7); }
+.result__tier-head { margin-bottom: var(--space-3); }
+
+/* The thesis block: whether the four probes actually agree on one latent number. */
+.result__thesis {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--border-hairline);
+  border-left: 2px solid var(--color-primary);
+  background: var(--surface-card);
+}
+.result__thesis-line { color: var(--text-strong); }
+.result__thesis-facets {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
+  font: var(--type-body-sm);
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--text-muted);
+}
+.result__thesis-facet { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.result__thesis-note { margin-top: var(--space-3); font: var(--type-body-sm); color: var(--text-muted); max-width: var(--measure-prose); }
+
+/* Concord and drift: honesty readouts, so they read as notes and never as a verdict. */
+.result__concord, .result__drift-note {
+  font: var(--type-body-sm); color: var(--text-muted);
+  max-width: var(--measure-prose); margin-top: var(--space-3);
+}
+
+/* The two-probe micro plot. */
+.result__plot, .result__facets {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-card);
+}
+.result__plot svg, .result__facets svg { display: block; width: 100%; height: auto; }
+.result__plot figcaption, .result__facets figcaption {
+  font: var(--type-body-sm); color: var(--text-muted);
+  margin-top: var(--space-3); max-width: var(--measure-prose);
+}
+.result__facet-z {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+  align-items: center; margin-top: var(--space-2);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+/* The strike lean is a taste the user chose, so it is set apart from the reading. */
+.result__lean { color: var(--text-muted); font-variant-numeric: normal; }
+.result__lean-note { font: var(--type-body-sm); color: var(--text-muted); max-width: var(--measure-prose); margin-top: var(--space-3); }
+
+.result__game-pick { max-width: 22rem; margin-bottom: var(--space-4); }
+.result__saved { font: var(--type-body-sm); color: var(--text-muted); margin-top: var(--space-3); }
+
+/* ── The plot legend ──────────────────────────────────────────────────────────
+   The swatches are empty inline spans carrying an instrument colour, so without a
+   box they painted nothing at all. A dot, matching the .dot primitive. */
+.plot-legend { display: inline-flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin-left: var(--space-2); }
+.plot-legend__item {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted); white-space: nowrap;
+}
+.plot-legend__swatch {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: var(--radius-round); flex: 0 0 auto;
+}
+
+/* The dialed-in panel's supporting readouts. */
+.session__dialed-concord, .session__dialed-budget {
+  font: var(--type-body-sm); color: var(--text-muted); max-width: 44ch;
+}

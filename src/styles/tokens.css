@@ -60,6 +60,9 @@
   --text-strong:     var(--stone-900);
   --text-body:       var(--stone-800);
   --text-muted:      var(--stone-600);
+  /* Large text and non-text marks ONLY. Stone-500 on paper is 3.73:1, which clears the 3:1
+     WCAG asks of text at 18px and above but fails the 4.5:1 it asks below that. Small copy
+     uses --text-muted (5.9:1). A test enforces the split. */
   --text-subtle:     var(--stone-500);
   --text-disabled:   var(--stone-400);
   --text-inverse:    var(--stone-50);

@@ -234,7 +234,7 @@
 .cs-ui-btn--primary {
   background: var(--color-primary); border-color: var(--color-primary); color: var(--text-on-primary);
 }
-.cs-ui-foot { font-size: var(--text-caption); color: var(--text-subtle); }
+.cs-ui-foot { font-size: var(--text-caption); color: var(--text-muted); }
 
 .cs-ui--code { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; padding: 0; background: var(--border-hairline); }
 .cs-code-col { background: var(--surface-page); padding: var(--space-4); min-width: 0; }
@@ -264,10 +264,10 @@
 }
 .cs-refs li::before {
   content: counter(ref); grid-row: 1 / span 2;
-  font-family: var(--font-mono); font-size: var(--text-caption); color: var(--text-subtle);
+  font-family: var(--font-mono); font-size: var(--text-caption); color: var(--text-muted);
 }
 .cs-ref-work { color: var(--text-body); }
-.cs-ref-backs { font-size: var(--text-caption); color: var(--text-subtle); }
+.cs-ref-backs { font-size: var(--text-caption); color: var(--text-muted); }
 
 .cs-links { list-style: none; max-width: var(--measure-prose); }
 .cs-links li {
@@ -276,10 +276,10 @@
   font: var(--type-body-sm);
 }
 .cs-links a { color: var(--text-link); }
-.cs-link-note { font-size: var(--text-caption); color: var(--text-subtle); text-align: right; }
+.cs-link-note { font-size: var(--text-caption); color: var(--text-muted); text-align: right; }
 
 .cs-credit { font: var(--type-heading-sm); color: var(--text-strong); margin-top: var(--space-6); }
-.cs-credit-theme { color: var(--text-subtle); font: var(--type-body-sm); margin-top: var(--space-1); }
+.cs-credit-theme { color: var(--text-muted); font: var(--type-body-sm); margin-top: var(--space-1); }
 
 .cs-back {
   position: sticky; top: 0; z-index: 5; display: inline-block;

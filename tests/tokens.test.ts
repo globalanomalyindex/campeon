@@ -126,6 +126,20 @@ describe('design tokens: the absolute rules', () => {
     }
   });
 
+  it('never puts the low-contrast subtle token on small text', () => {
+    // stone-500 on paper is 3.73:1. That clears the 3:1 WCAG asks of text at 18px and above,
+    // and fails the 4.5:1 it asks below that. The rule was written into a comment in shell.css
+    // and then broken 253 lines later in the same round, so it gets a test instead.
+    for (const { name, css } of sheets) {
+      for (const rule of code(css).match(/[^{}]*\{[^}]*\}/g) ?? []) {
+        // A usage, not the :root declaration that defines it.
+        if (!rule.includes('var(--text-subtle)')) continue;
+        expect(rule, `${name}: --text-subtle on small text\n${rule.trim()}`)
+          .not.toMatch(/--text-(body-sm|caption|label)|font-size:\s*1[0-7]px/);
+      }
+    }
+  });
+
   it('keeps the focus ring above the 3:1 WCAG threshold on both surfaces', () => {
     // A focus indicator has to be visible. Both rings were transparent mixes that measured
     // 2.15:1 on paper and 1.34:1 on ink, and buttons carry no other focus affordance.
