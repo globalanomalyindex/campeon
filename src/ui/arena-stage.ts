@@ -55,7 +55,7 @@ export function createArenaStage(
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const size = (): [number, number] => [window.innerWidth, window.innerHeight];
-  // Default: the cinematic film pass (warm ACES-ish tone-map + grain + vignette, gold #FFC400
+  // Default: the cinematic film pass (warm ACES-ish tone-map + grain + vignette, the hot-light anchor
   // preserved). 'retro' keeps the PS1 PSX look selectable behind the same PostProcessor seam.
   // reducedMotion is threaded through so the film grain freezes when the user opts out of motion.
   const post: PostProcessor =

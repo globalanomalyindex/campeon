@@ -1,3 +1,4 @@
+import { hex } from '../palette';
 import { WebGLRenderer } from 'three';
 import { Arena } from '../engine/arena';
 import { createPsxPass } from '../engine/psx-pass';
@@ -42,10 +43,12 @@ export function mountArenaHarness(root: HTMLElement): void {
   canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;cursor:none;';
   root.appendChild(canvas);
 
+  // The harness crosshair mirrors the real one, so it reads from the palette rather than
+  // repeating hex here. It used to hold the retired brass gold on the retired ink.
   const cross = document.createElement('div');
   cross.style.cssText =
-    'position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;' +
-    'border-radius:50%;background:#FFC400;box-shadow:0 0 0 1px #0c0b09;pointer-events:none;';
+    'position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;' +
+    `border-radius:50%;background:${hex.alabaster};outline:1px solid ${hex.ink};pointer-events:none;`;
   root.appendChild(cross);
 
   const hud = document.createElement('pre');

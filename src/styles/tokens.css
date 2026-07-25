@@ -85,7 +85,11 @@
   --color-info:    var(--turquoise); --color-info-wash:    var(--turquoise-wash); --text-on-info:    var(--stone-0);
   --color-accent:  var(--amethyst);  --color-accent-wash:  var(--amethyst-wash);  --text-on-accent:  var(--stone-0);
 
-  --focus-ring: color-mix(in oklab, var(--lapis) 45%, transparent);
+  /* Solid, not a 45% mix. Composited against paper that mix measured 2.15:1, and WCAG 2.2
+     SC 1.4.11 wants 3:1 for a focus indicator. Buttons carry only this ring, so a
+     transparent one left every keyboard user without a visible focus state. Solid Lapis is
+     7.37:1 on the page and 8.02:1 on a card. */
+  --focus-ring: var(--lapis);
   --focus-ring-width: 3px;
 
   /* ── 8a. Type ────────────────────────────────────────────────────────────── */
@@ -230,7 +234,10 @@
   --color-primary-hover: color-mix(in oklab, var(--azurite) 82%, var(--stone-0));
   --text-on-primary:     var(--stone-900);
   --text-link:           var(--azurite);
-  --focus-ring:          color-mix(in oklab, var(--azurite) 60%, transparent);
+  /* Azurite itself is only 2.81:1 on the chamber card, so the ring lifts to a brighter cut of
+     the same mineral: 6.43:1 on ink, 5.82:1 on a card, 6.84:1 on a sunken panel. It stays in
+     the blue interactive family rather than becoming a white outline. */
+  --focus-ring:          #6F9BD8;
 
   /* The four instruments also lift, so each stays legible on ink while keeping
      its identity. Literal hex here, not color-mix(), because src/palette.ts has to

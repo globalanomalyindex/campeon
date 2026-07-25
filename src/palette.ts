@@ -43,7 +43,7 @@ export const hex = {
   // the same collection as everything else.
   gunmetal: '#423C31', // --stone-700, the frame and cylinder
   wood: '#6E4B44', // hematite, the grip
-  brass: '#97742E', // pyrite, the small metal accents
+  brass: '#97742E', // pyrite: the small metal accents, and the target sphere's emissive floor
 } as const;
 
 const RGB: Record<keyof typeof hex, readonly [number, number, number]> = {

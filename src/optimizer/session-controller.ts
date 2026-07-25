@@ -27,9 +27,10 @@ import { fitGpParams } from './gp';
  * drift adjustment in finalize cannot rescue it either, because its own collinearity
  * guard drops the drift column exactly when the aliasing is worst.
  *
- * This hands back a fixed low-discrepancy permutation instead: level(k) = (k * stride) % n,
- * where stride is the integer nearest n * phi that is coprime with n. Coprimality is what
- * makes it a permutation; the golden-ratio spacing is what keeps |corr(k, level)| small.
+ * This hands back a fixed low-discrepancy permutation instead: level(k) = (k * stride) % n.
+ * Any stride coprime with n gives a permutation, so all of them are searched and the one that
+ * minimises |corr(k, level)| wins. At the shipped coldStart of 8 that takes the correlation
+ * from 1.00 to 0.24.
  *
  * It is deterministic and draws nothing from the session RNG, which the instruments share.
  * Perturbing that stream would change the target geometry a player sees.
@@ -41,15 +42,32 @@ import { fitGpParams } from './gp';
 export function coldStartOrder(n: number): readonly number[] {
   if (n <= 2) return Array.from({ length: Math.max(0, n) }, (_, i) => i);
   const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-  const target = Math.round(n * 0.6180339887498949);
-  let stride = 0;
-  for (let d = 0; d < n && stride === 0; d++) {
-    for (const cand of [target + d, target - d]) {
-      if (cand > 1 && cand < n && gcd(cand, n) === 1) { stride = cand; break; }
+
+  // |Pearson correlation| between a position and the level that stride presents there.
+  // Both sequences are permutations of 0..n-1, so they share the mean (n - 1) / 2.
+  const correlation = (stride: number): number => {
+    const mid = (n - 1) / 2;
+    let num = 0, dk = 0, dl = 0;
+    for (let k = 0; k < n; k++) {
+      const a = k - mid;
+      const b = ((k * stride) % n) - mid;
+      num += a * b; dk += a * a; dl += b * b;
     }
+    return dk === 0 || dl === 0 ? 0 : Math.abs(num / Math.sqrt(dk * dl));
+  };
+
+  // Every stride coprime with n produces a permutation, so search them all and take the one
+  // that decorrelates position from level best. A golden-ratio stride is the usual
+  // low-discrepancy choice and it is good but not optimal: at n = 5 it lands on 0.5, which is
+  // half the confound back. Ties go to the smaller stride, so the result is deterministic.
+  let best = 1;
+  let bestCorr = Infinity;
+  for (let stride = 1; stride < n; stride++) {
+    if (gcd(stride, n) !== 1) continue;
+    const c = correlation(stride);
+    if (c < bestCorr - 1e-12) { bestCorr = c; best = stride; }
   }
-  if (stride === 0) stride = 1;
-  return Array.from({ length: n }, (_, k) => (k * stride) % n);
+  return Array.from({ length: n }, (_, k) => (k * best) % n);
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));

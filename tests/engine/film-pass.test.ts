@@ -105,7 +105,10 @@ describe('createFilmPass (structural)', () => {
     const defaults = createFilmPass(renderer, size);
     const defMat = passMaterial(defaults);
     const defBright = (defaults as unknown as { __brightMaterial: ShaderMaterial }).__brightMaterial;
-    expect(defMat.uniforms.uBloom.value).toBeCloseTo(0.35);
+    // Canon 4.4 removes the coloured glow and the grain, so both default OFF. The bloom chain
+    // still runs at 0 (one render() call shape every frame), it just composites nothing.
+    expect(defMat.uniforms.uBloom.value, 'no coloured glow by default').toBeCloseTo(0);
+    expect(defMat.uniforms.uGrain.value, 'no noise by default').toBeCloseTo(0);
     expect(defBright.uniforms.uThresh.value).toBeCloseTo(0.55);
     defaults.dispose();
 

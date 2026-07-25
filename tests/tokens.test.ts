@@ -104,6 +104,39 @@ describe('design tokens: the absolute rules', () => {
     }
   });
 
+  it('carries no retired colour anywhere in src, not only in the stylesheets', () => {
+    // This test used to read src/styles alone, and the retired brass gold survived that whole
+    // time in src/engine/film-pass.ts as `new Vector3(255/255, 196/255, 0/255)`: a literal
+    // #FFC400 outside the palette seam, in the one file the guard could not see. Renderer
+    // colour has to come from src/palette.ts, so the check now walks the whole tree.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]);
+    const files = walk('src').filter((f) => /\.(ts|css)$/.test(f));
+
+    for (const file of files) {
+      const src = code(readFileSync(file, 'utf8'));
+      for (const dead of ['#c4251f', '#FFC400', '#efe7d6', '#0c0b09', 'Bartine']) {
+        expect(src.toLowerCase(), `${file} still references ${dead}`)
+          .not.toContain(dead.toLowerCase());
+      }
+      // The same colour written as component bytes, which is how it hid last time.
+      expect(src.replace(/\s/g, ''), `${file} spells the retired gold as 255/196/0`)
+        .not.toMatch(/255\/255,196\/255,0\/255/);
+    }
+  });
+
+  it('keeps the focus ring above the 3:1 WCAG threshold on both surfaces', () => {
+    // A focus indicator has to be visible. Both rings were transparent mixes that measured
+    // 2.15:1 on paper and 1.34:1 on ink, and buttons carry no other focus affordance.
+    const ring = tokens.match(/--focus-ring:\s*([^;]+);/g) ?? [];
+    expect(ring.length, 'a ring for paper and a ring for the chamber').toBeGreaterThanOrEqual(2);
+    for (const decl of ring) {
+      expect(decl, `${decl} must be a solid colour, not a transparent mix`)
+        .not.toMatch(/transparent/);
+    }
+  });
+
   it('moves calmly: no bounce, no overshoot', () => {
     for (const { name, css } of sheets) {
       for (const decl of code(css).match(/cubic-bezier\([^)]*\)/g) ?? []) {

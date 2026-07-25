@@ -1,3 +1,4 @@
+import { hex } from '../palette';
 import {
   Camera,
   LinearFilter,
@@ -14,21 +15,21 @@ import {
 import type { PostProcessor } from './psx-pass';
 
 export interface FilmOptions {
-  /** Vignette strength, 0-1 (default 0.34 - softer than the PSX pass). */
+  /** Vignette strength, 0-1 (default 0.22). A lens characteristic, kept restrained. */
   vignette?: number;
-  /** Animated grain intensity, 0-1 (default 0.06 - a fine film stock, not snow). */
+  /** Animated grain intensity, 0-1 (default 0: the adopted system carries no noise). */
   grain?: number;
   /** Mild edge chromatic offset in low-res texels at the frame corners (default 0.6; 0 disables). */
   chroma?: number;
   /** Pre-tone-map exposure multiplier (default 1.32): lifts subjects out of the near-black backdrop. */
   exposure?: number;
   /**
-   * Gold-selective bloom strength, 0-1 (default 0.35). 0 keeps the quarter-res bloom
-   * chain running (same render() call shape every frame) but composites nothing extra -
-   * one code path regardless of strength.
+   * Hue-selective bloom strength, 0-1 (default 0: the adopted system allows no coloured
+   * glow). The quarter-res chain still runs at 0, so the render() call shape is identical
+   * every frame and there is one code path regardless of strength.
    */
   bloom?: number;
-  /** Luma threshold where the gold bright-pass starts lifting highlights (default 0.55). */
+  /** Luma threshold where the bright-pass starts lifting highlights (default 0.55). */
   bloomThreshold?: number;
   /**
    * Freeze the grain clock for prefers-reduced-motion. When true the time uniform
@@ -50,7 +51,7 @@ void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
 
 // Bright-pass: isolate warm-gold highlights only (weak-spot / muzzle flash / crosshair anchor),
 // so the bloom chain never glows the whole frame - it lifts only pixels that are BOTH bright
-// enough AND close in hue to the #FFC400 gold anchor. Reuses the exact gold-proximity trick the
+// enough AND close in hue to the palette's hot-light anchor. Reuses the exact hue-proximity trick the
 // final composite's tint protection uses (dot of normalized colors), so "gold" means the same
 // thing in both places.
 const BRIGHT_FRAG = `
@@ -98,7 +99,7 @@ void main() {
 // Warm filmic / ACES-ish tone-map biased toward the cinema-ink/aged-cream/gold film stock.
 // Pipeline: optional mild edge chroma offset -> additive gold-selective bloom (composited BEFORE
 // tone-map so highlights roll off filmically, never clip hard) -> ACES-ish tone-map -> warm film
-// tint that PRESERVES the gold #FFC400 anchor (crosshair / weak-spot legibility) -> animated
+// tint that PRESERVES the hot-light anchor (crosshair / weak-spot legibility) -> animated
 // grain -> soft vignette. Full-res, single-sample scene; the bloom itself runs at quarter-res
 // (see render()) precisely to stay cheap, so this stays a light multi-pass chain, not a heavy one.
 const FRAG = `
@@ -174,7 +175,7 @@ void main() {
  * The cinematic film-grade post pass (the default arena look; PSX is kept as a selectable
  * "retro" option). Renders the scene full-resolution into a single linear-filtered target, then
  * runs a small quarter-resolution bloom chain that lifts ONLY warm-gold highlights (the
- * weak-spot, the muzzle flash, the crosshair anchor #FFC400) - not a whole-frame glow, so the
+ * weak-spot, the muzzle flash, the crosshair) - not a whole-frame glow, so the
  * film keeps its restraint - and composites that bloom additively before the tone-map. The final
  * blit then applies a warm filmic / ACES-ish tone-map that preserves the gold anchor, plus
  * animated grain, a soft vignette, and an optional mild edge chroma offset.
@@ -213,9 +214,16 @@ export function createFilmPass(
   const rtBright = new WebGLRenderTarget(bw0, bh0, { minFilter: LinearFilter, magFilter: LinearFilter });
   const rtBlur = new WebGLRenderTarget(bw0, bh0, { minFilter: LinearFilter, magFilter: LinearFilter });
 
-  // Gold anchor (#FFC400) in linear-ish 0-1 RGB so the shader can protect it from the warm tint
-  // and so the bright-pass can select the same gold hue for the bloom.
-  const gold = new Vector3(255 / 255, 196 / 255, 0 / 255);
+  // The hue the shader protects from the warm tint, and the hue the bright-pass keys the bloom
+  // on. It used to be the retired brass gold written as a literal here, which was the
+  // one place it survived the palette migration. tokens.test.ts could not see it because that
+  // test only reads src/styles. It now comes from the palette mirror like every other colour the
+  // renderer draws with, so the seam holds and the canon test can check it.
+  const anchorRgb = ((h: string): [number, number, number] => {
+    const n = parseInt(h.slice(1), 16);
+    return [((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255];
+  })(hex.sulfur);
+  const gold = new Vector3(anchorRgb[0], anchorRgb[1], anchorRgb[2]);
 
   const brightUniforms = {
     tDiffuse: { value: rt.texture },
@@ -254,11 +262,11 @@ export function createFilmPass(
     tBloom: { value: rtBright.texture },
     uRes: { value: new Vector2(w0, h0) },
     uTime: { value: 0 },
-    uVig: { value: opts.vignette ?? 0.34 },
-    uGrain: { value: opts.grain ?? 0.06 },
+    uVig: { value: opts.vignette ?? 0.22 },
+    uGrain: { value: opts.grain ?? 0 },
     uChroma: { value: opts.chroma ?? 0.6 },
     uExposure: { value: opts.exposure ?? 1.32 },
-    uBloom: { value: opts.bloom ?? 0.35 },
+    uBloom: { value: opts.bloom ?? 0 },
     uGold: { value: gold },
   };
   const material = new ShaderMaterial({

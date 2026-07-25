@@ -1,3 +1,4 @@
+import { hex } from '../palette';
 import { Color, Mesh, MeshStandardMaterial, SphereGeometry, Vector3 } from 'three';
 import type { Degrees, TargetHandle, TargetMotion } from '../types';
 import { mulberry32 } from '../stats/bootstrap';
@@ -60,12 +61,20 @@ export function placeStatic(rng: () => number, opt: PlaceOptions = {}): Placemen
   };
 }
 
-/** Build the standard gold target mesh (shared by static + moving targets). */
+/**
+ * Build the standard target mesh (shared by static + moving targets).
+ *
+ * This is the sphere that owns cm/360, so its colour matters more than a cosmetic one: it
+ * held the retired brass gold as a literal, which was the palette seam being bypassed in the
+ * single most important mesh in the app. It now reads the hot-light token like every other
+ * source of light in the scene.
+ */
 export function createTargetMesh(worldRadius: number): Mesh {
   const geometry = new SphereGeometry(worldRadius, 24, 16);
   const material = new MeshStandardMaterial({
-    color: new Color('#FFC400'),
-    emissive: new Color('#3a2a00'),
+    color: new Color(hex.sulfur),
+    emissive: new Color(hex.brass),
+    emissiveIntensity: 0.25,
     roughness: 0.4,
     metalness: 0,
   });
