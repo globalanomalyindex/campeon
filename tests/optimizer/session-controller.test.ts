@@ -77,7 +77,17 @@ describe('finalizeReport', () => {
     // so the end-loud CI must be strictly wider. This is load-bearing for the sd-weighting AND its
     // plumbing: drop the noise plumbing (or strip the sd-scaling in bootstrap.ts) and facet placement
     // stops mattering, collapsing the two widths and failing this.
-    const base = concave(34, 0.4); // genuine residual spread, not a zero-residual fit
+    // The shared `concave` helper uses curvature -1 across the whole search range, which at
+    // noise 0.4 is too weak to locate a peak at all: most resamples come out non-concave, and
+    // since those now widen the band instead of being dropped, BOTH variants honestly report
+    // the full range and the comparison saturates. So this case gets a sharper, genuinely
+    // identifiable peak, which is what makes the placement effect measurable.
+    const sharpRng = mulberry32(5);
+    const base: Observation[] = [18, 22, 26, 30, 35, 42, 52].map((cm) => {
+      const x = Math.log(cm);
+      const d = x - Math.log(34);
+      return { x, y: -4 * d * d + (sharpRng() * 2 - 1) * 0.4 };
+    });
     const endLoud = base.map((o, i) => ({ ...o, noise: i === 6 ? 6.0 : 0.05 }));   // loud at last (end) cm
     const centralLoud = base.map((o, i) => ({ ...o, noise: i === 3 ? 6.0 : 0.05 })); // loud at central cm
     const endR = finalizeReport(endLoud, bounds, mulberry32(909), { bootstrapIters: 400 });
@@ -85,6 +95,25 @@ describe('finalizeReport', () => {
     const endW = endR.ci90[1] - endR.ci90[0];
     const centralW = centralR.ci90[1] - centralR.ci90[0];
     expect(endW).toBeGreaterThan(centralW);
+    // Guard the fixture itself: if either band saturates the search bounds the comparison is
+    // vacuous, so a future edit that weakens the peak fails here rather than passing silently.
+    expect(endW, 'fixture must stay identifiable').toBeLessThan(bounds[1] - bounds[0] - 1);
+  });
+
+  it('reports the whole search range when the data cannot locate a peak at all', () => {
+    // The honesty direction that matters. A weak curve under real noise sends most resamples
+    // non-concave. Those carry no peak estimate, and they used to be dropped from both the
+    // numerator AND the denominator, so the band was taken over the surviving minority and
+    // came out tight and confident. Keeping them in the denominator means a run that cannot
+    // find a peak says so, by widening toward the full range instead of narrowing.
+    const weak = concave(34, 0.4); // curvature -1 across [15, 60]: not identifiable at this noise
+    const r = finalizeReport(weak, bounds, mulberry32(909), { bootstrapIters: 400 });
+    const width = r.ci90[1] - r.ci90[0];
+    expect(width).toBeGreaterThan((bounds[1] - bounds[0]) * 0.9);
+    // It must still be a real interval inside the searched window, never a fabricated one.
+    expect(r.ci90[0]).toBeGreaterThanOrEqual(bounds[0]);
+    expect(r.ci90[1]).toBeLessThanOrEqual(bounds[1]);
+    expect(r.ci90[0]).toBeLessThan(r.ci90[1]);
   });
 
   describe('detrendDrift (A4 ANCOVA session-drift adjustment, finalize-only)', () => {

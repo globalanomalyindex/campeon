@@ -10,19 +10,36 @@ const peakCm360 = (obs: Observation[]): number => {
   return Math.exp(-b1 / (2 * b2));
 };
 
-/** 5th/95th percentiles of a list of peak estimates (90% CI). Sorts in place. */
-function percentileBand(peaks: number[]): [number, number] {
+/**
+ * The 5th/95th percentile band over `total` attempted resamples. Sorts in place.
+ *
+ * `peaks` holds only the resamples that produced a concave fit with an interior peak. The
+ * band used to be taken over those survivors alone while still being labelled 90%, so when
+ * a third of the resamples were non-concave the interval actually covered 90% of 67%, and
+ * the label overstated its own coverage. A non-concave resample is evidence that the data
+ * admits no interior peak, which is MORE uncertainty about where the peak sits, not less.
+ *
+ * So the dropped resamples stay in the denominator, and each is attributed to whichever
+ * tail widens the interval. The band can then only grow when resamples fail, never shrink.
+ * With nothing dropped this is arithmetically identical to the previous behaviour.
+ */
+export function percentileBand(peaks: number[], total: number = peaks.length): [number, number] {
   peaks.sort((a, b) => a - b);
-  const at = (q: number) => peaks[Math.min(peaks.length - 1, Math.floor(q * peaks.length))];
+  const k = peaks.length;
+  const n = Math.max(total, k);
+  const dropped = n - k;
   const LO = 0.05, HI = 0.95; // 90% CI
-  return [at(LO), at(HI)];
+  const at = (i: number): number => peaks[Math.max(0, Math.min(k - 1, i))]!;
+  return [at(Math.floor(LO * n) - dropped), at(Math.floor(HI * n))];
 }
 
 /**
  * Residual (semi-parametric) bootstrap 90% CI on the optimal cm/360.
  *
  * Resamples residuals around the fitted parabola, refits, and takes the 5th/95th percentiles.
- * Non-concave resamples (no peak) are dropped, so the CI reflects only valid peak estimates.
+ * Non-concave resamples yield no interior peak. They are excluded from the percentile values
+ * but KEPT in the denominator (see `percentileBand`), so a run where many resamples fail
+ * reports a wider band rather than a confident one over a shrunken sample.
  *
  * RELIABILITY-AWARE (P1-3, heteroscedastic): instead of pooling every instrument's residual into
  * one bag and resampling it uniformly - which lets one noisy facet inflate (or, worse, a lucky-quiet
@@ -98,7 +115,7 @@ export function bootstrapCi(
   const plain = ((): [number, number] => {
     if (homoscedastic) {
       throwIfEmpty(pooledPeaks.length);
-      return percentileBand(pooledPeaks);
+      return percentileBand(pooledPeaks, iters);
     }
 
     // Heteroscedastic resampling (drawn from a SEPARATE seeded stream so the pooled floor above stays
@@ -119,8 +136,8 @@ export function bootstrapCi(
 
     // Honest floor: union the reliability-aware band with the conservative pooled band, so the result
     // can only ever WIDEN - never narrow below the pooled bound when facets genuinely disagree.
-    const pooled = pooledPeaks.length > 0 ? percentileBand(pooledPeaks) : null;
-    const hetero = heteroPeaks.length > 0 ? percentileBand(heteroPeaks) : null;
+    const pooled = pooledPeaks.length > 0 ? percentileBand(pooledPeaks, iters) : null;
+    const hetero = heteroPeaks.length > 0 ? percentileBand(heteroPeaks, iters) : null;
     if (pooled === null) return hetero as [number, number];
     if (hetero === null) return pooled;
     return [Math.min(hetero[0], pooled[0]), Math.max(hetero[1], pooled[1])];
@@ -153,7 +170,7 @@ export function bootstrapCi(
     }
   }
   if (driftPeaks.length === 0) return plain; // nothing honest to add - never narrow, never fabricate
-  const driftBand = percentileBand(driftPeaks);
+  const driftBand = percentileBand(driftPeaks, iters);
   // Widen-only union with the plain band computed on the same seeded call (mirrors pooled/hetero).
   return [Math.min(plain[0], driftBand[0]), Math.max(plain[1], driftBand[1])];
 }
