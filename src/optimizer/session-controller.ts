@@ -139,6 +139,13 @@ export function finalizeReport(
   }
 
   const peak = clamp(fit.optimalCm360, lo, hi);
+  // Bounds honesty: when the vertex of whichever fit RAN (plain or detrended) falls outside the
+  // searched range, the clamp above turns "the best is beyond the range I searched" into a number
+  // sitting exactly on the edge, indistinguishable from a measured interior optimum. Record which
+  // side it fell past so every downstream layer can present the edge as a bound. The check sits
+  // after model selection on purpose: it must describe the fit that produced the number.
+  const atBound: 'low' | 'high' | undefined =
+    fit.optimalCm360 < lo ? 'low' : fit.optimalCm360 > hi ? 'high' : undefined;
   let ci: [Cm360, Cm360];
   try {
     // The obs carry their per-point `noise` (the P1-1 heteroscedastic nugget) all the way through, so
@@ -166,6 +173,7 @@ export function finalizeReport(
     ci90: ci,
     curve: fit.curve,
     ...(drifted !== null ? { driftZ: drifted.driftZ } : {}),
+    ...(atBound !== undefined ? { peakAtBound: atBound } : {}),
   };
 }
 
@@ -243,8 +251,15 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
       trials.length < coldStart ? seedAt(trials.length) : clamp(engine.suggest(obs, bounds), lo, hi);
     const id = schedule[trials.length % schedule.length];
     config.onTrialStart?.(id, trials.length, cm360);
+    // The gain the player arrives at this trial holding. The acclimation lead-in sizes itself
+    // from |ln(cm360) - ln(prevCm360)|, because the cost of adapting scales with how far the
+    // gain moved. Without this every trial spends the full worst-case budget, which is safe
+    // (over-acclimating cannot bias a score) but charges the player time it does not need. On
+    // the first trial there is no previous trial, so the honest answer is unknown and the
+    // planner spends the full budget.
+    const prev = trials.length > 0 ? trials[trials.length - 1]!.cm360 : undefined;
     const result = await config.instruments[id].run(
-      { cm360, dpi: config.dpi, rng, profile },
+      { cm360, dpi: config.dpi, rng, profile, ...(prev !== undefined ? { prevCm360: prev } : {}) },
       config.scene,
     );
     trials.push(result);

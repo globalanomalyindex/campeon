@@ -1,4 +1,5 @@
 import type { ArenaScene, Degrees, InstrumentId, TrialContext, TrialResult } from '../types';
+import { planAcclimation } from './acclimation';
 import { KalmanCV } from '../scoring/kalman';
 import { timeOnTarget, TrialRecorder, type Frame, type Recording } from './recording';
 import { separation } from '../engine/targets';
@@ -306,6 +307,11 @@ export const track = {
   id: ID,
   run(ctx: TrialContext, scene: ArenaScene): Promise<TrialResult> {
     scene.setSensitivity(ctx.cm360, ctx.dpi);
+    // Unscored acclimation lead-in (see acclimation.ts): the player tracks the same weaving prey
+    // for plan.ms before the recorder attaches, so the fast gain-adaptation transient is spent
+    // before a single scored frame exists. The target and its motion seed are drawn EXACTLY as
+    // before (one ctx.rng draw, first), so scored geometry is approach-invariant.
+    const plan = planAcclimation(ctx, ID);
     const seed = Math.floor(ctx.rng() * 1e9);
     // Centre the weaving prey on where the player is currently looking → it starts on-screen and the
     // ±12°/±5° weave keeps it there. The view drifts between trials, so the old absolute origin
@@ -320,16 +326,22 @@ export const track = {
       worldRadius: 0.6,
       motion: { yawAmp: 12, pitchAmp: 5, baseFreq: 0.5, seed },
     });
-    const rec = new TrialRecorder(scene, () => handle);
     return new Promise<TrialResult>((resolve) => {
       let elapsed = 0;
+      let rec: TrialRecorder | null = null; // attached only once the lead-in has elapsed
       const offFrame = scene.onFrame((dt) => {
         elapsed += dt;
-        if (elapsed >= DURATION_MS) {
+        if (rec === null && elapsed >= plan.ms) {
+          // Scoring begins here. Everything before this frame was acclimation and is never recorded.
+          rec = new TrialRecorder(scene, () => handle);
+        }
+        if (elapsed >= plan.ms + DURATION_MS) {
           offFrame();
-          rec.stop();
+          rec?.stop();
           scene.clearTargets();
-          resolve(analyzeTrack(rec.recording(), ctx));
+          const r = analyzeTrack(rec ? rec.recording() : { frames: [], fires: [] }, ctx);
+          // Disclose the discarded lead-in (protocol parameter, not a measurement).
+          resolve({ ...r, raw: { ...r.raw, leadInMs: plan.ms } });
         }
       });
     });

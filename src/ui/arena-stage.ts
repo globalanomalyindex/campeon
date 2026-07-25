@@ -86,7 +86,15 @@ export function createArenaStage(
   let last = 0;
   let raf = window.requestAnimationFrame(function loop(ts: number): void {
     const dt = last === 0 ? 16 : ts - last; last = ts;
-    arena.tick(dt); arena.render();
+    // Presence, from the one signal that says the player is actually aiming: pointer lock. The arena
+    // owns what absence MEANS (it freezes the clock, the targets, the samples and the shots, so an
+    // in-flight trial resumes where it was left); the shell only reports it, once per frame, before
+    // the tick that would otherwise credit unattended time to a scored trial.
+    arena.setPresent(pointer.isLocked());
+    arena.tick(dt);
+    // Rendering is outside the gate: a frozen trial still has to be drawn, dimmed behind the paused
+    // scrim, or the visitor is looking at a black window while the arena waits for them.
+    arena.render();
     raf = window.requestAnimationFrame(loop);
   });
 

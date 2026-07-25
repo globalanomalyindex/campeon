@@ -51,6 +51,60 @@ export function fitQuadratic(obs: Observation[]): Quadratic {
   return { b0, b1, b2 };
 }
 
+/**
+ * Leverage (hat-matrix diagonal) per observation for the quadratic design [1, x, x²].
+ *
+ * A residual bootstrap resamples the FITTED residuals, and fitted residuals are systematically
+ * smaller than the true errors: the fit is pulled toward each point, and hardest toward the
+ * high-leverage ones at the ends of the range. Resampling them raw therefore understates the
+ * noise and produces an interval narrower than the evidence supports. Scaling each residual by
+ * 1/sqrt(1 - h_ii) removes exactly that shrinkage.
+ *
+ * h_ii = z_iᵀ (XᵀX)⁻¹ z_i with z_i = [1, x_i, x_i²]. For a p-parameter fit the diagonals sum to
+ * p, so with n points they average p/n: the correction is large when the design is thin and
+ * negligible when it is rich, which is the right behaviour.
+ *
+ * Returns an empty array when the design is too thin for the correction to mean anything
+ * (n <= p, where every h_ii is 1) or when the normal equations are singular. Callers treat that
+ * as "no correction", never as an error.
+ */
+export function hatDiagonal(obs: readonly Observation[]): number[] {
+  const n = obs.length;
+  if (n <= 3) return []; // n == p: every leverage is 1 and the correction is undefined
+  let S0 = 0, S1 = 0, S2 = 0, S3 = 0, S4 = 0;
+  for (const { x } of obs) {
+    const x2 = x * x;
+    S0 += 1; S1 += x; S2 += x2; S3 += x2 * x; S4 += x2 * x2;
+  }
+  const A = [[S0, S1, S2], [S1, S2, S3], [S2, S3, S4]];
+  const out: number[] = [];
+  for (const { x } of obs) {
+    const z = [1, x, x * x];
+    const w = solve3(A.map((row) => [...row]), [...z]);
+    const h = z[0]! * w[0] + z[1]! * w[1] + z[2]! * w[2];
+    if (!Number.isFinite(h)) return []; // singular design: no honest correction available
+    out.push(h);
+  }
+  return out;
+}
+
+/**
+ * The factor each residual is scaled by before resampling, one per observation.
+ *
+ * Always >= 1, so this can only ever WIDEN the resulting interval. That is deliberate and it is
+ * the invariant a test pins: the canon allows an interval to widen and never to narrow.
+ */
+export function leverageScale(obs: readonly Observation[]): number[] {
+  const h = hatDiagonal(obs);
+  if (h.length !== obs.length) return obs.map(() => 1);
+  return h.map((hi) => {
+    // Clamp just below 1 so a numerically-saturated leverage cannot divide by zero. A point at
+    // h = 1 is fitted exactly and carries no residual information at all.
+    const safe = Math.min(Math.max(hi, 0), 1 - 1e-9);
+    return 1 / Math.sqrt(1 - safe);
+  });
+}
+
 export interface PeakFit { optimalCm360: number; coeffs: Quadratic; curve: { x: number; mean: number }[]; }
 
 /** Sample the (detrended) quadratic over the observed x range - shared by the plain and drift fits. */

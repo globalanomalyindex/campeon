@@ -6,6 +6,37 @@ import { TURN_CM } from '../convert/cm360';
 export const PITCH_LIMIT: Degrees = 89;
 
 /**
+ * The arena's field of view, fixed HORIZONTALLY at 103°.
+ *
+ * Why horizontal, and why fixed. A target's angular size and bearing are properties of the world,
+ * but what the player aims at is where that bearing lands ACROSS THE WINDOW, and that mapping is
+ * set by the horizontal half-field: screenFraction = tan(yaw) / tan(hfov / 2). The rig used to set
+ * a fixed 90° VERTICAL fov, which makes the horizontal field a function of the window's aspect
+ * ratio (106° at 4:3, 121° at 16:9, 134° at 21:9). Two visitors on differently shaped windows
+ * were then aiming at different-sized targets placed at different fractions of their screens, while
+ * the scorer treated both as the same angular task - so Fitts throughput, which divides by angular
+ * width, was comparing across tasks. Fixing the horizontal field makes the on-screen geometry of a
+ * drill a function of bearing alone, which is the invariant the measurement assumes.
+ *
+ * 103° is the horizontal field the audience actually aims in: it is Valorant's fixed value at 16:9
+ * and within a few degrees of CS2's default there, and it is the number the FOV converter in options
+ * offers as its source default. A tall window widens the VERTICAL field instead (the drills' motion
+ * is mostly yaw: ±25° of placement spread against ±12° of pitch), so the axis under test holds.
+ */
+export const HORIZONTAL_FOV: Degrees = 103;
+
+/**
+ * The vertical fov (what THREE's PerspectiveCamera takes) that yields HORIZONTAL_FOV at `aspect`.
+ * A non-finite or non-positive aspect (a zero-sized or not-yet-laid-out canvas) falls back to a
+ * square field: nothing is visible at that size, so this must not propagate NaN into the projection.
+ */
+export function verticalFovFor(aspect: number): Degrees {
+  const a = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const halfWidth = Math.tan(MathUtils.degToRad(HORIZONTAL_FOV) / 2); // focal units
+  return MathUtils.radToDeg(2 * Math.atan(halfWidth / a));
+}
+
+/**
  * View rotation (degrees) per one normalized mouse count, so that a full 360°
  * turn equals `cm360` of physical mouse travel at `dpi`.
  *   deg/count = 914.4 / (cm360 · dpi)
@@ -53,7 +84,7 @@ export class CameraRig {
   private degPerCount: Degrees;
 
   constructor(cm360: Cm360, dpi: Dpi, aspect = 1) {
-    this.camera = new PerspectiveCamera(90, aspect, 0.1, 1000);
+    this.camera = new PerspectiveCamera(verticalFovFor(aspect), aspect, 0.1, 1000);
     this.camera.rotation.order = 'YXZ';
     this.degPerCount = degreesPerCount(cm360, dpi);
     this.sync();
@@ -61,6 +92,17 @@ export class CameraRig {
 
   setSensitivity(cm360: Cm360, dpi: Dpi): void {
     this.degPerCount = degreesPerCount(cm360, dpi);
+  }
+
+  /**
+   * Reshape the view for a new window aspect. The vertical fov moves WITH the aspect so the
+   * horizontal field stays HORIZONTAL_FOV: a resize mid-session must not change the task. Setting
+   * `aspect` alone (what the arena used to do) is what let window shape leak into the measurement.
+   */
+  setAspect(aspect: number): void {
+    this.camera.aspect = aspect;
+    this.camera.fov = verticalFovFor(aspect);
+    this.camera.updateProjectionMatrix();
   }
 
   apply(sample: AimSample): void {

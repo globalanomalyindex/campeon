@@ -1,4 +1,5 @@
 import type { ArenaScene, Degrees, InstrumentId, Ms, TargetHandle, TrialContext, TrialResult } from '../types';
+import { planAcclimation } from './acclimation';
 import { segment } from '../scoring/submovement';
 import { speedTrace, type Frame } from './recording';
 import { separation } from '../engine/targets';
@@ -65,6 +66,11 @@ export const strike = {
   id: ID,
   run(ctx: TrialContext, scene: ArenaScene): Promise<TrialResult> {
     scene.setSensitivity(ctx.cm360, ctx.dpi);
+    // Unscored acclimation lead-in (see acclimation.ts): the first `lead` shots are real reaches
+    // at the new gain, discarded before scoring. Their geometry draws from the plan's PRIVATE rng
+    // so the scored spawns consume exactly the ctx.rng draws they consumed before the lead-in.
+    const plan = planAcclimation(ctx, ID);
+    let lead = plan.reaches;
     const shots: StrikeShot[] = [];
     let handle: TargetHandle | null = null;
     let presentedAt = 0;
@@ -74,8 +80,9 @@ export const strike = {
       // Spawn around where the player is currently looking → always on-screen (the view drifts between
       // trials; an absolute-origin spawn could land off-screen and waste the player's time hunting it).
       const [vYaw, vPitch] = scene.view();
-      const yaw = vYaw + (ctx.rng() * 2 - 1) * 20;
-      const pitch = Math.max(-80, Math.min(80, vPitch + (ctx.rng() * 2 - 1) * 10));
+      const rng = lead > 0 ? plan.rng : ctx.rng;
+      const yaw = vYaw + (rng() * 2 - 1) * 20;
+      const pitch = Math.max(-80, Math.min(80, vPitch + (rng() * 2 - 1) * 10));
       handle = scene.spawnTarget({ kind: 'static', yaw, pitch, distance: 20, worldRadius: 0.7 });
       presentedAt = now;
       frames = [];
@@ -92,6 +99,14 @@ export const strike = {
       });
       const offFire = scene.onFire((now) => {
         if (!handle) return;
+        if (lead > 0) {
+          // An acclimation reach: consume it and re-present without recording anything.
+          lead -= 1;
+          scene.clearTargets();
+          handle = null;
+          present(now);
+          return;
+        }
         const aim = scene.view();
         const tgt = handle.bearing();
         const radial = separation(aim, tgt);
@@ -120,7 +135,9 @@ export const strike = {
           // Re-center endpointError about its mean so σ_θ is a scatter, not a bias.
           const mean = shots.reduce((s, x) => s + x.endpointError, 0) / shots.length;
           const centered = shots.map((s) => ({ ...s, endpointError: s.endpointError - mean }));
-          resolve({ ...analyzeStrike(centered, ctx), at: now });
+          const r = analyzeStrike(centered, ctx);
+          // Disclose the discarded lead-in (protocol parameter, not a measurement).
+          resolve({ ...r, raw: { ...r.raw, leadInShots: plan.reaches }, at: now });
         } else {
           present(now);
         }

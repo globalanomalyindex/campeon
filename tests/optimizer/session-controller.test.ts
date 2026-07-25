@@ -34,6 +34,56 @@ describe('finalizeReport', () => {
     expect(r.ci90[1]).toBeLessThanOrEqual(60);
   });
 
+  describe('peakAtBound (bounds honesty: a clamped vertex is disclosed as a bound)', () => {
+    // The defect this pins: a concave fit whose vertex sits OUTSIDE the searched range used to be
+    // silently clamped to the edge and reported exactly like an interior optimum, with a clamped
+    // "measured" band around it. The flag makes the clamp observable in the data itself, so no
+    // rendering layer can mistake an edge for a located peak.
+    it('flags the report on whichever side the vertex fell past, and the printed number is the edge', () => {
+      // concave(90): every observed cm sits inside [15, 60] but the least-squares vertex is at
+      // ln(90), past the high edge. The session concluded "best is beyond the range searched".
+      const high = finalizeReport(concave(90, 0.02), bounds, mulberry32(21), { bootstrapIters: 200 });
+      expect(high.peakAtBound).toBe('high');
+      expect(high.optimalCm360).toBe(bounds[1]); // the number IS the edge; the flag says so
+      const low = finalizeReport(concave(8, 0.02), bounds, mulberry32(22), { bootstrapIters: 200 });
+      expect(low.peakAtBound).toBe('low');
+      expect(low.optimalCm360).toBe(bounds[0]);
+    });
+
+    it('an interior vertex carries NO flag: absence means located, and is never fabricated', () => {
+      const r = finalizeReport(concave(34, 0.02), bounds, mulberry32(23), { bootstrapIters: 200 });
+      expect(r.peakAtBound).toBeUndefined();
+    });
+
+    it('the no-peak fallback carries NO flag (its full-bounds CI is already the honesty signal)', () => {
+      const flat: Observation[] = [15, 25, 35, 45, 60].map((cm, i) => ({ x: Math.log(cm), y: 0.1 * i }));
+      const r = finalizeReport(flat, bounds, mulberry32(24));
+      expect(r.peakAtBound).toBeUndefined();
+      expect(r.ci90).toEqual([15, 60]);
+    });
+
+    it('follows the fit that actually ran: a DETRENDED vertex past the edge is flagged too', () => {
+      // Same construction as the A4 drift fixtures below, with the latent peak pushed past the
+      // high edge. The extended fit must run (driftZ present) and the flag must reflect ITS vertex,
+      // proving the clamp check sits after model selection, on whichever fit produced the number.
+      const cms = [18, 22, 26, 30, 35, 40, 46, 52, 58, 30, 29, 32, 31, 28];
+      const ks = cms.map((_, k) => k);
+      const muK = ks.reduce((s, v) => s + v, 0) / ks.length;
+      const sdK = Math.sqrt(ks.reduce((s, v) => s + (v - muK) ** 2, 0) / (ks.length - 1));
+      const peakX = Math.log(90);
+      const rng = mulberry32(5);
+      const obs: Observation[] = cms.map((cm, k) => {
+        const x = Math.log(cm);
+        const tau = (k - muK) / sdK;
+        return { x, tau, y: -2 * (x - peakX) ** 2 + 5 + 0.8 * tau + (rng() * 2 - 1) * 0.02 };
+      });
+      const ext = finalizeReport(obs, bounds, mulberry32(25), { bootstrapIters: 200, detrendDrift: true });
+      expect(ext.driftZ).toBeDefined(); // the extended fit is the one that ran
+      expect(ext.peakAtBound).toBe('high');
+      expect(ext.optimalCm360).toBe(bounds[1]);
+    });
+  });
+
   it('falls back to a full-bounds CI when the curve is not concave (flat data)', () => {
     const flat: Observation[] = [15, 25, 35, 45, 60].map((cm, i) => ({ x: Math.log(cm), y: 0.1 * i }));
     const r = finalizeReport(flat, bounds, mulberry32(3));
@@ -439,6 +489,33 @@ describe('runSession - shouldStop / initialTrials', () => {
     rng: mulberry32(5),
     bootstrapIters: 80,
     ...extra,
+  });
+
+  it('threads the arrival gain, so the acclimation lead-in can size itself to the change', async () => {
+    // The lead-in budget scales with |ln(cm360) - ln(prevCm360)|, because the cost of adapting
+    // to an unfamiliar gain scales with how far the gain moved. If the controller does not hand
+    // over the previous trial's sensitivity, every trial spends the full worst-case budget: safe,
+    // since over-acclimating cannot bias a score, but it charges the player time for nothing.
+    const seen: Array<number | undefined> = [];
+    const spy: Instrument = {
+      id: 'flick',
+      run: async (ctx) => {
+        seen.push(ctx.prevCm360);
+        return { instrument: 'flick', cm360: ctx.cm360, score: 0.5, raw: {}, at: 0 } as TrialResult;
+      },
+    };
+    const { trials } = await runSession(cfg({
+      instruments: { flick: spy } as Record<InstrumentId, Instrument>,
+      maxTrials: 4,
+      coldStart: 4,
+    }));
+    expect(seen).toHaveLength(4);
+    // Trial 0 has no predecessor, so the arrival gain is genuinely unknown and stays absent.
+    expect(seen[0]).toBeUndefined();
+    // Every later trial receives exactly the sensitivity the previous trial ran at.
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i], `trial ${i} arrival gain`).toBe(trials[i - 1]!.cm360);
+    }
   });
 
   it('breaks the loop when shouldStop returns true (checked at the top of each iteration)', async () => {

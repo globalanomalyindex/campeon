@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { analyzeFlick, flick, FLICK_CONDITIONS, type FlickTap } from '../../src/instruments/flick';
+import { planAcclimation } from '../../src/instruments/acclimation';
 import type { FittsCondition, TrialContext } from '../../src/types';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { sampleStd } from '../../src/scoring/stats';
@@ -135,7 +136,10 @@ async function driveProjected(
   verticalReaches: number;
 }> {
   const scene = new FakeScene();
-  const c: TrialContext = { ...ctx(), rng: makeRng() };
+  // Same-sensitivity arrival → the minimum acclimation lead-in (1 unscored tap), which this
+  // fixture plays out with an exact landing before the scored sequence begins.
+  const c: TrialContext = { ...ctx(), prevCm360: 34, rng: makeRng() };
+  const lead = planAcclimation(c, 'flick').reaches;
   const order = presentationOrder(makeRng()); // same seed → same shuffle as inside run
   const p = flick.run(c, scene);
   scene.tick(0); // the first target is presented on the first frame, so the stamp carries the arena clock
@@ -144,8 +148,15 @@ async function driveProjected(
   const counts = new Map<string, number>();
   let prevAim: [number, number] = [0, 0]; // scene.view() at present time (start of the reach)
   let verticalReaches = 0;
+  for (let l = 0; l < lead; l++) {
+    const spec = scene.spawned[l]!;
+    const tgt: [number, number] = [spec.yaw ?? 0, spec.pitch ?? 0];
+    scene.tick(120, tgt);
+    scene.fire(tgt); // unscored acclimation tap: land exactly on it and move on
+    prevAim = tgt;
+  }
   for (let i = 0; i < order.length; i++) {
-    const spec = scene.spawned[i]!;
+    const spec = scene.spawned[lead + i]!;
     const tgt: [number, number] = [spec.yaw ?? 0, spec.pitch ?? 0];
     const dy = tgt[0] - prevAim[0];
     const dp = tgt[1] - prevAim[1];
@@ -257,8 +268,15 @@ describe('flick.run - A2 seam safety across the ±180 yaw wrap', () => {
       };
     };
     const scene = new FakeScene();
-    scene.view_ = [175, 0]; // free-aim near the seam before the trial begins - reachable in the arena
-    const c: TrialContext = { ...ctx(), rng: makeScripted() };
+    // Same-sensitivity arrival → the minimum lead-in (1 unscored tap). The scored presents draw
+    // their dirs from the SCRIPTED ctx.rng exactly as before (lead geometry is a private stream).
+    const c: TrialContext = { ...ctx(), prevCm360: 34, rng: makeScripted() };
+    const lead = planAcclimation(c, 'flick').reaches;
+    // Start the free-aim where the (deterministic, private-stream) lead tap will land the view
+    // EXACTLY at [175, 0] near the seam - the same base the scored walk always used, so the
+    // fixture keeps exercising the sign-flip corruption class rather than the ~360 outlier one.
+    const dir0 = planAcclimation(c, 'flick').rng() * Math.PI * 2; // fresh plan = same private stream
+    scene.view_ = [wrap(175 - 12 * Math.cos(dir0)), -12 * Math.sin(dir0)];
     const order = presentationOrder(() => 0); // shuffle draws are all 0 → same order as inside run
     const p = flick.run(c, scene);
     scene.tick(0); // the first target is presented on the first frame (see clock-stamp.test.ts)
@@ -268,8 +286,19 @@ describe('flick.run - A2 seam safety across the ±180 yaw wrap', () => {
     let prevAim: [number, number] = [175, 0];
     let seamSpawns = 0;
     let naiveCorrupted = 0;
+    for (let l = 0; l < lead; l++) {
+      const spec = scene.spawned[l]!;
+      // Wrap the lead target's bearing exactly as the arena would, so the free-aim view the
+      // scored sequence starts from is a legal wrapped yaw (the corruption class this fixture
+      // pins - the SIGN FLIP, not the ~360 outlier - depends on that).
+      const tgt: [number, number] = [wrap(spec.yaw ?? 0), spec.pitch ?? 0];
+      scene.moveTarget(tgt);
+      scene.tick(120, tgt);
+      scene.fire(tgt); // unscored acclimation tap: land exactly on it and move on
+      prevAim = tgt;
+    }
     for (let i = 0; i < order.length; i++) {
-      const spec = scene.spawned[i]!;
+      const spec = scene.spawned[lead + i]!;
       const rawYaw = spec.yaw ?? 0; // run writes view + amplitude*cos(dir), unwrapped
       if (rawYaw >= 180 || rawYaw < -180) seamSpawns += 1;
       const tgt: [number, number] = [wrap(rawYaw), spec.pitch ?? 0];

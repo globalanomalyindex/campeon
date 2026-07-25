@@ -9,6 +9,7 @@ import type {
   TrialContext,
   TrialResult,
 } from '../types';
+import { planAcclimation } from './acclimation';
 import {
   conditionThroughput,
   aggregateThroughput,
@@ -129,6 +130,13 @@ export const flick = {
       [order[i], order[j]] = [order[j]!, order[i]!];
     }
 
+    // Unscored acclimation lead-in (see acclimation.ts): the first `lead` taps are real reaches
+    // at the new gain, discarded before any tap is recorded. Their geometry draws from the plan's
+    // PRIVATE rng so the scored presentation (the shuffle above + per-target directions below)
+    // consumes exactly the ctx.rng draws it consumed before the lead-in existed.
+    const plan = planAcclimation(ctx, ID);
+    let lead = plan.reaches;
+
     const taps: FlickTap[] = [];
     let idx = 0;
     let handle: TargetHandle | null = null;
@@ -138,10 +146,13 @@ export const flick = {
 
     return new Promise<TrialResult>((resolve) => {
       const present = (now: Ms): void => {
-        const c = order[idx]!;
+        const leading = lead > 0;
+        // Lead-in taps cycle the real condition grid so the practice spans the amplitudes the
+        // scored taps will use; a scored tap always takes the next slot of the shuffled order.
+        const c = leading ? FLICK_CONDITIONS[(plan.reaches - lead) % FLICK_CONDITIONS.length]! : order[idx]!;
         const view = scene.view();
         presentAim = view;
-        const dir = ctx.rng() * Math.PI * 2;
+        const dir = (leading ? plan.rng : ctx.rng)() * Math.PI * 2;
         const yaw = view[0] + c.amplitude * Math.cos(dir);
         const pitch = Math.max(-40, Math.min(40, view[1] + c.amplitude * Math.sin(dir)));
         const worldRadius = 20 * Math.tan((c.width / 2) * (Math.PI / 180)); // W = angular diameter at d=20
@@ -166,6 +177,14 @@ export const flick = {
 
       const offFire = scene.onFire((now) => {
         if (!handle) return;
+        if (lead > 0) {
+          // An acclimation reach: consume it and re-present without recording anything.
+          lead -= 1;
+          scene.clearTargets();
+          handle = null;
+          present(now);
+          return;
+        }
         const c = order[idx]!;
         const aim = scene.view();
         const tgt = handle.bearing();
@@ -195,7 +214,9 @@ export const flick = {
         if (idx >= order.length) {
           offFrame();
           offFire();
-          resolve({ ...analyzeFlick(taps, ctx), at: now });
+          const r = analyzeFlick(taps, ctx);
+          // Disclose the discarded lead-in (protocol parameter, not a measurement).
+          resolve({ ...r, raw: { ...r.raw, leadInTaps: plan.reaches }, at: now });
         } else {
           present(now);
         }

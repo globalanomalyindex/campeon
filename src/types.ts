@@ -50,7 +50,20 @@ export interface TargetHandle { id: string; bearing(): [Degrees, Degrees]; radiu
 
 // ── instruments (instruments/) ─────────────────────────────────────────
 export type InstrumentId = 'track' | 'flick' | 'calibrate' | 'strike';
-export interface TrialContext { cm360: Cm360; dpi: Dpi; rng: () => number; profile: Profile; }
+export interface TrialContext {
+  cm360: Cm360;
+  dpi: Dpi;
+  rng: () => number;
+  profile: Profile;
+  /** The cm/360 the player arrived at this trial adapted to - normally the previous trial's value,
+   *  or the setting they walked in with on the first trial. Consumed ONLY by the unscored
+   *  acclimation lead-in (src/instruments/acclimation.ts) to size how much practice the player
+   *  gets before scoring starts: adaptation cost grows with |ln(new) - ln(prev)|, so a near
+   *  neighbour needs less than a jump across the range. Absent = arrival gain unknown, and the
+   *  lead-in then spends its FULL budget (treat an unknown as a far jump, never as a near one).
+   *  It never touches scoring, geometry, or the shared rng stream. */
+  prevCm360?: Cm360;
+}
 export interface TrialResult {
   instrument: InstrumentId;
   cm360: Cm360;
@@ -116,6 +129,12 @@ export interface Report {
    *  assert one cause. Present ONLY when the extended fit was identifiable (n ≥ 10, tau carried, tau
    *  not collinear with the quadratic design); absent → the readout renders dashed, never padded. */
   driftZ?: number;
+  /** Set when the fitted vertex landed OUTSIDE the searched range and was clamped to that edge. The
+   *  reported optimum is then a BOUND on the answer with the evidence pointing past it: 'high' means
+   *  the fit peaked above the range (the number is at least the edge), 'low' below it (at most the
+   *  edge). Absent means the vertex was interior (a located optimum) or no peak was fittable at all
+   *  (the full-bounds fallback is its own honesty signal). Never inferred, never fabricated. */
+  peakAtBound?: 'low' | 'high';
 }
 
 // ── facet concordance (A5: is "one latent cm/360" true, or four numbers we averaged?) ──────────
@@ -190,6 +209,12 @@ export interface Result {
    *  on) one answer. Optional so OLD saved Results render without it; dropped on `tuned` (a hand-picked
    *  value has no measured concordance) and gated behind `!tuned` at the screen. */
   facetConcordance?: FacetConcordance;
+  /** Copied verbatim from `Report.peakAtBound`: the reported number sits on a clamped EDGE of the
+   *  searched window and is a bound on the answer, with the evidence pointing past it. The result
+   *  screen swaps the measured-CI line for bound copy and offers the wider-search route. Optional so
+   *  OLD saved Results (which lack it) render as before; absence carries no claim either way and the
+   *  flag is never inferred from the optimum happening to sit on an edge. */
+  peakAtBound?: 'low' | 'high';
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────

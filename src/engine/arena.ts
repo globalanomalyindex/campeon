@@ -93,6 +93,19 @@ export interface ArenaOptions {
 export const ARENA_GROUND_Y = -3;
 
 /**
+ * The longest single frame the arena will credit to its clock, in ms (10 fps).
+ *
+ * The clock is a hand-accumulated sum of rAF deltas, and rAF hands back the WHOLE gap on the first
+ * frame after the tab was hidden, the machine slept, or the compositor stalled. Uncapped, that gap
+ * lands inside an in-flight trial as one enormous frame: the instrument's elapsed accumulator jumps
+ * (a 6 s track trial can end on its second frame), the target advances seconds along its path
+ * between two adjacent recorded frames, and the recording claims the player was shown all of it.
+ * A frame at or under the cap is a hitch a real machine produces, and it passes through untouched.
+ * Beyond the cap the arena was stalled: that time was never shown to the player, so it is dropped.
+ */
+export const MAX_FRAME_MS: Ms = 100;
+
+/**
  * A three color int for a warm arena SURFACE, expressed as a documented BRIGHTNESS of a palette
  * pigment (never a raw literal): every leather-toned surface the arena draws - the stage floor, the
  * grid hairlines - is `hex.hide` (the quarry's own dusty-leather token) at a different value, so a
@@ -126,6 +139,7 @@ export class Arena implements ArenaScene {
   private readonly envDisposables: Array<{ dispose(): void }> = [];
   private disposed = false;
   private nowMs: Ms = 0;
+  private present = true;
   private readonly post: PostProcessor | undefined;
   private enemies: EnemyLayer | undefined;
   private viewmodel: ViewmodelLayer | undefined;
@@ -199,6 +213,7 @@ export class Arena implements ArenaScene {
   }
 
   private handleSample(sample: AimSample): void {
+    if (!this.present) return; // absent: a cursor swinging over a scrim is not an aim
     this.rig.apply(sample);
     const view = this.rig.view();
     this.viewmodel?.look(view); // cosmetic weapon sway reads the new bearing; writes nothing
@@ -206,6 +221,7 @@ export class Arena implements ArenaScene {
   }
 
   private handleFire(): void {
+    if (!this.present) return; // absent: a click on a dialog button is not a shot
     // Classify against the LIVE target first - before an instrument's fire handler clears/advances it -
     // so the pop reads the target you actually shot. Cosmetic only: reads view+bearings, writes nothing.
     this.enemies?.fire(this.nowMs, this.rig.view(), [...this.targets.values()]);
@@ -248,14 +264,38 @@ export class Arena implements ArenaScene {
     return this.rig.view();
   }
 
+  /**
+   * Presence gate (VALIDITY): whether the player is demonstrably in the arena, which the shell
+   * reports from pointer lock. While absent the arena advances nothing - no clock, no target motion,
+   * no frame, no aim sample, no shot - so an in-flight trial FREEZES and resumes from exactly where
+   * it was left, and nothing collected while the player was not playing is scored as if they were.
+   *
+   * The other honest option was to discard an interrupted trial outright. Freezing is the choice
+   * here. Neither one scores the absence, and the difference is what each costs. Discarding makes
+   * the pause a filter on the data: a visitor presses Esc when a trial is going badly or a
+   * sensitivity feels wrong, so dropping exactly those trials deletes the low tail at whichever
+   * cm/360 was under test and bends the fitted curve toward the sensitivities they chose to sit
+   * through, which is a direction error. Freezing costs precision: the trial becomes two exposures
+   * with a gap the player rested in, which adds noise to that one trial without moving it
+   * systematically. What freezing does NOT do is disclose the interruption, and a trial that spanned
+   * one deserves to widen the interval it feeds. That belongs to whoever owns the trial record.
+   * Defaults to present, so a headless caller that never reports presence behaves as before.
+   */
+  setPresent(present: boolean): void {
+    this.present = present;
+  }
+
   /** Advance the clock by `dtMs`, move targets, and emit the frame to subscribers. */
   tick(dtMs: Ms): void {
-    if (this.disposed) return;
-    this.nowMs += dtMs;
+    if (this.disposed || !this.present) return;
+    // Credit at most one physically possible frame, and never a negative or NaN one: rAF hands back
+    // the whole sleep on the first frame after a hidden tab, and that delta must not reach a trial.
+    const dt = dtMs > 0 ? Math.min(dtMs, MAX_FRAME_MS) : 0;
+    this.nowMs += dt;
     for (const t of this.moving) t.update(this.nowMs);
     this.enemies?.update(this.nowMs); // follow target positions + advance sprite animations (cosmetic)
     this.viewmodel?.tick(this.nowMs); // advance the weapon recoil/sway springs (cosmetic)
-    for (const cb of this.frameCbs) cb(dtMs, this.nowMs);
+    for (const cb of this.frameCbs) cb(dt, this.nowMs);
   }
 
   onFrame(cb: FrameCallback): () => void {
@@ -336,8 +376,9 @@ export class Arena implements ArenaScene {
   /** Re-read the size function and update camera aspect + renderer (call on window resize). */
   resize(): void {
     const [w, h] = this.sizeFn();
-    this.rig.camera.aspect = w / Math.max(1, h);
-    this.rig.camera.updateProjectionMatrix();
+    // Through the rig, which moves the vertical fov with the aspect so the HORIZONTAL field is
+    // unchanged. Writing camera.aspect alone let the window's shape change the aiming task.
+    this.rig.setAspect(w / Math.max(1, h));
     this.renderer.setSize(w, h);
     this.post?.setSize(w, h);
   }

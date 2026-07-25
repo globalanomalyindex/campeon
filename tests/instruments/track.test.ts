@@ -324,7 +324,9 @@ describe('track.run', () => {
   it('drives a moving target for the trial duration and resolves a scored result', async () => {
     const scene = new FakeScene();
     const p = track.run(ctx(), scene);
-    for (let i = 0; i < 400; i++) {
+    // No prevCm360 in ctx → the full 2400 ms acclimation lead-in precedes the 6000 ms scored
+    // window, so the script must cover 8400 ms of frames (about 525 ticks at 16 ms).
+    for (let i = 0; i < 600; i++) {
       const b: [number, number] = [10 * Math.sin(i * 0.05), 3 * Math.sin(i * 0.04)];
       scene.moveTarget(b, 2.5);
       scene.tick(16, b);

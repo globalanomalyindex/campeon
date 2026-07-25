@@ -450,6 +450,8 @@
   max-width: 46ch;
 }
 .result__ci--tuned { color: var(--text-muted); }
+/* Bounds honesty: the bound copy replaces the measured-CI line, same quiet register. */
+.result__ci--bounded { color: var(--text-muted); }
 .result__credit { color: var(--text-muted); font: var(--type-body-sm); margin-top: var(--space-2); }
 
 /* The four facets, joined on the lattice, each marked by its mineral. The track width is the

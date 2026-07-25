@@ -85,6 +85,22 @@ describe('buildResult', () => {
     const r = buildResult(report, trials, 800);
     expect(r.driftZ).toBeUndefined();
   });
+
+  it('carries the peakAtBound disclosure verbatim from the Report (a bound stays a bound)', () => {
+    const r = buildResult({ ...report, peakAtBound: 'high' }, trials, 800);
+    expect(r.peakAtBound).toBe('high');
+    const l = buildResult({ ...report, peakAtBound: 'low' }, trials, 800);
+    expect(l.peakAtBound).toBe('low');
+  });
+
+  it('omits peakAtBound when the Report has none (old persisted results degrade gracefully)', () => {
+    // Absence must mean "no clamp was recorded", never be inferred from the optimum sitting on
+    // an edge: an old saved Result cannot have the flag fabricated for it in either direction.
+    const r = buildResult(report, trials, 800);
+    expect(r.peakAtBound).toBeUndefined();
+    const edge = buildResult({ ...report, optimalCm360: 60 }, trials, 800);
+    expect(edge.peakAtBound).toBeUndefined();
+  });
 });
 
 describe('ciConcord', () => {

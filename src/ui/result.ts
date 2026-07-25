@@ -3,7 +3,7 @@ import type { FacetConcordance, GameId, Result } from '../types';
 import { GAME_YAW } from '../convert/yaw-table';
 import { buildExportBundle, toJson, triggerDownload } from '../state/export';
 import { plotGeometry, plotLegendHtml, renderConvergencePlot } from './convergence-plot';
-import { CONCORD_COPY, THESIS_COPY, THESIS_INCONCLUSIVE } from './concord';
+import { BOUNDED_COPY, BOUNDED_LEAD, CONCORD_COPY, THESIS_COPY, THESIS_INCONCLUSIVE } from './concord';
 import { marksFromTrials } from './session-view';
 import { ciConcord } from '../optimizer/result';
 
@@ -48,10 +48,12 @@ function thesisHtml(fc: FacetConcordance): string {
 // A single screen-reader summary sentence rendered ONCE near the number (not a live region - the
 // result is static). The CI range is spelled " to " so no en-dash glyph is ever voiced; a tuned-by-feel
 // value carries NO measured-CI claim (honesty), so it is announced as tuned without a band.
-const srSummary = (r: Result, tuned: boolean): string =>
+const srSummary = (r: Result, tuned: boolean, bounded?: 'low' | 'high'): string =>
   tuned
     ? `Your sensitivity, tuned by feel: ${fmt(r.optimalCm360)} centimetres per 360. It carries no measured interval.`
-    : `Your most-evolved sensitivity is ${fmt(r.optimalCm360)} centimetres per 360, with a 90% confidence interval from ${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}.`;
+    : bounded
+      ? `Your number reads as ${bounded === 'high' ? 'at least' : 'at most'} ${fmt(r.optimalCm360)} centimetres per 360. The fitted curve peaks past the ${bounded === 'high' ? 'slow' : 'fast'} edge of the searched window, so the edge is a bound and no measured interval is reported.`
+      : `Your most-evolved sensitivity is ${fmt(r.optimalCm360)} centimetres per 360, with a 90% confidence interval from ${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}.`;
 
 // Fixed viewBox: clientWidth is 0 before layout, so the geometry must use a constant design size.
 const PLOT_SIZE = { width: 360, height: 200 };
@@ -70,9 +72,15 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       const hasFacets =
         !tuned && r.bounds !== undefined &&
         (bk.trackContribZ !== undefined || bk.flickContribZ !== undefined);
+      // Bounds honesty: when the fitted vertex fell past an edge of the searched window, the number on
+      // screen is that edge and must read as a bound. Gated on the persisted flag ONLY - an old saved
+      // Result without the field renders exactly as before, and boundedness is never inferred from the
+      // optimum happening to sit on an edge. A tuned value already dropped every measured claim.
+      const bounded = !tuned ? r.peakAtBound : undefined;
       // CI concord: a measured-only readout (gated !tuned - a hand-picked value has no measured CI/concord).
-      // undefined for a degenerate/old CI so nothing is fabricated.
-      const concord = !tuned ? ciConcord(r.optimalCm360, r.ci90) : undefined;
+      // undefined for a degenerate/old CI so nothing is fabricated. Also gated !bounded: a clamped band's
+      // width describes where the clamp cut it, so a width bucket would dress the truncation as a reading.
+      const concord = !tuned && !bounded ? ciConcord(r.optimalCm360, r.ci90) : undefined;
       // The strike lean comes from the user's real taste knob (carried as r.speedAccuracy); OLD results lack
       // it (number-only), and it is the only facet that encodes a chosen lean rather than pure skill.
       const lean = r.speedAccuracy;
@@ -92,18 +100,22 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       // evidence around it - the payoff reads as a reveal, not a data dump.
       root.innerHTML = `
         <div class="wrap stack result__inner">
-          <p class="result__lead reveal" data-reveal style="--reveal-i:0">Your number</p>
+          <p class="result__lead reveal" data-reveal style="--reveal-i:0">${bounded ? BOUNDED_LEAD : 'Your number'}</p>
           <h1 class="display result__number reveal" data-reveal style="--reveal-i:1"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
-          <p class="result__sr-summary sr-only">${srSummary(r, tuned)}</p>
+          <p class="result__sr-summary sr-only">${srSummary(r, tuned, bounded)}</p>
           ${tuned
             ? `<p class="result__ci result__ci--tuned reveal" data-reveal style="--reveal-i:2">You picked this one by feel, so it carries no measured interval.</p>`
-            : `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% confidence interval <span data-result="ci">${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}</span> cm/360</p>`}
+            : bounded
+              ? `<p class="result__ci result__ci--bounded reveal" data-result="bounded" data-bounded="${bounded}" data-reveal style="--reveal-i:2">${BOUNDED_COPY[bounded](fmt(r.optimalCm360))}</p>`
+              : `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% confidence interval <span data-result="ci">${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}</span> cm/360</p>`}
           ${concord
             ? `<p class="result__concord reveal" data-result="concord" data-concord="${concord}" data-reveal style="--reveal-i:3">${CONCORD_COPY[concord]}</p>`
             : ''}
           ${!tuned && r.curve && r.bounds
             ? `<figure class="result__plot reveal" data-reveal style="--reveal-i:4"><svg data-plot aria-hidden="true"></svg>
-                <figcaption>The four probes converging on your one number. ${plotLegendHtml()}</figcaption></figure>`
+                <figcaption>${bounded
+                  ? 'The four probes still climbing at the edge of the searched window. The answer line and the band stop where the search stopped.'
+                  : 'The four probes converging on your one number.'} ${plotLegendHtml()}</figcaption></figure>`
             : ''}
           <p class="result__credit reveal" data-reveal style="--reveal-i:5">Measured across four environments and six organisms: dragonfly, falcon, spider, raptor, archerfish, mantis shrimp.</p>
           <div class="result__tier reveal" data-tier="origin" data-reveal style="--reveal-i:6">
@@ -140,7 +152,8 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
             <p class="result__saved">Saved locally. Nothing leaves your machine.</p>
           </div>
           <div class="result__actions reveal" data-reveal style="--reveal-i:9">
-            <button class="action action--primary" data-action="range">Step into the range</button>
+            ${bounded ? `<button class="action action--primary" data-action="widen-search">Widen the search window</button>` : ''}
+            <button class="action ${bounded ? 'action--secondary' : 'action--primary'}" data-action="range">Step into the range</button>
             <button class="action action--secondary" data-action="case-study">Read how this works</button>
             <button class="action action--ghost" data-action="again">Run again</button>
             <button class="action action--ghost" data-action="export">Export JSON</button>
@@ -148,6 +161,9 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
         </div>`;
       root.querySelector('[data-action="again"]')!.addEventListener('click', () => ctx.navigate('hero'));
       root.querySelector('[data-action="range"]')!.addEventListener('click', () => ctx.navigate('range'));
+      // The honest next step for a bounded result: the options screen owns the search-window control,
+      // so the offer to search wider routes there instead of inventing a second mechanism.
+      root.querySelector('[data-action="widen-search"]')?.addEventListener('click', () => ctx.navigate('options'));
       // The result is the one place a reader is most likely to want the reasoning, and it was the
       // one screen with no route to it.
       root.querySelector('[data-action="case-study"]')!.addEventListener('click', () => ctx.navigate('case-study'));

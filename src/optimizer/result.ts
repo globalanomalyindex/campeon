@@ -62,6 +62,9 @@ export function buildResult(
     // A4: the measured session-drift readout, copied VERBATIM from the Report. Absent when the
     // extended fit fell back (or for old reports) so the result screen dashes it - never padded.
     ...(report.driftZ !== undefined ? { driftZ: report.driftZ } : {}),
+    // Bounds honesty: the clamped-vertex disclosure, copied verbatim. Absent for interior peaks and
+    // for old reports; never inferred from the optimum happening to sit on an edge of the window.
+    ...(report.peakAtBound !== undefined ? { peakAtBound: report.peakAtBound } : {}),
     // A5: the per-facet peaks + concordance tier - the "one latent cm/360" thesis tested as a claim.
     // Seeded on the trial count (a decoupled stream, like the live-plot interim RNG) so this readout
     // is deterministic and never perturbs the scored sequence. Dropped for tuned results by adoptResult.

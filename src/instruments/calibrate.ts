@@ -1,4 +1,5 @@
 import type { ArenaScene, Degrees, InstrumentId, Ms, Shot, TargetHandle, TrialContext, TrialResult } from '../types';
+import { planAcclimation } from './acclimation';
 import { decompose, ewmaBias, calibrationCost, DEFAULT_WEIGHTS } from '../scoring/bias-variance';
 import { missComponents } from './recording';
 import { sampleStd } from '../scoring/stats';
@@ -57,6 +58,11 @@ export const calibrate = {
   id: ID,
   run(ctx: TrialContext, scene: ArenaScene): Promise<TrialResult> {
     scene.setSensitivity(ctx.cm360, ctx.dpi);
+    // Unscored acclimation lead-in (see acclimation.ts): the first `lead` shots are real reaches
+    // at the new gain, discarded before scoring. Their geometry draws from the plan's PRIVATE rng
+    // so the scored spawns consume exactly the ctx.rng draws they consumed before the lead-in.
+    const plan = planAcclimation(ctx, ID);
+    let lead = plan.reaches;
     const shots: CalibrateShot[] = [];
     let handle: TargetHandle | null = null;
     let presentedAt = 0;
@@ -64,9 +70,10 @@ export const calibrate = {
 
     const present = (now: Ms): void => {
       presentAim = scene.view();
+      const rng = lead > 0 ? plan.rng : ctx.rng;
       // Spawn around the current view → always on-screen (the reach is the offset, not an absolute bearing).
-      const yaw = presentAim[0] + (ctx.rng() * 2 - 1) * 18;
-      const pitch = Math.max(-80, Math.min(80, presentAim[1] + (ctx.rng() * 2 - 1) * 9));
+      const yaw = presentAim[0] + (rng() * 2 - 1) * 18;
+      const pitch = Math.max(-80, Math.min(80, presentAim[1] + (rng() * 2 - 1) * 9));
       handle = scene.spawnTarget({ kind: 'static', yaw, pitch, distance: 20, worldRadius: 0.6 });
       presentedAt = now;
     };
@@ -85,6 +92,14 @@ export const calibrate = {
 
       const offFire = scene.onFire((now) => {
         if (!handle) return;
+        if (lead > 0) {
+          // An acclimation reach: consume it and re-present without recording anything.
+          lead -= 1;
+          scene.clearTargets();
+          handle = null;
+          present(now);
+          return;
+        }
         const aim = scene.view();
         const tgt = handle.bearing();
         const m = missComponents(presentAim, tgt, aim);
@@ -99,7 +114,9 @@ export const calibrate = {
         if (shots.length >= SHOTS) {
           offOpen?.();
           offFire();
-          resolve({ ...analyzeCalibrate(shots, ctx), at: now });
+          const r = analyzeCalibrate(shots, ctx);
+          // Disclose the discarded lead-in (protocol parameter, not a measurement).
+          resolve({ ...r, raw: { ...r.raw, leadInShots: plan.reaches }, at: now });
         } else {
           present(now);
         }
