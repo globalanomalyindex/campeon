@@ -4,8 +4,9 @@ Things a five-lens measurement audit confirmed, that are NOT fixed yet. They are
 down rather than quietly carried, because the whole argument of this tool is that it says
 what it does and does not know.
 
-Fixed already, for contrast: the session-clock stamp bug (commit `5f38086`) and the two
-order confounds in cold-start seeding and the shared stop-check RNG (commit `dbdd734`).
+Fixed already, for contrast: the session-clock stamp bug (commit `5f38086`), the two
+order confounds in cold-start seeding and the shared stop-check RNG (commit `dbdd734`), and the
+bootstrap band that narrowed when resamples failed (commit `7e0f6f9`).
 
 ---
 
@@ -63,16 +64,26 @@ they were already close to right.
 The fix is an unscored acclimation lead-in at the start of each trial, discarded before
 scoring. Roughly ten lines per instrument and about forty seconds of session time.
 
-## 3. Confidence intervals are truncated in five places, all narrowing
+## 3. Confidence intervals are truncated, all in the narrowing direction
 
-The canon says intervals widen only. Five places currently do the opposite:
+The canon says intervals widen only. Five places did the opposite. One is now fixed.
+
+**Fixed** in commit `7e0f6f9`: non-concave bootstrap resamples were dropped from the
+percentile list *and* from the denominator, so the band was taken over the surviving
+minority and still labelled 90%. Failures now stay in the denominator and widen the band.
+Measured: a curve too weak to locate a peak was reporting a 30.9 cm band inside a 45 cm
+search range. It now reports the range, which is the honest answer.
+
+Still open:
 
 - Residuals are resampled without the leverage correction `1 / sqrt(1 - h_ii)`.
-- Non-concave bootstrap resamples are dropped from the numerator but left in the
-  denominator, so the 90% label overstates its coverage.
 - An extrapolated vertex, and both interval endpoints, are clamped to the search bounds and
-  then printed as a measured band.
-- The card sweep measures its own scale spread (`spreadPct`) and discards it.
+  then printed as a measured band. This is the natural next one, and it pairs with the fix
+  above: a clamped endpoint should be disclosed as a bound rather than presented as a
+  measurement.
+- The card sweep measures its own scale spread (`spreadPct`) and discards it, so a
+  calibration that disagreed with itself by 5% reports the same confidence as one that
+  agreed to 0.5%.
 - Facet disagreement is computed and never unioned into the interval.
 
 Each is small on its own. Together they mean the interval is narrower than the evidence
