@@ -9,6 +9,9 @@ import {
   CONVENTION_K_MAX,
   conventionFrom,
   LATTICE_MIN_SAMPLES,
+  conventionFromGated,
+  latticeGateOpen,
+  type LatticeGate,
 } from '../../src/input/lattice';
 
 /** One synthetic hand motion as REAL integer mouse counts: mixed signs, small magnitudes common,
@@ -265,5 +268,55 @@ describe('conventionFrom is ONE-SIDED (the collapse tests)', () => {
       const c = conventionFrom(s);
       if (c.state === 'scaled') expect(Math.abs(c.k - 1)).toBeGreaterThan(0.02);
     }
+  });
+});
+
+describe('the acceleration hard gate', () => {
+  const halfStream = scaledBy(handCounts(120, mulberry32(0x5eed)), 0.5);
+
+  it('is closed without raw pointer mode, whatever the stream says', () => {
+    // An accelerated stream is integral after rounding, so the lattice cannot see acceleration at
+    // all. Without raw input there is nothing else standing between an accelerated stream and a
+    // confident k, so the estimator does not run.
+    const gate: LatticeGate = { mode: 'os-adjusted', accel: { accelerated: false, ratio: 0.01 } };
+    expect(latticeGateOpen(gate)).toBe(false);
+    expect(conventionFromGated(halfStream, gate)).toBeNull();
+  });
+
+  it('is closed when no lock was granted at all', () => {
+    expect(latticeGateOpen({ mode: null, accel: null })).toBe(false);
+    expect(conventionFromGated(halfStream, { mode: null, accel: null })).toBeNull();
+  });
+
+  it('is closed when a verdict says acceleration survived raw mode', () => {
+    // Raw input bypasses OS acceleration at the source, but a driver-level curve does not care.
+    // A positive verdict closes the gate even on raw.
+    const gate: LatticeGate = { mode: 'raw', accel: { accelerated: true, ratio: 0.42 } };
+    expect(latticeGateOpen(gate)).toBe(false);
+    expect(conventionFromGated(halfStream, gate)).toBeNull();
+  });
+
+  it('is open on raw with a clean verdict', () => {
+    const gate: LatticeGate = { mode: 'raw', accel: { accelerated: false, ratio: 0.02 } };
+    expect(latticeGateOpen(gate)).toBe(true);
+    expect(conventionFromGated(halfStream, gate)).toEqual(conventionFrom(halfStream));
+  });
+
+  it('is open on raw with no verdict, because raw input bypasses OS acceleration at the source', () => {
+    const gate: LatticeGate = { mode: 'raw', accel: null };
+    expect(latticeGateOpen(gate)).toBe(true);
+    const c = conventionFromGated(halfStream, gate);
+    expect(c).toMatchObject({ state: 'scaled' });
+  });
+
+  it('returns null for a closed gate rather than an indeterminate result', () => {
+    // These two are NOT the same fact and must not collapse into one. `indeterminate` means the
+    // estimator ran and refused, so a longer stream might yet pin k. `null` means it never ran and
+    // no amount of data on this browser will change that, which is the difference between "try
+    // again" and "type your sensitivity instead" on the result screen.
+    const closed = conventionFromGated(halfStream, { mode: 'os-adjusted', accel: null });
+    expect(closed).toBeNull();
+    const ran = conventionFromGated([1, 2, 3], { mode: 'raw', accel: null });
+    expect(ran).toEqual({ state: 'indeterminate', reason: 'too-few-samples', purity: 0 });
   });
 });

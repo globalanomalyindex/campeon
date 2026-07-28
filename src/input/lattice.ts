@@ -8,6 +8,8 @@
 // lattice spacing and therefore k. Over 200 simulated sweeps per case it recovers k of 0.5, 1/3,
 // 1.25, 1.5, 2 and 3 at 100 percent, where the integer gcd it replaces refused the fractional ones
 // (pinned by 'recovers a non-unit lattice spacing over 200 sweeps per case').
+import type { PointerLockMode } from '../types';
+import type { AccelVerdict } from './accel-check';
 
 /** Deltas at or below this are no motion at all. Zero is an integer multiple of EVERY spacing, so
  *  counting it lifts every candidate's modulus equally and buys no discrimination at all. */
@@ -204,4 +206,40 @@ export function conventionFrom(rawDeltas: readonly number[]): Convention {
     return { state: 'indeterminate', reason: 'spacing-one', purity: fit.purity };
   }
   return { state: 'scaled', k: fit.spacing, purity: fit.purity };
+}
+
+/** What the input layer knows about the stream's provenance. `accel` is null when no cross-check
+ *  pass was run, which is the normal case on raw input: the turn machine only runs its deliberately
+ *  fast pass on os-adjusted browsers, where the mode alone already closes this gate. The field
+ *  exists so a future raw-mode probe (a driver curve does not care about unadjustedMovement) can
+ *  close it without a signature change. */
+export interface LatticeGate {
+  mode: PointerLockMode | null;
+  accel: AccelVerdict | null;
+}
+
+/**
+ * Whether the estimator is entitled to run. Fails closed, and the reason is a proof rather than a
+ * precaution: an accelerated delta is still an integer after rounding, so acceleration is invisible
+ * to the lattice ('reads an accelerated-then-rounded stream as indeterminate across 200 sweeps').
+ * The lattice therefore cannot substitute for the acceleration check, and without raw input there is
+ * nothing left to catch an accelerated stream before it becomes a confident k.
+ */
+export function latticeGateOpen(gate: LatticeGate): boolean {
+  if (gate.mode !== 'raw') return false;
+  return gate.accel === null || gate.accel.accelerated === false;
+}
+
+/**
+ * `conventionFrom` behind the acceleration gate. Returns null when the gate is closed, which is a
+ * DIFFERENT fact from `indeterminate`: indeterminate means the estimator ran and refused, so more
+ * data could still pin k, while null means it was never entitled to run on this browser. The result
+ * screen needs the distinction to choose between "keep going" and "type your sensitivity instead".
+ */
+export function conventionFromGated(
+  rawDeltas: readonly number[],
+  gate: LatticeGate,
+): Convention | null {
+  if (!latticeGateOpen(gate)) return null;
+  return conventionFrom(rawDeltas);
 }
