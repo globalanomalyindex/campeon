@@ -4436,6 +4436,29 @@ Expected: PASS, zero failures
 git add src/ui/result.ts src/optimizer/result.ts tests/ui/result.test.ts tests/optimizer/result.test.ts
 git commit -m "feat(result): the payoff screen ordered by what each claim assumes" -m "Tier one leads because it assumes nothing: multiply your sensitivity by a ratio of two counts in the same units. A confined factor of 1.00 is reported as exactly what the interval supports, no more (F33). Tier two appears only under a pinned k, carries a per-row 90% band combining the search's own interval with k's spread in quadrature (A5, D3), and says why when withheld. Tier three renders hardware counts when k is pinned and otherwise names the second unmeasured factor in every centimetre claim (A6), because the tier that exists to refuse overclaiming must not quietly overclaim."
 ```
+> **AMENDED DURING EXECUTION, 2026-07-28.** The canon sweep's no-double-hyphen assertion must read
+> element text with a SEPARATOR, not raw concatenated `textContent`.
+>
+> Task 11 renders a dash placeholder in each per-game cell a pinned k has no sensitivity for, which is
+> correct and conventional. Concatenating siblings then produces `Apex Legends--`, six times on the
+> plan's own fixture, and the canon assertion fires.
+>
+> That is a false positive. The canon forbids the double hyphen as PUNCTUATION IN PROSE. Two adjacent
+> cells each holding one dash are two dashes in two cells; a reader never sees a double hyphen, and
+> the `--` exists only inside the test's extraction method. Join the element texts with a space, or
+> assert per element. A genuine `--` inside one run of text still fires, which is the behaviour the
+> rule is for.
+>
+> Do NOT solve it by changing the markup or by padding the fixture to a full table. Emitting a single
+> dash for a pair of empty cells would misrender the table, and a fixture with no partial case would
+> delete the coverage rather than fix it. Task 11's own suite never exercises a partial table, which
+> is why this reached execution at all, so add a partial-table case while you are here.
+>
+> Also note: task 12's step-4 CSS has ALREADY been applied, pulled forward into task 11 because the
+> component-and-its-styles rule meant task 11 could not otherwise end green. That block includes the
+> restored `.result__games` rules, the `--color-primary-wash` token, and `.result__tier--one`, which
+> neither task carried.
+
 ### Task 12: Tier styling, counts-true bound copy, and the canon sweep test
 
 **Files:**
@@ -9820,6 +9843,33 @@ what keeps the scored Recording byte-identical. A reach with no onset or no clos
 dropped: it would read as a landedFraction near 1, which is a fabricated agreement."
 ```
 
+> **AMENDED DURING EXECUTION, 2026-07-28. The no-stable-belief guard is wrong in KIND, not in
+> threshold, and this task redesigns it.**
+>
+> The plan asserts that for a re-anchoring player the fit lands at rate 0 and the boundary check
+> refuses. Measured, it does not. On the plan's own fixture the profiled argmin is 0.075, above
+> `ADAPT_RATE_MIN`, so the estimator answers instead of refusing, and across 40 seeds it refuses on 33
+> and answers on 7. That is not an unlucky seed.
+>
+> The reason is in the surface: SSE is 0.749588 at rate 0.075 against 0.756545 at 0, a 0.9 percent gap
+> that the noise swamps. The rate is not merely at a boundary, it is **unidentified**, and where the
+> profile is flat the argmin is noise.
+>
+> Do not fix this by raising `ADAPT_RATE_MIN`. That tunes a heuristic against one fixture, and task 32
+> has already committed a test pinning the constant at 0.05, so the plan cannot have both.
+>
+> **Replace the signature with an identifiability test.** Compare the profile SSE at the argmin against
+> the SSE at the boundary. When the relative improvement is too small to distinguish, the adaptation
+> rate is not determined by the data, and because it trades off against the belief term an
+> undetermined rate means an undetermined anchor, so the estimator must refuse. This is the discipline
+> already used twice in this repo: `fitDrift` refuses when the drift covariate is collinear with the
+> quadratic design, and `conventionFrom` refuses when the lattice spacing is ambiguous rather than
+> reporting the tidier answer.
+>
+> **The threshold is measured, never chosen.** It must refuse on the no-stable-belief fixtures across
+> many seeds AND still answer on healthy ones. Report both rates. A guard that refuses on everything
+> is not a fix, it deletes the estimator.
+
 ### Task 34: the two refusals, pinned as tests in their own right
 
 **Files:**
@@ -10314,6 +10364,28 @@ Beyond their combined precision the bands are unioned and the point is left wher
 disagreement measures whether the internal model maps world rotation or screen offset to hand
 travel, and that is a finding."
 ```
+
+> **AMENDED DURING EXECUTION, 2026-07-28. The test as written cannot fail, so the FIXTURE changes.**
+>
+> Step 2's falsification does not fire. The executor applied the plan's exact mutation and the test
+> passed 7 of 7, and it is structural rather than an unlucky constant: `submovement.ts` defines `tO`
+> as `troughTime - onsetTime`, so recomputing `onsetTime + tO` is `a + (b - a)`. For positive `a < b`
+> that readdition is exact essentially always, by Sterbenz when the two are within a factor of two and
+> by rounding back to `b` otherwise. Measured over 38,000,000 stamp pairs at a uniform 16 ms step:
+> zero mismatches.
+>
+> The fixture is the problem. It ticks `scene.tick(16, ...)` uniformly and `requestAnimationFrame`
+> does not. With irregular deltas the roundtrip genuinely fails about 1 percent of the time over
+> 57,000,000 pairs, so exposing `troughTime` IS worth doing in production; this fixture cannot show it.
+>
+> **Give the fixture a seeded irregular tick sequence and pick the seed so the mutant fails
+> deterministically.** Not probabilistically: at roughly 1 percent per pair a chance-based test would
+> need hundreds of reaches to be reliable and would still flake. Choose the seed, verify the mutation
+> fails with it, and record in the test comment both the seed and the fact that a uniform tick makes
+> the assertion vacuous, so nobody simplifies the fixture back later.
+>
+> This also makes the fixture more faithful, which is the second reason. A clock-robustness test on a
+> perfectly regular clock is testing the easy half of the problem.
 
 ### Task 37: clock-offset invariance for the anchor
 
