@@ -162,3 +162,38 @@ describe('ratioFraming', () => {
     expect(ratioFraming([0.9, 1.2])).toBe('indistinct');
   });
 });
+
+describe('the pinned convention, declared rather than smuggled', () => {
+  it('rides exactly when the table does, and is absent when k is unpinned', () => {
+    const pinned = buildPrescription(report, anchor, LATTICE_2)!;
+    expect(pinned.k).toBe(2);
+    expect('k' in pinned).toBe(true);
+    const typed = buildPrescription(report, anchor, TYPED_125)!;
+    expect(typed.k).toBe(1.25);
+    const unpinned = buildPrescription(report, anchor)!;
+    expect('k' in unpinned).toBe(false);
+    expect(buildPrescription(report, anchor, UNPINNED)!.k).toBeUndefined();
+  });
+
+  it('is a disclosure, never the divisor: tier three reads hardwareCounts, which was divided once', () => {
+    // Re-deriving C*/k at render time would be a second place for the division to live, and the
+    // two would drift the first time either side changed. hardwareCounts is that division, done
+    // once in buildPrescription; k rides so a Result rehydrated from storage can still SAY which
+    // factor was pinned, with no draft left to ask.
+    const p = buildPrescription(report, anchor, TYPED_125)!;
+    expect(p.hardwareCounts).toBe(p.counts / p.k!);
+    expect(p.hardwareCounts).toBe(8000 / 1.25);
+  });
+
+  it('every field the object carries is a field the interface declares', () => {
+    // The guard, and the reason this task exists. TypeScript does not excess-property-check through
+    // a spread, so `{ ...tierTwoFrom(...) }` can put a member on the shipped Prescription that no
+    // type mentions, and the Prescription is persisted and exported. This list is the declared
+    // shape: a spread that grows a new member fails here before it reaches a player's JSON.
+    const p = buildPrescription(report, anchor, TYPED_125)!;
+    expect(Object.keys(p).sort()).toEqual([
+      'counts', 'countsCi90', 'hardwareCounts', 'k', 'kLogSd', 'kSource', 'perGameSens',
+      'ratio', 'ratioCi90',
+    ]);
+  });
+});

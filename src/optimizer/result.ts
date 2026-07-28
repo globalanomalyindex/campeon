@@ -54,6 +54,18 @@ export interface Prescription {
   perGameSens?: Partial<Record<GameId, number>>;
   /** Absent exactly when `perGameSens` is: an unpinned k costs the tier, never the answer. */
   kSource?: 'lattice' | 'typed-sens';
+  /** The pinned convention itself: browser deltas per real mouse count. A DISCLOSURE, and never a
+   *  divisor at render time. `hardwareCounts` below is C* / k with the division already done once
+   *  in this module, and tier three renders that; re-deriving it at the screen would put the same
+   *  arithmetic in two files, which is the duplication amendment A4 exists to prevent. It rides
+   *  because a Result rehydrated from localStorage has no draft left to ask which factor was pinned,
+   *  and because it is already on the object: tierTwoFrom returns it and the spread that builds this
+   *  shape carries it whether or not a type mentions it (tsc does not excess-property-check through
+   *  a spread). Declared, so the field a player finds in their exported JSON is a field this
+   *  interface owns. Present exactly when `perGameSens` is.
+   *  Regression: tests/optimizer/prescription.test.ts ('every field the object carries is a field
+   *  the interface declares'). */
+  k?: number;
   /** k's own uncertainty in ln space, inherited whole from the pin (A5). On the typed-sens route
    *  this is the anchor's reproduction spread landing whole on k, so it is not small; the screen
    *  folds it into each per-game row's 90% band in quadrature with `countsCi90` (D3), so the
@@ -109,7 +121,13 @@ export function buildPrescription(
   // a second path to the same number would be a second place for k to go missing. An unpinned
   // KPin costs the tier, never the ratio.
   let tierTwo:
-    | { perGameSens: Partial<Record<GameId, number>>; kSource: 'lattice' | 'typed-sens'; kLogSd: number; hardwareCounts: Counts360 }
+    | {
+        perGameSens: Partial<Record<GameId, number>>;
+        kSource: 'lattice' | 'typed-sens';
+        k: number;
+        kLogSd: number;
+        hardwareCounts: Counts360;
+      }
     | null = null;
   if (k !== undefined && k.pinned) {
     const t = tierTwoFrom(cStar, k, games);
