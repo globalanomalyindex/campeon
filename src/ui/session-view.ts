@@ -286,7 +286,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         // createdAt: 0 left every record unsortable and unprunable.
         const now = Date.now();
         const sessionId = `s-${now}-${allTrials.length}`;
-        const result = buildResult(report, allTrials, ctx.draft.bounds, ctx.draft.profile);
+        const result = buildResult(report, allTrials, { bounds: ctx.draft.bounds, profile: ctx.draft.profile });
         ctx.storage.saveSession({ id: sessionId, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: now });
         ctx.storage.saveResult(sessionId, result);
         ctx.lastResult = { sessionId, result };

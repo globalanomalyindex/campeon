@@ -1,4 +1,7 @@
 import type { Counts360, GameId, Profile, Report, Result, TrialResult } from '../types';
+import { counts360 } from '../types';
+import { sensRatio } from '../convert/counts';
+import { tierTwoFrom, type KPin } from '../input/count-convention';
 import { computeBreakdown, facetConcordance } from './breakdown';
 import { mulberry32 } from '../stats/rng';
 
@@ -6,31 +9,30 @@ export type CiConcord = 'tight' | 'moderate' | 'wide';
 
 /**
  * Bucket the 90% CI into a LOG-SPACE WIDTH-RELATIVE descriptor by thresholds only - NOT an invented
- * agreement score. Reads exactly the CI width in ln(cm/360) space, `ln(hi) - ln(lo)`, which is the same
- * scale the curve is fit on and is scale-invariant (a 30→33 CI buckets identically to a 60→66 one). The
- * descriptor is purely a width bucket; the COPY that renders it must never assert a single cause (a wide
- * CI cannot distinguish short-session sampling noise from facet disagreement). Returns undefined for a
- * degenerate/non-finite CI so no descriptor is fabricated for an unmeasurable bound.
+ * agreement score. Reads exactly the CI width in ln space, `ln(hi) - ln(lo)`, the same scale the
+ * curve is fit on, and scale-invariant (an 8000 to 8800 CI buckets identically to a 16000 to 17600
+ * one - which is also why the cm-to-counts unit change left the thresholds untouched). The
+ * descriptor is purely a width bucket; the COPY that renders it must never assert a single cause (a
+ * wide CI cannot distinguish short-session sampling noise from facet disagreement). Returns
+ * undefined for a degenerate/non-finite CI so no descriptor is fabricated for an unmeasurable bound.
  */
 export function ciConcord(_optimal: Counts360, ci90: readonly [Counts360, Counts360]): CiConcord | undefined {
   const [lo, hi] = ci90;
   if (!(lo > 0) || !(hi > 0) || !(hi > lo)) return undefined;
   const w = Math.log(hi) - Math.log(lo); // CI width in ln space (scale-invariant)
-  if (w <= 0.18) return 'tight';   // ratio hi/lo ≲ 1.20
-  if (w >= 0.55) return 'wide';    // ratio hi/lo ≳ 1.73
+  if (w <= 0.18) return 'tight';   // ratio hi/lo below about 1.20
+  if (w >= 0.55) return 'wide';    // ratio hi/lo above about 1.73
   return 'moderate';
 }
 
 /**
- * The three-tier prescription. Authored here in phase 1a because `Result.prescription` needs it in
- * the same commit that deletes `Result.perGameSens`; phase 1b owns `buildPrescription` and every
- * field it fills, and phases 3 and 4 fill the k and anchor sides.
- *
- * `ratio` and `ratioCi90` are OPTIONAL. As required fields they blocked tier two whenever k was
- * pinned but the anchor refused, which is a reachable state (a player who typed their game and
- * sensitivity but whose turn passes disagreed). `kLogSd` exists because the typed-sensitivity route
- * inherits the anchor's spread whole, so tier two has to widen rather than borrow tier one's
- * precision.
+ * The payoff, shaped by what each claim assumes (spec: "The result screen, ordered by what each
+ * claim assumes"). Tier one is `ratio`, present only when an anchor was measurable; tier two is
+ * `perGameSens`, present ONLY under a pinned k; tier three is `counts`, restated by the screen
+ * with the optional typed-DPI arithmetic. The shape is canonical (plan contract, Decision 1 as
+ * amended by A5: ratio/ratioCi90 optional, kLogSd added). `hardwareCounts` goes one field beyond
+ * the amended contract and is flagged in this part's hand-offs: A6 requires tier three to render
+ * C* / k when k is pinned, and the screen has no other honest access to k.
  */
 export interface Prescription {
   /** anchor.counts / report.optimalCounts: the factor to multiply the current in-game sensitivity
@@ -54,8 +56,10 @@ export interface Prescription {
   kSource?: 'lattice' | 'typed-sens';
   /** k's own uncertainty in ln space, inherited whole from the pin (A5). On the typed-sens route
    *  this is the anchor's reproduction spread landing whole on k, so it is not small; the screen
-   *  must WIDEN each per-game row by it rather than borrowing tier one's precision. 0 on the
-   *  lattice route as phase 3 currently pins it. Present exactly when `perGameSens` is. */
+   *  folds it into each per-game row's 90% band in quadrature with `countsCi90` (D3), so the
+   *  band carries BOTH the search's precision and the pin's. 0 on the lattice route as phase 3
+   *  currently pins it, and the band still renders then, carrying the search term alone.
+   *  Present exactly when `perGameSens` is. */
   kLogSd?: number;
   /** C* / k: the located optimum in the mouse's OWN counts (A6). Present exactly when k is
    *  pinned. Tier three renders THIS as convertible hardware counts; without it the screen keeps
@@ -63,45 +67,138 @@ export interface Prescription {
   hardwareCounts?: Counts360;
 }
 
+/** The C0 reading tier one divides by. A structural subset of reconcile.ts's `Anchor` (phase 4),
+ *  declared here so this module never imports a file it does not own: phase 4 passes its Anchor
+ *  straight in and TypeScript checks it structurally. */
+export interface AnchorReading { counts: Counts360; ci90: [Counts360, Counts360]; }
+
 /**
- * Assemble the player-facing Result: the one cm/360 answer + CI, the native per-game sensitivities
- * at that answer, and the breakdown of how each facet contributed. `games` optionally restricts the
- * per-game table (default: all games in the yaw table).
+ * Build the payoff tiers, or refuse. Every early return here is a measured-honesty gate, not
+ * defensiveness: this function would rather hand the screen nothing than a plausible wrong factor,
+ * because the factor is the number a player will actually type into their game.
+ */
+export function buildPrescription(
+  report: Report,
+  anchor: AnchorReading | null,
+  k?: KPin,
+  games?: readonly GameId[],
+): Prescription | null {
+  // A clamped vertex is a bound with the evidence pointing past it (Report.peakAtBound). A factor
+  // OR a per-game table taken against a bound would prescribe the edge of MY search window as if
+  // it were the player's best, so the whole prescription refuses and the screen keeps its bound
+  // copy instead.
+  if (report.peakAtBound !== undefined) return null;
+  const cStar = report.optimalCounts;
+  const [cLo, cHi] = report.ci90;
+  const positive = (v: number): boolean => Number.isFinite(v) && v > 0;
+  if (![cStar, cLo, cHi].every(positive) || cHi < cLo) return null;
+  // Tier one exists only with an anchor. anchor === null is the honest refusal (turn disagreed,
+  // flick refused) and costs the ratio alone; a NON-null anchor with a NaN, non-positive count or
+  // inverted interval means the caller has a bug this module must not paper over: refuse the
+  // whole prescription outright (pinned by 'refuses degenerate inputs').
+  let tierOne: { ratio: number; ratioCi90: [number, number] } | null = null;
+  if (anchor !== null) {
+    const [aLo, aHi] = anchor.ci90;
+    if (![anchor.counts, aLo, aHi].every(positive) || aHi < aLo) return null;
+    // sensRatio is the ONE implementation of the tier-one quotient (phase 1a's hand-off): a second
+    // open-coded copy of the same division would be a second place for it to drift. The positive
+    // checks above already satisfy its own guard, so it cannot throw here.
+    tierOne = { ratio: sensRatio(anchor.counts, cStar), ratioCi90: [aLo / cHi, aHi / cLo] };
+  }
+  // Tier two rides only on a pinned k, and phase 3's tierTwoFrom is its ONLY implementation (A4):
+  // a second path to the same number would be a second place for k to go missing. An unpinned
+  // KPin costs the tier, never the ratio.
+  let tierTwo:
+    | { perGameSens: Partial<Record<GameId, number>>; kSource: 'lattice' | 'typed-sens'; kLogSd: number; hardwareCounts: Counts360 }
+    | null = null;
+  if (k !== undefined && k.pinned) {
+    const t = tierTwoFrom(cStar, k, games);
+    // hardwareCounts carries the SAME division tierTwoFrom performs, surfaced so tier three can
+    // render mouse-own counts when k is pinned (A6) - one k, applied in one commit of arithmetic.
+    if (t !== null) tierTwo = { ...t, hardwareCounts: counts360(cStar / k.k) };
+  }
+  // Neither tier earned: there is nothing to prescribe. The located counts still reach the screen
+  // through the Result itself, so refusing here costs the factor and the table and nothing else.
+  if (tierOne === null && tierTwo === null) return null;
+  return {
+    counts: cStar,
+    countsCi90: report.ci90,
+    ...(tierOne ?? {}),
+    ...(tierTwo ?? {}),
+  };
+}
+
+export type RatioFraming = 'directional' | 'confirmed' | 'indistinct';
+
+/** Everything the ratio interval allows must sit within this of no change (in |ln|) before the
+ *  screen may read it as "already at your best". 0.05 sits just above the anchor's simulated
+ *  accuracy floor (about 4% MAE across the spec's Monte Carlo conditions), so the confirmed claim
+ *  never outruns the instrument's own resolution; below that floor, "move by 3%" would be noise
+ *  dressed as an instruction. */
+export const CONFIRMED_MAX_ABS_LN = 0.05;
+
+/**
+ * Which sentence the ratio has earned. 'directional': the interval excludes 1, a change is
+ * distinguishable from none, the multiply instruction leads. 'confirmed': the interval contains 1
+ * AND is confined within CONFIRMED_MAX_ABS_LN of it - the best outcome the instrument can report,
+ * phrased by the screen as what the interval supports and no more (see F33: the copy must not
+ * claim the session "had every chance", which is a claim about the design, not a measurement).
+ * 'indistinct': the interval contains 1 but is not confined, so the screen drops the change
+ * framing rather than report a change it cannot distinguish from none (spec, error-path list,
+ * final item). Callers pass a buildPrescription vetted interval; this classifier never repairs one.
+ */
+export function ratioFraming(ratioCi90: readonly [number, number]): RatioFraming {
+  const [lo, hi] = ratioCi90;
+  if (lo > 1 || hi < 1) return 'directional';
+  return Math.max(Math.abs(Math.log(lo)), Math.abs(Math.log(hi))) <= CONFIRMED_MAX_ABS_LN
+    ? 'confirmed'
+    : 'indistinct';
+}
+
+export interface BuildResultOpts {
+  /** Restrict tier two's table (default: every yaw-table game). */
+  games?: readonly GameId[];
+  /** Search bounds, persisted with the verbatim curve so the plot survives a reload. */
+  bounds?: [Counts360, Counts360];
+  profile?: Profile;
+}
+
+/**
+ * Assemble the player-facing Result: the located optimum in counts per 360 + CI, the breakdown of
+ * how each facet contributed, and (when `bounds` is supplied) the Report's fitted `curve` copied
+ * VERBATIM with the bounds persisted, so the result screen can redraw the convergence plot with a
+ * correct x-axis after a localStorage reload (strictly downstream of scoring - NO smoothing, NO
+ * refit). `profile` is the SAME profile the optimizer fused with; omitting it leaves the affine
+ * contributions NaN (rendered as a dash) and the lean absent, so old/headless callers stay
+ * number-only.
  *
- * When `bounds` is supplied, the Report's fitted `curve` is copied VERBATIM and the bounds are
- * persisted so the result screen can redraw the convergence plot with a correct x-axis even after a
- * localStorage reload (this is strictly downstream of scoring - NO smoothing, NO refit). Headless/old
- * callers that omit `bounds` produce a number-only Result.
- *
- * `profile` is the SAME profile the optimizer fused with; when supplied, the breakdown reports each
- * facet's affine-fused contribution (track/flick) at the optimum, and the result carries the user's
- * speed↔accuracy lean (`profile.speedAccuracy`, the real taste knob). Omitting it leaves the contributions
- * NaN (→ dash) and the lean absent, so old/headless callers stay number-only.
+ * The per-game table no longer lives on the Result: it is tier two of the Prescription and exists
+ * only under a pinned k (buildPrescription). Computing it from counts alone would need exactly the
+ * k = 1 guess the lattice's one-sided contract forbids.
  */
 export function buildResult(
   report: Report,
   trials: readonly TrialResult[],
-  bounds?: [Counts360, Counts360],
-  profile?: Profile,
+  opts: BuildResultOpts = {},
 ): Result {
+  const { bounds, profile } = opts;
   return {
     optimalCounts: report.optimalCounts,
     ci90: report.ci90,
     breakdown: computeBreakdown(trials, report.optimalCounts, profile),
     ...(bounds ? { curve: report.curve, bounds } : {}),
     // The strike lean is the user's REAL taste knob (profile.speedAccuracy), not the hardcoded
-    // instrumentWeights.strike (=1). Carry it so the result screen can label the strike rows. Omit it
-    // without a profile so old/headless callers stay number-only.
+    // instrumentWeights.strike (=1). Carry it so the result screen can label the strike rows. Omit
+    // it without a profile so old/headless callers stay number-only.
     ...(profile && Number.isFinite(profile.speedAccuracy) ? { speedAccuracy: profile.speedAccuracy } : {}),
     // A4: the measured session-drift readout, copied VERBATIM from the Report. Absent when the
     // extended fit fell back (or for old reports) so the result screen dashes it - never padded.
     ...(report.driftZ !== undefined ? { driftZ: report.driftZ } : {}),
     // Bounds honesty: the clamped-vertex disclosure, copied verbatim. Absent for interior peaks and
-    // for old reports; never inferred from the optimum happening to sit on an edge of the window.
+    // for old reports; never inferred from the optimum happening to sit on an edge.
     ...(report.peakAtBound !== undefined ? { peakAtBound: report.peakAtBound } : {}),
-    // A5: the per-facet peaks + concordance tier - the "one latent cm/360" thesis tested as a claim.
-    // Seeded on the trial count (a decoupled stream, like the live-plot interim RNG) so this readout
-    // is deterministic and never perturbs the scored sequence. Dropped for tuned results by adoptResult.
+    // A5: the per-facet peaks + concordance tier. Seeded on the trial count (a decoupled stream)
+    // so this readout is deterministic and never perturbs the scored sequence.
     facetConcordance: facetConcordance(trials, mulberry32(0xface ^ trials.length)),
   };
 }

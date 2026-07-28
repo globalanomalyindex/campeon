@@ -80,14 +80,14 @@ describe('facet concordance wiring: measured Results carry it, tuned Results dro
   const profile = { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } };
 
   it('buildResult attaches a concordance readout (four facets, a tier over the fittable ones)', () => {
-    const r = buildResult(report, trials, countsBounds(15, 60), profile);
+    const r = buildResult(report, trials, { profile });
     expect(r.facetConcordance).toBeDefined();
     expect(r.facetConcordance!.facets).toHaveLength(4);
     expect(r.facetConcordance!.tier).toBe('concordant');
   });
 
   it('adoptResult (tuned by feel) DROPS the measured concordance AND the drift readout - self-describing export', () => {
-    const measured = buildResult(report, trials, countsBounds(15, 60), profile);
+    const measured = buildResult(report, trials, { profile });
     expect(measured.driftZ).toBeDefined();
     const tuned = adoptResult(measured, counts360(42));
     expect(tuned.tuned).toBe(true);
