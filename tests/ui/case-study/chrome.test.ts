@@ -4,7 +4,7 @@ import { monoLabel, sectionNumeral, registrationFrame, specRail } from '../../..
 
 describe('case-study chrome builders', () => {
   it('monoLabel joins parts with + separators', () => {
-    const el = monoLabel(['ii', 'the instruments', 'cm/360']);
+    const el = monoLabel(['ii', 'the instruments', 'counts per 360']);
     expect(el.querySelectorAll('.sep').length).toBe(2);
     expect(el.textContent).toContain('the instruments');
   });

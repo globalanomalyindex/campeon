@@ -135,7 +135,7 @@ function buildGateFigure(): HTMLElement {
     art: screenSketch({
       heading: 'Mouse acceleration detected',
       lines: [
-        'The sweep says your mouse speeds up the faster you move, which makes one true turn distance impossible to pin down.',
+        'The check says your mouse speeds up the faster you move, which makes one true turn distance impossible to pin down.',
         'Turn off enhance pointer precision, or your driver\'s acceleration, then run it again.',
       ],
       actions: [{ label: 'Try again', primary: true }, { label: 'I\'ll type my numbers instead' }],
@@ -155,13 +155,13 @@ function buildResultCardFigure(): HTMLElement {
     screen: 'fig. 04 · the result, as a specimen card',
     demo: 'worked example · invented numbers',
     art: specimenCard({
-      counts: '9,150',
-      ci: '90% ci 8,650 to 9,800 counts per 360',
+      counts: '9,260',
+      ci: '90% ci 8,630 to 9,800 counts per 360',
       facets: [
-        { instrument: 'track', label: 'track', value: '8,850' },
-        { instrument: 'flick', label: 'flick', value: '9,575' },
-        { instrument: 'calibrate', label: 'calibrate', value: '9,200' },
-        { instrument: 'strike', label: 'strike', value: '10,400' },
+        { instrument: 'track', label: 'track', value: '8,900' },
+        { instrument: 'flick', label: 'flick', value: '9,600' },
+        { instrument: 'calibrate', label: 'calibrate', value: '9,250' },
+        { instrument: 'strike', label: 'strike', value: '10,450' },
       ],
       note: 'The four views broadly agree; a few more trials would tighten this band.',
     }),
