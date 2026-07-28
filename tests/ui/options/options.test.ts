@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { counts360, countsBounds } from '../../../src/types';
 import { options } from '../../../src/ui/options/options';
+import { COUNT_LO, COUNT_HI } from '../../../src/ui/options/settings';
 import type { AppContext } from '../../../src/ui/shell';
 import type { PersistedPrefs, Result, Storage } from '../../../src/types';
 
@@ -55,6 +56,20 @@ describe('options screen', () => {
     expect(host.querySelector('[data-school]')).toBeNull();
     expect(host.querySelectorAll('[data-panel="games"] input, [data-panel="games"] select').length).toBe(0);
     screen.unmount();
+  });
+
+  it('gives the window inputs the same limits the code clamps to', () => {
+    // The unit swap converted the labels and the values to counts and left these two attributes at
+    // the retired centimetre range of 5 to 150, so the control rejected every value it displayed.
+    // Pinning it against settings.ts means the markup cannot drift from the clamp again.
+    const { host } = mount(ctx());
+    for (const which of ['lo', 'hi'] as const) {
+      const input = host.querySelector<HTMLInputElement>(`[data-bound="${which}"]`)!;
+      expect(Number(input.min)).toBe(COUNT_LO);
+      expect(Number(input.max)).toBe(COUNT_HI);
+      expect(Number(input.value)).toBeGreaterThanOrEqual(COUNT_LO);
+      expect(Number(input.value)).toBeLessThanOrEqual(COUNT_HI);
+    }
   });
 
   it('typing previews the window but commits nothing until apply is pressed', () => {

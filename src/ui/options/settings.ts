@@ -11,7 +11,13 @@ import type { Counts360 } from '../../types';
  * measured, and `boundsFromSeed` is what does that.
  */
 export const DEFAULT_BOUNDS: [Counts360, Counts360] = countsBounds(4800, 19200);
-const LO = 1600, HI = 47200, MIN_SPAN = 1600;
+/** The hard clamp on a search window, in counts per 360. Exported because the options screen's
+ *  number inputs must advertise the SAME limits the code enforces: the unit swap left those two
+ *  attributes at the retired centimetre range of 5 to 150, so the control rejected every value it
+ *  displayed. Pinned by tests/ui/options/options.test.ts "gives the window inputs the same limits
+ *  the code clamps to". */
+export const COUNT_LO = 1600, COUNT_HI = 47200;
+const LO = COUNT_LO, HI = COUNT_HI, MIN_SPAN = 1600;
 
 export function normalizeBounds(a: number, b: number): [Counts360, Counts360] {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return [...DEFAULT_BOUNDS];

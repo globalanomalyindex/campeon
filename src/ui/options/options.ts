@@ -18,7 +18,7 @@
 import { rememberPrefs, type AppContext, type Screen } from '../shell';
 import { GAME_YAW } from '../../convert/yaw-table';
 import { monitorDistanceMatchCounts } from '../../convert/schools';
-import { normalizeBounds } from './settings';
+import { normalizeBounds, COUNT_LO, COUNT_HI } from './settings';
 import { counts360 } from '../../types';
 
 /** Geometric middle of the search window: the scale is logarithmic, so the mean is too. */
@@ -55,8 +55,8 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
             <h3 class="t-heading-md options__h">The search window <span class="t-label options__sub">counts per 360</span></h3>
             <p class="t-body-sm options__note">This is the range I search while you play the drills. A wider window covers more of the scale and takes longer to settle. Running a new calibration replaces it with a window around whatever I measure.</p>
             <div class="options__row">
-              <label class="field"><span>Lowest</span><input type="number" data-bound="lo" value="${lo}" min="5" max="150"></label>
-              <label class="field"><span>Highest</span><input type="number" data-bound="hi" value="${hi}" min="5" max="150"></label>
+              <label class="field"><span>Lowest</span><input type="number" data-bound="lo" value="${lo}" min="${COUNT_LO}" max="${COUNT_HI}"></label>
+              <label class="field"><span>Highest</span><input type="number" data-bound="hi" value="${hi}" min="${COUNT_LO}" max="${COUNT_HI}"></label>
             </div>
             <p class="options__readout">Searching <span class="t-figure options__figure" data-bounds-out>${lo} to ${hi}</span> counts per 360, centred on <span data-mid-sub>${mid}</span>.</p>
             <div class="options__commit">
