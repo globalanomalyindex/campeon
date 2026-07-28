@@ -21,7 +21,7 @@ export type GameId =
 export interface YawEntry { id: GameId; label: string; yaw: number; note?: string; }
 
 // ── raw input (input/) ─────────────────────────────────────────────────
-export interface AimSample { t: Ms; dx: number; dy: number; }   // normalized-count deltas (÷ devicePixelRatio)
+export interface AimSample { t: Ms; dx: number; dy: number; }   // browser movement deltas, untouched
 export type PointerLockMode = 'raw' | 'os-adjusted';
 
 // ── arena (engine/) ────────────────────────────────────────────────────

@@ -1,5 +1,4 @@
-import type { AimSample, PointerLockMode } from '../types';
-import { normalizeByDpr } from './dpi';
+import type { AimSample, Ms, PointerLockMode } from '../types';
 
 interface MovementLike {
   movementX: number;
@@ -7,17 +6,40 @@ interface MovementLike {
   timeStamp?: number;
 }
 
-/** Flatten coalesced pointer events into DPR-normalized AimSamples (pure). */
+/**
+ * Flatten coalesced pointer events into AimSamples, carrying `movementX`/`movementY` through
+ * UNCHANGED (pure).
+ *
+ * It used to divide both axes by `devicePixelRatio`, on the reasoning recorded in the deleted
+ * input/dpi.ts: Chrome reports device pixels, Firefox reports CSS pixels, and dividing by DPR makes
+ * them agree. Dividing two streams that differ by a factor by that same factor cannot reconcile
+ * them, so what it actually did was make one browser correct and leave the other wrong by DPR. It
+ * also halved every delta on a DPR 2 display, which destroys the integer lattice the count
+ * convention probe reads. Pinned by tests/input/pointer-lock.test.ts "carries movementX and
+ * movementY through unchanged".
+ */
 export function flattenCoalesced(
   events: readonly MovementLike[],
-  dpr: number,
-  fallbackTime: number,
+  fallbackTime: Ms,
 ): AimSample[] {
   return events.map((e) => ({
     t: e.timeStamp ?? fallbackTime,
-    dx: normalizeByDpr(e.movementX, dpr),
-    dy: normalizeByDpr(e.movementY, dpr),
+    dx: e.movementX,
+    dy: e.movementY,
   }));
+}
+
+/**
+ * The horizontal deltas exactly as the browser reported them, in event order.
+ *
+ * Separate from `flattenCoalesced` because the consumer is different in kind: the count convention
+ * probe needs a flat number stream to read a lattice spacing off, not timestamped samples, and it
+ * must see any non-integer value the browser produced. Nothing here rounds, clamps or filters: a
+ * spacing other than 1 is the only evidence that the deltas were scaled, so smoothing it away would
+ * make the probe confidently wrong instead of honestly indeterminate.
+ */
+export function rawDeltasFrom(events: readonly MovementLike[]): number[] {
+  return events.map((e) => e.movementX);
 }
 
 export interface PointerLockController {
@@ -31,6 +53,10 @@ export interface PointerLockController {
   exit(): void;
   /** Subscribe to per-sample deltas while locked. Returns an unsubscribe fn. */
   onSample(cb: (sample: AimSample) => void): () => void;
+  /** Subscribe to the browser's UNTOUCHED per-event deltas while locked, for the count convention
+   *  probe. Parallel to `onSample` rather than derived from it, so a future change to sampling
+   *  (filtering, resampling) cannot silently reshape the lattice the probe reads. */
+  onRawDelta(cb: (dx: number, dy: number) => void): () => void;
   /** Subscribe to fire (primary-button) events while locked. Returns an unsubscribe fn. */
   onFire(cb: () => void): () => void;
   /** Granted mode, or null when not locked. 'raw' only on browsers that support raw input. */
@@ -53,6 +79,7 @@ export interface PointerLockController {
 export function createPointerLock(element: HTMLElement): PointerLockController {
   const cbs = new Set<(sample: AimSample) => void>();
   const fireCbs = new Set<() => void>();
+  const rawCbs = new Set<(dx: number, dy: number) => void>();
   let currentMode: PointerLockMode | null = null;
   let locked = false;
   const supportsRaw = 'onpointerrawupdate' in window;
@@ -61,11 +88,16 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
   const onMove = (ev: Event): void => {
     if (!locked) return;
     const pe = ev as PointerEvent;
-    const dpr = window.devicePixelRatio || 1;
     const coalesced =
       typeof pe.getCoalescedEvents === 'function' ? pe.getCoalescedEvents() : [];
     const batch = coalesced.length > 0 ? coalesced : [pe];
-    const samples = flattenCoalesced(batch, dpr, ev.timeStamp);
+    // The raw channel is fed from the SAME batch, before any sample transform, so the two streams
+    // can never disagree about how many events arrived (a doubled or dropped event would make the
+    // lattice spacing meaningless).
+    if (rawCbs.size > 0) {
+      for (const e of batch) for (const cb of rawCbs) cb(e.movementX, e.movementY);
+    }
+    const samples = flattenCoalesced(batch, ev.timeStamp);
     for (const sample of samples) for (const cb of cbs) cb(sample);
   };
 
@@ -121,6 +153,12 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
         fireCbs.delete(cb);
       };
     },
+    onRawDelta(cb): () => void {
+      rawCbs.add(cb);
+      return () => {
+        rawCbs.delete(cb);
+      };
+    },
     mode(): PointerLockMode | null {
       return currentMode;
     },
@@ -133,6 +171,7 @@ export function createPointerLock(element: HTMLElement): PointerLockController {
       document.removeEventListener('mousedown', onMouseDown);
       cbs.clear();
       fireCbs.clear();
+      rawCbs.clear();
     },
   };
 }
