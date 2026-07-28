@@ -7,6 +7,7 @@ import {
 } from '../../src/ui/session-view';
 import type { AppContext } from '../../src/ui/shell';
 import type { InstrumentId, Report, TrialResult } from '../../src/types';
+import type { SessionOutcome } from '../../src/optimizer/session-controller';
 import type { ArenaStage } from '../../src/ui/arena-stage';
 
 describe('session-view helpers', () => {
@@ -89,9 +90,9 @@ function mountWithRunningSegment(opts: { denyLock?: boolean } = {}) {
   const host = document.createElement('div');
   document.body.appendChild(host);
 
-  let resolveSegment: ((v: { report: Report; trials: TrialResult[] }) => void) | null = null;
+  let resolveSegment: ((v: SessionOutcome) => void) | null = null;
   let rejectSegment: ((e: unknown) => void) | null = null;
-  const runSegment = vi.fn(() => new Promise<{ report: Report; trials: TrialResult[] }>((res, rej) => {
+  const runSegment = vi.fn(() => new Promise<SessionOutcome>((res, rej) => {
     resolveSegment = res; rejectSegment = rej;
   }));
 
@@ -495,7 +496,7 @@ describe('session-view: dialed-in decision support (Phase C)', () => {
     (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
     await flush();
     expect(runSegment).toHaveBeenCalledTimes(1);
-    getResolve()!({ report: REPORT, trials: TRIALS });
+    getResolve()!({ report: REPORT, trials: TRIALS, reaches: [], leadInDiscarded: 0 });
     await flush();
     await flush();
 
@@ -513,7 +514,7 @@ describe('session-view: dialed-in decision support (Phase C)', () => {
     const { root, screen, getResolve } = mountWithRunningSegment();
     (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
     await flush();
-    getResolve()!({ report: { ...REPORT, ci90: countsBounds(NaN, NaN) }, trials: TRIALS });
+    getResolve()!({ report: { ...REPORT, ci90: countsBounds(NaN, NaN) }, trials: TRIALS, reaches: [], leadInDiscarded: 0 });
     await flush();
     await flush();
     expect((root.querySelector('[data-dialed="concord"]') as HTMLElement).hidden).toBe(true);
@@ -526,7 +527,7 @@ describe('session-view: dialed-in decision support (Phase C)', () => {
     ctx.storage.savePrefs = (p) => void savedPrefs.push(p);
     (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
     await flush();
-    getResolve()!({ report: REPORT, trials: TRIALS });
+    getResolve()!({ report: REPORT, trials: TRIALS, reaches: [], leadInDiscarded: 0 });
     await flush();
     await flush();
     (root.querySelector('[data-dialed="lock"]') as HTMLButtonElement).click();

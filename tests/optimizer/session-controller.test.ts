@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { finalizeReport, runSession } from '../../src/optimizer/session-controller';
+import { anchorFromReaches, FLICK_MIN_LEVELS, FLICK_MIN_REACHES } from '../../src/anchor/flick-anchor';
+import { leadInReaches } from '../../src/instruments/acclimation';
 import { makeBo } from '../../src/optimizer/bayesopt';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { FakeScene } from '../instruments/fake-scene';
 import { counts360, countsBounds } from '../../src/types';
-import type { Counts360, Instrument, InstrumentId, Observation, Profile, SearchEngine, TrialResult } from '../../src/types';
+import type { Counts360, Instrument, InstrumentId, Observation, Profile, SearchEngine, TrialContext, TrialResult } from '../../src/types';
 
 // These fixtures use small count totals (15 to 60) because the search is scale free in ln space, and
 // keeping the numbers small keeps the fitted peaks in this file comparable to the ones it was written
@@ -569,5 +571,189 @@ describe('runSession - live callbacks', () => {
     const a = await runSession({ ...base(), rng: mulberry32(5) });
     const b = await runSession({ ...base(), rng: mulberry32(5), onTrial: () => {} });
     expect(b.trials.map((t) => t.counts)).toEqual(a.trials.map((t) => t.counts));
+  });
+});
+
+/**
+ * Per-frame share of a reach's primary displacement. The same trace phase 4's reach-observer test
+ * drives, and it is chosen rather than smooth on purpose: the shares sum to exactly 1.00 at index 6
+ * and then correct, so segment() finds a strict local minimum at precisely the sample whose aim is
+ * the primary submovement's full extent. A monotone ramp has no trough and the observer would drop
+ * the reach, which is the correct behaviour and would make this fixture measure nothing.
+ */
+const FRACTIONS = [0, 0.06, 0.26, 0.44, 0.18, 0.04, 0.02, 0.12, 0.05, 0.01] as const;
+
+/**
+ * A scripted player that presents targets on the scene exactly as the discrete instruments do
+ * (spawn one, reach, clear it, spawn the next) and whose OPEN-LOOP reach lands the fraction of the
+ * way its belief implies, adapting within the trial.
+ *
+ * ln f = (ln B0 - ln C_r) * rate^j + bias, which is the model src/anchor/flick-anchor.ts fits. The
+ * target sits 30 degrees away, so the along-axis miss at the trough is 30 * (f - 1) and the reach
+ * amplitude is 30: landedFraction is f exactly, with no tolerance to tune. Direction alternates so
+ * the scene's yaw does not walk away across hundreds of reaches.
+ *
+ * It is NOT one of the shipped drills. It exercises the scene protocol the drills use and nothing
+ * about their scoring, which is covered by their own suites.
+ */
+function reachingPlayer(opts: {
+  scene: FakeScene;
+  id: InstrumentId;
+  believed: number;
+  peak: number;
+  perTrial: number;
+  rate?: number;
+  bias?: number;
+  noise?: number;
+  seed?: number;
+}): Instrument {
+  const rate = opts.rate ?? 0.6;
+  const bias = opts.bias ?? Math.log(0.94); // the cheap correction: a persistent 6 percent undershoot
+  const noise = opts.noise ?? 0;
+  const rng = mulberry32(opts.seed ?? 0xb01d);
+  const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+  return {
+    id: opts.id,
+    run(ctx) {
+      const scene = opts.scene;
+      const e0 = Math.log(opts.believed) - Math.log(ctx.counts);
+      for (let j = 0; j < opts.perTrial; j++) {
+        const dir = j % 2 === 0 ? 1 : -1;
+        const start = scene.view()[0];
+        scene.spawnTarget({ kind: 'static', yaw: start + dir * 30, pitch: 0, distance: 20, worldRadius: 0.6 });
+        const f = Math.exp(e0 * Math.pow(rate, j) + bias + noise * gauss());
+        let yaw = start;
+        for (const share of FRACTIONS) {
+          scene.tick(16, [yaw, 0]);
+          yaw += share * dir * 30 * f;
+        }
+        scene.clearTargets();
+        scene.tick(16, [yaw, 0]); // the target is gone, so the observer closes the reach
+      }
+      const d = Math.log(ctx.counts) - Math.log(opts.peak);
+      return Promise.resolve<TrialResult>({
+        instrument: opts.id,
+        counts: ctx.counts,
+        score: -d * d + (ctx.rng() * 2 - 1) * 0.02,
+        raw: {},
+        at: 0,
+      });
+    },
+  };
+}
+
+const COUNT_BOUNDS: [Counts360, Counts360] = [counts360(3000), counts360(12000)];
+
+describe('runSession - the anchor observational channel', () => {
+  const B0 = 9000; // the counts per 360 the scripted player's hands believe in
+  const PEAK = 6000; // where its score peaks, which is not where its belief sits
+  const PER_TRIAL = 12;
+  const MAX_TRIALS = 24;
+
+  /** One session against the scripted player, plus the ctx each trial actually received. */
+  const play = async (): Promise<{
+    outcome: Awaited<ReturnType<typeof runSession>>;
+    ctxs: TrialContext[];
+  }> => {
+    const scene = new FakeScene();
+    const player = reachingPlayer({ scene, id: 'flick', believed: B0, peak: PEAK, perTrial: PER_TRIAL, noise: 0.03 });
+    const ctxs: TrialContext[] = [];
+    const spy: Instrument = {
+      id: 'flick',
+      run: (c, s) => {
+        ctxs.push(c);
+        return player.run(c, s);
+      },
+    };
+    const outcome = await runSession({
+      profile: profile({ flick: 1 }),
+      bounds: COUNT_BOUNDS,
+      engine: makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' }),
+      instruments: instruments({ flick: spy }),
+      scene,
+      schedule: ['flick'],
+      maxTrials: MAX_TRIALS,
+      coldStart: 8,
+      rng: mulberry32(4242),
+      bootstrapIters: 200,
+    });
+    return { outcome, ctxs };
+  };
+
+  it('reads every reach of every trial exactly once', async () => {
+    const { outcome } = await play();
+    // Exactly once is also the assertion that ONE observer was constructed for the run. Building it
+    // inside the loop would subscribe a second listener to the same frame stream and double this.
+    expect(outcome.reaches).toHaveLength(MAX_TRIALS * PER_TRIAL);
+    expect(outcome.reaches.every((r) => Number.isFinite(r.landedFraction) && r.landedFraction > 0)).toBe(true);
+  });
+
+  it('numbers reaches from 0 within each trial, which is what carries the adaptation term', async () => {
+    const { outcome } = await play();
+    const expected = Array.from({ length: PER_TRIAL }, (_, j) => j);
+    expect(outcome.reaches.slice(0, PER_TRIAL).map((r) => r.index)).toEqual(expected);
+    expect(outcome.reaches.slice(PER_TRIAL, PER_TRIAL * 2).map((r) => r.index)).toEqual(expected);
+  });
+
+  it('opens the trial before the instrument spawns, so the FIRST trial is not silently lost', async () => {
+    // beginTrial sequenced after run() would leave `rendered` null for the whole first trial and
+    // drop its reaches with no error anywhere. The first trial's gain appearing among the rendered
+    // gains is the only external evidence the call is ordered right.
+    const { outcome, ctxs } = await play();
+    const rendered = new Set(outcome.reaches.map((r) => r.rendered));
+    expect(rendered.has(ctxs[0]!.counts)).toBe(true);
+    expect(rendered.size).toBeGreaterThanOrEqual(FLICK_MIN_LEVELS);
+  });
+
+  it('discloses how many of the reaches it read were reaches the scorer discarded', async () => {
+    const { outcome, ctxs } = await play();
+    // Computed from the same pure query the controller hands the observer, over the same ctx
+    // objects the instruments received, and capped by how many reaches the trial actually contained.
+    const expected = ctxs.reduce((n, c) => n + Math.min(leadInReaches(c), PER_TRIAL), 0);
+    expect(outcome.leadInDiscarded).toBe(expected);
+    expect(outcome.leadInDiscarded).toBeGreaterThan(0);
+    expect(outcome.leadInDiscarded).toBeLessThan(outcome.reaches.length);
+  });
+
+  it('the reaches it carries out recover the belief the player was scripted with', async () => {
+    const { outcome } = await play();
+    expect(outcome.reaches.length).toBeGreaterThanOrEqual(FLICK_MIN_REACHES);
+    const a = anchorFromReaches(outcome.reaches);
+    if (a.identifiable !== true) throw new Error(`expected identifiable, got refusal: ${a.reason}`);
+    // 8 percent, against the 4.6 percent mean absolute error the estimator demonstrated across
+    // simulated sessions. This is one session, so the window is wider than the claim; it is not a
+    // licence to loosen it further. If this fails, print `a` and check adaptRate first: a rate
+    // pinned at a bound means the searched band collapsed, not that the estimator broke.
+    expect(Math.abs(a.counts / B0 - 1)).toBeLessThan(0.08);
+    // And the belief is NOT the optimum. If these two were the same number the whole test would
+    // pass on an estimator that just echoed the located counts back.
+    expect(Math.abs(a.counts / outcome.report.optimalCounts - 1)).toBeGreaterThan(0.2);
+  });
+
+  it('a scene that presents nothing yields no reaches and an honest refusal, never a guess', async () => {
+    // The synthetic instruments above never touch the scene. That is a real deployment state (a
+    // headless or scripted run), and the whole point of carrying reaches out rather than an anchor
+    // is that the caller sees the emptiness and the estimator refuses on it.
+    const outcome = await runSession({
+      profile: profile({ flick: 1 }),
+      bounds: COUNT_BOUNDS,
+      engine: makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' }),
+      instruments: instruments({ flick: synthetic('flick', PEAK) }),
+      scene: new FakeScene(),
+      schedule: ['flick'],
+      maxTrials: 10,
+      rng: mulberry32(5),
+      bootstrapIters: 80,
+    });
+    expect(outcome.reaches).toEqual([]);
+    expect(outcome.leadInDiscarded).toBe(0);
+    expect(anchorFromReaches(outcome.reaches)).toEqual({ identifiable: false, reason: 'too-few-reaches' });
+  });
+
+  it('is deterministic: the same seeds twice give the identical reaches', async () => {
+    const a = await play();
+    const b = await play();
+    expect(b.outcome.reaches).toEqual(a.outcome.reaches);
+    expect(b.outcome.trials.map((t) => t.counts)).toEqual(a.outcome.trials.map((t) => t.counts));
   });
 });

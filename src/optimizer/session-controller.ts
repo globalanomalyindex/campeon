@@ -7,9 +7,13 @@ import type {
   Profile,
   Report,
   SearchEngine,
+  TrialContext,
   TrialResult,
 } from '../types';
 import { counts360, countsBounds } from '../types';
+import type { FirstReach } from '../anchor/flick-anchor';
+import { ReachObserver } from '../anchor/reach-observer';
+import { leadInReaches } from '../instruments/acclimation';
 import { fitPeak, fitPeakDrift, type PeakFit } from '../stats/peak-fit';
 import { bootstrapCi } from '../stats/bootstrap';
 import { mulberry32 } from '../stats/rng';
@@ -223,6 +227,17 @@ export interface SessionConfig {
 export interface SessionOutcome {
   report: Report;
   trials: TrialResult[];
+  /** Every reach the anchor's observational channel could read, across every trial of this run, in
+   *  order. Empty is a legitimate outcome (a scene that presents no targets, or a run whose reaches
+   *  had no readable trough), which is exactly why the reaches come out rather than an anchor:
+   *  `anchorFromReaches` refuses on too few, and a refusal must cost tier one rather than produce a
+   *  factor built on three observations. Pinned by tests/optimizer/session-controller.test.ts
+   *  ('a scene that presents nothing yields no reaches and an honest refusal, never a guess'). */
+  reaches: FirstReach[];
+  /** How many of those reaches were reaches the scorer discarded as acclimation lead-in. A
+   *  disclosure the result screen may render. Never an input to the fit: the estimator uses every
+   *  reach and cares only about the ordinal. */
+  leadInDiscarded: number;
 }
 
 /**
@@ -246,53 +261,79 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
   const seedAt = (k: number): Counts360 => levelAt(orderedLevel[k] ?? k);
 
   const trials: TrialResult[] = config.initialTrials ? [...config.initialTrials] : [];
-  while (trials.length < config.maxTrials) {
-    if (config.shouldStop?.()) break;
-    const obs = trialsToObservations(trials, profile);
-    const counts =
-      trials.length < coldStart
-        ? seedAt(trials.length)
-        : counts360(clamp(engine.suggest(obs, bounds), lo, hi));
-    const id = schedule[trials.length % schedule.length];
-    config.onTrialStart?.(id, trials.length, counts);
-    // The gain the player arrives at this trial holding. The acclimation lead-in sizes itself
-    // from |ln(counts) - ln(prevCounts)|, because the cost of adapting scales with how far the
-    // gain moved. Without this every trial spends the full worst-case budget, which is safe
-    // (over-acclimating cannot bias a score) but charges the player time it does not need. On
-    // the first trial there is no previous trial, so the honest answer is unknown and the
-    // planner spends the full budget.
-    const prev = trials.length > 0 ? trials[trials.length - 1]!.counts : undefined;
-    const result = await config.instruments[id].run(
-      { counts, rng, profile, ...(prev !== undefined ? { prevCounts: prev } : {}) },
-      config.scene,
-    );
-    trials.push(result);
 
-    if (config.onTrial) {
-      const interim = finalizeReport(
-        trialsToObservations(trials, profile),
-        bounds,
-        mulberry32(0x5eed ^ trials.length), // own stream - does NOT touch the instrument RNG
-        { bootstrapIters: config.interimBootstrapIters ?? 120 },
-      );
-      config.onTrial(result, trials, interim);
-    }
+  // The anchor's observational channel (src/anchor/reach-observer.ts). ONE observer for the whole
+  // run, constructed before the first trial spawns anything: building it per trial would subscribe
+  // a second listener to the same frame stream and count every reach twice. It reads the live target
+  // off the scene, because target lifetime belongs to the instruments and nothing outside them knows
+  // which target is up (src/types.ts ArenaScene.activeTarget, task 36). It writes nothing: the scored
+  // Recording is byte-identical with it attached, pinned by tests/anchor/reach-observer.test.ts.
+  const observer = new ReachObserver(config.scene, () => config.scene.activeTarget());
+  try {
+    while (trials.length < config.maxTrials) {
+      if (config.shouldStop?.()) break;
+      const obs = trialsToObservations(trials, profile);
+      const counts =
+        trials.length < coldStart
+          ? seedAt(trials.length)
+          : counts360(clamp(engine.suggest(obs, bounds), lo, hi));
+      const id = schedule[trials.length % schedule.length];
+      config.onTrialStart?.(id, trials.length, counts);
+      // The gain the player arrives at this trial holding. The acclimation lead-in sizes itself
+      // from |ln(counts) - ln(prevCounts)|, because the cost of adapting scales with how far the
+      // gain moved. Without this every trial spends the full worst-case budget, which is safe
+      // (over-acclimating cannot bias a score) but charges the player time it does not need. On
+      // the first trial there is no previous trial, so the honest answer is unknown and the
+      // planner spends the full budget.
+      const prev = trials.length > 0 ? trials[trials.length - 1]!.counts : undefined;
+      // Lifted out of the run() call so the observer and the instrument cannot disagree about the
+      // trial. leadInReaches MUST see this exact ctx: planAcclimation derives the discard count
+      // from it, and a second ctx object would label scored reaches as lead-in ones.
+      const trialCtx: TrialContext = {
+        counts,
+        rng,
+        profile,
+        ...(prev !== undefined ? { prevCounts: prev } : {}),
+      };
+      // Opened BEFORE the instrument spawns its first lead-in target. Until beginTrial runs the
+      // observer has no rendered gain and drops every reach, with no error anywhere, so a call
+      // sequenced after run() would silently lose the trial that carries the strongest belief
+      // signal. Pinned by 'opens the trial before the instrument spawns'.
+      observer.beginTrial(counts, leadInReaches(trialCtx));
+      const result = await config.instruments[id].run(trialCtx, config.scene);
+      trials.push(result);
 
-    if (config.ciStopWidth !== undefined && trials.length >= minTrials) {
-      try {
-        // Its own stream, like the interim report above. Passing the shared instrument RNG
-        // here meant every stop check burned a few hundred draws, so the target geometry a
-        // player saw later in the session depended on how many stop checks had run.
-        const ci = bootstrapCi(
-          [...trialsToObservations(trials, profile)],
-          iters,
-          mulberry32(0x570b ^ trials.length),
+      if (config.onTrial) {
+        const interim = finalizeReport(
+          trialsToObservations(trials, profile),
+          bounds,
+          mulberry32(0x5eed ^ trials.length), // own stream - does NOT touch the instrument RNG
+          { bootstrapIters: config.interimBootstrapIters ?? 120 },
         );
-        if (Math.abs(ci[1] - ci[0]) <= config.ciStopWidth) break;
-      } catch {
-        // not yet concave-fittable → keep gathering
+        config.onTrial(result, trials, interim);
+      }
+
+      if (config.ciStopWidth !== undefined && trials.length >= minTrials) {
+        try {
+          // Its own stream, like the interim report above. Passing the shared instrument RNG
+          // here meant every stop check burned a few hundred draws, so the target geometry a
+          // player saw later in the session depended on how many stop checks had run.
+          const ci = bootstrapCi(
+            [...trialsToObservations(trials, profile)],
+            iters,
+            mulberry32(0x570b ^ trials.length),
+          );
+          if (Math.abs(ci[1] - ci[0]) <= config.ciStopWidth) break;
+        } catch {
+          // not yet concave-fittable → keep gathering
+        }
       }
     }
+  } finally {
+    // Unsubscribe even when an instrument throws: a live frame listener on a scene the session no
+    // longer drives is a leak with no owner. stop() also closes the last trial's still-open reach,
+    // so the final reach of the run is counted rather than dropped, and it is idempotent.
+    observer.stop();
   }
 
   // Final report: cross-check the parabola peak against the surrogate's posterior-mean argmax so the
@@ -317,5 +358,10 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
     detrendDrift: true,
     ...(gpPeak !== undefined ? { gpPeakCounts: gpPeak } : {}),
   });
-  return { report, trials };
+  return {
+    report,
+    trials,
+    reaches: observer.reaches(),
+    leadInDiscarded: observer.discardedByScoring(),
+  };
 }
