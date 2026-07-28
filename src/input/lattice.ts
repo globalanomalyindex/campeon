@@ -50,6 +50,26 @@ const CANDIDATE_SEEDS = 5;
 const MIN_DISTINCT_DELTAS = 6;
 
 /**
+ * What the delta stream was able to say about k. There is deliberately no `k = 1` result: see
+ * `conventionFrom`.
+ *
+ * - `scaled`: the stream sits on a lattice of spacing k, and `purity` says how completely it does,
+ *   which `pinConvention` turns into k's own spread rather than discarding.
+ * - `spacing-one`: the stream is a unit lattice, which is exactly what a stream scaled by a fraction
+ *   and re-rounded also is. No claim about k either way.
+ * - `too-few-samples`: fewer than `LATTICE_MIN_SAMPLES` usable deltas.
+ * - `no-lattice`: no plausible spacing was pure enough, so either the stream is genuinely
+ *   non-integral or its only pure spacing was outside the convention band.
+ */
+export type Convention =
+  | { state: 'scaled'; k: number; purity: number }
+  | {
+      state: 'indeterminate';
+      reason: 'spacing-one' | 'too-few-samples' | 'no-lattice';
+      purity: number;
+    };
+
+/**
  * |mean of exp(2*pi*i*x/spacing)| over `absDeltas`. Exactly one when every delta is an integer
  * multiple of `spacing`. Returns 0 for a non-positive spacing or an empty stream rather than NaN, so
  * an unguarded caller gets a refusal and not a number that looks like a reading.
@@ -136,4 +156,52 @@ export function usableAbsDeltas(rawDeltas: readonly number[]): number[] {
     if (Number.isFinite(a) && a > ZERO_DELTA_EPS) out.push(a);
   }
   return out;
+}
+
+/** Minimum usable (finite, non-zero) deltas before the estimator will speak at all. Below this the
+ *  modulus of a short stream is high by chance: the candidate set is small and every candidate has
+ *  few phases to disagree with. */
+export const LATTICE_MIN_SAMPLES = 60;
+
+/** Half-width of the band around unity that reads as `spacing-one`. Within two percent of 1 a
+ *  stream cannot be distinguished from an integer stream that was rescaled by a fraction and
+ *  re-rounded (the simulated collapse read 1.00 to 1.01), and no real coordinate convention lives
+ *  there. */
+const SPACING_ONE_TOL = 0.02;
+
+/**
+ * The count convention read off a raw movement-delta stream. `rawDeltas` may interleave the x and y
+ * components of every sample, because a browser that scales one scales the other identically. It
+ * carries no timestamps: the estimator is a function of the delta multiset alone, which is why there
+ * is no clock-offset test for it to pass.
+ *
+ * ONE-SIDED BY CONSTRUCTION. A spacing of one is reported as `indeterminate` with reason
+ * `spacing-one`, never as `k = 1`, because a stream that was scaled by a FRACTION and then
+ * re-rounded to integers is a perfect unit lattice and no statistic separates it from a genuine one.
+ * Reporting k = 1 there would be a silent factor-of-two error in the emitted sensitivity. See the
+ * collapse tests in tests/input/lattice.test.ts, which exist to stop exactly that "tidy-up".
+ *
+ * The collapse is narrower than one-sidedness makes it sound, and the narrowness is why this
+ * estimator is worth shipping: an INTEGER scaling survives rounding untouched, so a browser that
+ * multiplies raw counts by a devicePixelRatio of 2 is reported correctly as `scaled(2)`. Division, a
+ * fractional ratio and acceleration are the cases that hide, and they hide completely.
+ *
+ * `purity` on an indeterminate result describes the stream, not our confidence in a k: on
+ * `spacing-one` it is the modulus at spacing 1 (usually exactly one, which is the whole problem), on
+ * `no-lattice` it is the best any candidate reached, and on `too-few-samples` it is zero because
+ * nothing was measured.
+ */
+export function conventionFrom(rawDeltas: readonly number[]): Convention {
+  const abs = usableAbsDeltas(rawDeltas);
+  if (abs.length < LATTICE_MIN_SAMPLES) {
+    return { state: 'indeterminate', reason: 'too-few-samples', purity: 0 };
+  }
+  const fit = latticeSpacing(abs);
+  if (fit.spacing === null) {
+    return { state: 'indeterminate', reason: 'no-lattice', purity: fit.purity };
+  }
+  if (Math.abs(fit.spacing - 1) <= SPACING_ONE_TOL) {
+    return { state: 'indeterminate', reason: 'spacing-one', purity: fit.purity };
+  }
+  return { state: 'scaled', k: fit.spacing, purity: fit.purity };
 }
