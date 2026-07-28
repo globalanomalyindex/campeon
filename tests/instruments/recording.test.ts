@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { TrialRecorder, speedTrace, timeOnTarget, missComponents } from '../../src/instruments/recording';
+import { TrialRecorder, countTrace, timeOnTarget, missComponents, type Frame } from '../../src/instruments/recording';
+import { segment, ONSET_COUNTS_PER_SEC } from '../../src/scoring/submovement';
+import { counts360 } from '../../src/types';
 import { FakeScene } from './fake-scene';
 
 describe('TrialRecorder', () => {
@@ -23,14 +25,61 @@ describe('TrialRecorder', () => {
   });
 });
 
-describe('speedTrace', () => {
-  it('is angular speed (deg/s) between consecutive frames', () => {
-    const trace = speedTrace([
-      { t: 0, aim: [0, 0], target: null, targetRadius: null },
-      { t: 100, aim: [9, 0], target: null, targetRadius: null },
-    ]);
-    expect(trace).toHaveLength(1);
-    expect(trace[0].speed).toBeCloseTo(90, 4);
+describe('countTrace', () => {
+  /** Counts the hand emits in each successive 16 ms frame. One primary bump, one correction. */
+  const EMISSION = [0, 12, 40, 90, 60, 20, 4, 2, 18, 6] as const;
+
+  /** The frames those counts produce when the arena renders `rendered` counts per 360. */
+  function framesFor(rendered: number): Frame[] {
+    const degPerCount = 360 / rendered;
+    const out: Frame[] = [{ t: 0, aim: [0, 0], target: null, targetRadius: null }];
+    let yaw = 0;
+    for (let i = 0; i < EMISSION.length; i++) {
+      yaw += EMISSION[i]! * degPerCount;
+      out.push({ t: (i + 1) * 16, aim: [yaw, 0], target: null, targetRadius: null });
+    }
+    return out;
+  }
+
+  /** The deg/s trace the segmenter used to be handed, kept here as the teeth of the test. */
+  function degSpeeds(frames: readonly Frame[]): number[] {
+    const out: number[] = [];
+    for (let i = 1; i < frames.length; i++) {
+      out.push(Math.abs(frames[i]!.aim[0] - frames[i - 1]!.aim[0]) / ((frames[i]!.t - frames[i - 1]!.t) / 1000));
+    }
+    return out;
+  }
+
+  it('is the emitted counts per second, whatever the frame spacing', () => {
+    const trace = countTrace(framesFor(6000), counts360(6000));
+    expect(trace).toHaveLength(EMISSION.length);
+    expect(trace[1]!.countsPerSec).toBeCloseTo(12 / 0.016, 6);
+    expect(trace[3]!.countsPerSec).toBeCloseTo(90 / 0.016, 6);
+    expect(trace[3]!.t).toBe(64);
+  });
+
+  it('the same hand emission reads the same count trace at any rendered gain', () => {
+    const slow = countTrace(framesFor(6000), counts360(6000));
+    const fast = countTrace(framesFor(18000), counts360(18000));
+    expect(fast).toHaveLength(slow.length);
+    for (let i = 0; i < slow.length; i++) {
+      expect(fast[i]!.countsPerSec).toBeCloseTo(slow[i]!.countsPerSec, 6);
+    }
+    // Teeth: the SAME emission renders three times the angular speed at 6000 counts/360 as at
+    // 18000, so a threshold fixed in deg/s provably cannot return the same onset for both.
+    expect(degSpeeds(framesFor(6000))[1]!).toBeCloseTo(3 * degSpeeds(framesFor(18000))[1]!, 6);
+  });
+
+  it('and therefore segments identically at both gains', () => {
+    const a = segment(countTrace(framesFor(6000), counts360(6000)), { onsetThresh: ONSET_COUNTS_PER_SEC });
+    const b = segment(countTrace(framesFor(18000), counts360(18000)), { onsetThresh: ONSET_COUNTS_PER_SEC });
+    // The first frame pair emits nothing, so onset is the second sample: EMISSION[1] = 12 counts in
+    // 16 ms is 750 counts/s, the first sample over the 600 floor.
+    expect(a.onsetTime).toBe(32);
+    expect(a.nCorr).toBe(1);
+    expect(b.onsetTime).toBe(a.onsetTime);
+    expect(b.nCorr).toBe(a.nCorr);
+    expect(b.vPeak).toBeCloseTo(a.vPeak, 6);
   });
 });
 

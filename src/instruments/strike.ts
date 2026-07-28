@@ -1,7 +1,7 @@
 import type { ArenaScene, Degrees, InstrumentId, Ms, TargetHandle, TrialContext, TrialResult } from '../types';
 import { planAcclimation } from './acclimation';
-import { segment } from '../scoring/submovement';
-import { speedTrace, type Frame } from './recording';
+import { segment, ONSET_COUNTS_PER_SEC } from '../scoring/submovement';
+import { countTrace, type Frame } from './recording';
 import { separation } from '../engine/targets';
 import { sampleStd } from '../scoring/stats';
 
@@ -11,7 +11,7 @@ const SHOTS = 10;
 export interface StrikeShot {
   tR: Ms; // reaction/commit: target onset → movement onset
   tS: Ms; // ballistic strike: onset → fire
-  vPeak: number; // peak angular speed (deg/s)
+  vPeak: number; // peak speed of the primary orient, counts/s (a raw diagnostic, not scored)
   endpointError: Degrees; // signed scatter about the mean
   hit: boolean;
 }
@@ -110,11 +110,11 @@ export const strike = {
         const aim = scene.view();
         const tgt = handle.bearing();
         const radial = separation(aim, tgt);
-        const tr = speedTrace(frames);
+        const tr = countTrace(frames, ctx.counts);
         let onsetTime = presentedAt;
         let vPeak = 0;
         try {
-          const seg = segment(tr, { onsetThresh: 20, cueTime: presentedAt });
+          const seg = segment(tr, { onsetThresh: ONSET_COUNTS_PER_SEC, cueTime: presentedAt });
           onsetTime = seg.onsetTime;
           vPeak = seg.vPeak;
         } catch {

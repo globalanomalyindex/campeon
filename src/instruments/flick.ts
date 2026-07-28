@@ -17,8 +17,8 @@ import {
   type ConditionThroughput,
 } from '../scoring/fitts';
 import { mean } from '../scoring/stats';
-import { segment } from '../scoring/submovement';
-import { missComponents, speedTrace, type Frame } from './recording';
+import { segment, ONSET_COUNTS_PER_SEC } from '../scoring/submovement';
+import { missComponents, countTrace, type Frame } from './recording';
 import { separation } from '../engine/targets';
 
 const ID: InstrumentId = 'flick';
@@ -196,7 +196,7 @@ export const flick = {
         const errAlong = missComponents(presentAim, tgt, aim).radial;
         let nCorr = 0;
         try {
-          nCorr = segment(speedTrace(reachFrames), { onsetThresh: 20 }).nCorr;
+          nCorr = segment(countTrace(reachFrames, ctx.counts), { onsetThresh: ONSET_COUNTS_PER_SEC }).nCorr;
         } catch {
           nCorr = 0; // no movement detected → no corrections
         }

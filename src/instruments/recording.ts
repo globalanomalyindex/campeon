@@ -1,4 +1,6 @@
-import type { ArenaScene, Degrees, Ms, TargetHandle } from '../types';
+import type { ArenaScene, Counts360, Degrees, Ms, TargetHandle } from '../types';
+import type { CountSample } from '../scoring/submovement';
+import { degreesPerCount } from '../convert/counts';
 import { separation } from '../engine/targets';
 import { wrapYaw } from '../engine/camera-rig';
 
@@ -54,13 +56,23 @@ export class TrialRecorder {
   }
 }
 
-/** Angular speed (deg/s) between consecutive frames. */
-export function speedTrace(frames: readonly Frame[]): Array<{ t: Ms; speed: number }> {
-  const out: Array<{ t: Ms; speed: number }> = [];
+/**
+ * Frames → the aim's speed in COUNT SPACE, given the counts per 360 the trial RENDERED.
+ *
+ * This replaces the deg/s `speedTrace`. Angular speed is the product of what the hand did and the
+ * gain under test, so every threshold applied to it was a threshold on the axis being measured. The
+ * conversion is exact and known: the arena rendered `rendered`, so one count is `360 / rendered`
+ * degrees and dividing it back out recovers what the hand emitted. It is not an estimate.
+ * The magnitude is unsigned, matching the segmenter's contract; direction lives in the aim samples.
+ */
+export function countTrace(frames: readonly Frame[], rendered: Counts360): CountSample[] {
+  const degPerCount = degreesPerCount(rendered);
+  const out: CountSample[] = [];
   for (let i = 1; i < frames.length; i++) {
     const dtSec = (frames[i]!.t - frames[i - 1]!.t) / 1000;
     if (dtSec <= 0) continue;
-    out.push({ t: frames[i]!.t, speed: separation(frames[i - 1]!.aim, frames[i]!.aim) / dtSec });
+    const deg = separation(frames[i - 1]!.aim, frames[i]!.aim);
+    out.push({ t: frames[i]!.t, countsPerSec: deg / degPerCount / dtSec });
   }
   return out;
 }
