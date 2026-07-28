@@ -33,12 +33,10 @@
 
 /* Grids that join on the 1px lattice rather than floating apart. Every joined grid in
    the app is this pattern, so the frame is declared once and the per-screen rules add
-   only their columns and their cell padding. The calibrate readouts are named here for
-   the same reason: three hand-copies of four declarations is three chances to drift. */
+   only their columns and their cell padding. */
 .lattice,
 .hero__drawer,
-.result__breakdown,
-.calibrate__readouts {
+.result__breakdown {
   display: grid; gap: 1px;
   background: var(--border-hairline);
   border: 1px solid var(--border-hairline);

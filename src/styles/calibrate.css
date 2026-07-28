@@ -1,7 +1,7 @@
 /* campeón: calibration
-   The sweep and the spin. Both measure, so both carry the calibrate mineral
-   (turquoise) as their signal colour. The canvas itself is a measuring surface,
-   so it sits on ink while the surrounding chrome stays on paper. */
+   The blind reference turn. It measures, so it carries the calibrate mineral
+   (turquoise) as its signal colour. The stage is a measuring surface, so it sits
+   on ink while the surrounding chrome stays on paper. */
 
 .calibrate__stage {
   position: relative;
@@ -10,8 +10,6 @@
   border: 1px solid var(--border-default);
   overflow: hidden;
 }
-.calibrate__canvas { display: block; width: 100%; height: 360px; cursor: crosshair; }
-
 .calibrate__hint {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
@@ -25,26 +23,8 @@
   border: 1px solid color-mix(in oklab, var(--stone-50) 20%, transparent);
 }
 
-/* Three readouts, joined on the 1px lattice rather than floating apart. The lattice frame is
-   declared once with the primitive in shell.css; this sets the columns and the rhythm. */
-.calibrate__readouts {
-  grid-template-columns: repeat(3, 1fr);
-  margin-top: var(--space-4);
-}
-.calibrate__ro { background: var(--surface-card); padding: var(--space-3) var(--space-4); }
-.calibrate__ro .k {
-  font: var(--type-label); font-family: var(--font-text);
-  letter-spacing: var(--tracking-label); text-transform: uppercase;
-  color: var(--text-muted);
-}
-.calibrate__ro .v {
-  font-family: var(--font-display);
-  font-feature-settings: var(--features-figures);
-  font-variant-numeric: tabular-nums slashed-zero;
-  font-size: var(--text-heading-md);
-  color: var(--text-strong);
-  margin-top: var(--space-1);
-}
+/* The three live readouts left with the sweep: a blind instrument shows no number while it
+   measures, and reports its spread once, afterwards. */
 
 /* What a step measured and how tightly, stated under the step itself. A note, so it sits
    below the instruction in size and colour and never competes with it. */
@@ -102,26 +82,10 @@
 }
 .cal-helper b { color: var(--text-strong); font-weight: var(--weight-regular); }
 
-/* The pace meter: fills toward the right range and turns malachite when held. */
-.cal-pace {
-  height: 8px;
-  border: 1px solid var(--border-hairline);
-  background: var(--surface-sunken);
-  overflow: hidden;
-  margin: var(--space-3) 0;
-  position: relative;
-}
-.cal-pace__fill {
-  height: 100%; width: 0;
-  background: var(--color-warning);
-  /* The fill tracks a live pointer sample, so it moves on the shortest step of the ramp:
-     long enough to smooth the jitter, short enough that the meter still reads as the hand. */
-  transition: width var(--dur-instant) linear, background-color var(--dur-fast) var(--ease-standard);
-}
-.cal-pace__fill[data-ok='true'] { background: var(--color-success); }
-.cal-pace__label { font: var(--type-body-sm); color: var(--text-muted); }
+/* The pace meter went with the sweep: it fed back a live reading of the very stroke it was
+   measuring, which is the coaching the blind turn exists to withhold. */
 
-/* The two-step preview on the intro. */
+/* The step preview on the intro. */
 .cal-preview { list-style: none; padding: 0; margin: var(--space-2) 0; display: grid; gap: var(--space-2); }
 .cal-preview li { display: flex; gap: var(--space-3); align-items: baseline; }
 .cal-preview .cal-preview__n {
@@ -131,8 +95,8 @@
   min-width: 2ch;
 }
 
-/* The way out of a guided step. Held at the foot of the sweep and the spin so a keyboard
-   visitor can Tab to a real control from either one, mid-pass included. */
+/* The way out of a guided step. Held at the foot of the turn so a keyboard visitor can Tab to a
+   real control from it, mid-pass included. */
 .cal-exit { display: flex; flex-wrap: wrap; gap: var(--space-5); }
 
 /* A field-level problem, stated where the field is. Carries the warning mineral as text
@@ -147,5 +111,4 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cal-pulse__dot { animation: none; }
-  .cal-pace__fill { transition: none; }
 }
