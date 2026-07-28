@@ -1,7 +1,6 @@
 import type {
   ArenaScene,
-  Cm360,
-  Dpi,
+  Counts360,
   Instrument,
   InstrumentId,
   Observation,
@@ -10,6 +9,7 @@ import type {
   SearchEngine,
   TrialResult,
 } from '../types';
+import { counts360, countsBounds } from '../types';
 import { fitPeak, fitPeakDrift, type PeakFit } from '../stats/peak-fit';
 import { bootstrapCi } from '../stats/bootstrap';
 import { mulberry32 } from '../stats/rng';
@@ -76,7 +76,7 @@ export interface FinalizeOptions {
   /** Bootstrap resamples for the CI (default 400). */
   bootstrapIters?: number;
   /** If set, widen the CI when the GP peak and the curve peak disagree (spec §5.3). */
-  gpPeakCm360?: number;
+  gpPeakCounts?: number;
   /** Log-space disagreement threshold for the GP/curve widen (default 0.15 ≈ 16% relative). */
   disagreeLogThreshold?: number;
   /** A4: fit the extended ANCOVA model y = b0 + b1·x + b2·x² + b3·τ and report the peak of the
@@ -93,11 +93,11 @@ export interface FinalizeOptions {
  * Seeded at the geometric midpoint (log-space, matching the optimizer's ln domain); any real
  * observation beats the −Infinity seed (blended z-scores are routinely negative).
  */
-function fallbackReport(obs: readonly Observation[], lo: Cm360, hi: Cm360): Report {
+function fallbackReport(obs: readonly Observation[], lo: Counts360, hi: Counts360): Report {
   let best = { x: Math.log(Math.sqrt(lo * hi)), y: -Infinity };
   for (const o of obs) if (o.y > best.y) best = o;
   return {
-    optimalCm360: clamp(Math.exp(best.x), lo, hi),
+    optimalCounts: counts360(clamp(Math.exp(best.x), lo, hi)),
     ci90: [lo, hi],
     curve: [...obs].map((o) => ({ x: o.x, mean: o.y })).sort((a, b) => a.x - b.x),
   };
@@ -112,7 +112,7 @@ function fallbackReport(obs: readonly Observation[], lo: Cm360, hi: Cm360): Repo
  */
 export function finalizeReport(
   obs: readonly Observation[],
-  bounds: [Cm360, Cm360],
+  bounds: [Counts360, Counts360],
   rng: () => number,
   opts: FinalizeOptions = {},
 ): Report {
@@ -138,15 +138,15 @@ export function finalizeReport(
     }
   }
 
-  const peak = clamp(fit.optimalCm360, lo, hi);
+  const peak = counts360(clamp(fit.optimalCounts, lo, hi));
   // Bounds honesty: when the vertex of whichever fit RAN (plain or detrended) falls outside the
   // searched range, the clamp above turns "the best is beyond the range I searched" into a number
   // sitting exactly on the edge, indistinguishable from a measured interior optimum. Record which
   // side it fell past so every downstream layer can present the edge as a bound. The check sits
   // after model selection on purpose: it must describe the fit that produced the number.
   const atBound: 'low' | 'high' | undefined =
-    fit.optimalCm360 < lo ? 'low' : fit.optimalCm360 > hi ? 'high' : undefined;
-  let ci: [Cm360, Cm360];
+    fit.optimalCounts < lo ? 'low' : fit.optimalCounts > hi ? 'high' : undefined;
+  let ci: [Counts360, Counts360];
   try {
     // The obs carry their per-point `noise` (the P1-1 heteroscedastic nugget) all the way through, so
     // bootstrapCi resamples residuals reliability-aware (P1-3): a loud facet widens the CI, a quiet
@@ -155,21 +155,21 @@ export function finalizeReport(
     // model, unioned with the plain band on the same seeded draws (widen-only; it runs the SAME
     // guarded fitDrift, so peak and CI can never disagree on which model ran).
     const raw = bootstrapCi([...obs], iters, rng, opts.detrendDrift === true ? { drift: true } : {});
-    ci = [clamp(Math.min(raw[0], raw[1]), lo, hi), clamp(Math.max(raw[0], raw[1]), lo, hi)];
+    ci = countsBounds(clamp(Math.min(raw[0], raw[1]), lo, hi), clamp(Math.max(raw[0], raw[1]), lo, hi));
   } catch {
     ci = [lo, hi]; // bootstrap could not bound it → honest wide range
   }
-  if (opts.gpPeakCm360 !== undefined) {
-    const gp = clamp(opts.gpPeakCm360, lo, hi);
+  if (opts.gpPeakCounts !== undefined) {
+    const gp = clamp(opts.gpPeakCounts, lo, hi);
     const thresh = opts.disagreeLogThreshold ?? 0.15;
     if (Math.abs(Math.log(gp) - Math.log(peak)) > thresh) {
-      ci = [Math.min(ci[0], gp, peak), Math.max(ci[1], gp, peak)];
+      ci = countsBounds(Math.min(ci[0], gp, peak), Math.max(ci[1], gp, peak));
     }
   }
   // driftZ is the measured b3 the detrend REMOVED from the number - practice or fatigue, the data
   // cannot say which. Present only when the extended fit actually ran; never padded on fallback.
   return {
-    optimalCm360: peak,
+    optimalCounts: peak,
     ci90: ci,
     curve: fit.curve,
     ...(drifted !== null ? { driftZ: drifted.driftZ } : {}),
@@ -178,9 +178,8 @@ export function finalizeReport(
 }
 
 export interface SessionConfig {
-  dpi: Dpi;
   profile: Profile;
-  bounds: [Cm360, Cm360];
+  bounds: [Counts360, Counts360];
   engine: SearchEngine;
   instruments: Record<InstrumentId, Instrument>;
   scene: ArenaScene;
@@ -198,12 +197,14 @@ export interface SessionConfig {
   coldStart?: number;
   /** Earliest trial index at which CI early-stop is allowed (default 8). */
   minTrials?: number;
-  /** Stop early once the 90% CI (in cm/360) is narrower than this. */
-  ciStopWidth?: Cm360;
+  /** Stop early once the 90% CI, measured in counts, is narrower than this. A WIDTH, not a
+   *  position, so it is a plain number: a difference of two branded counts is not itself a count
+   *  total. */
+  ciStopWidth?: number;
   /** Bootstrap resamples for early-stop checks and the final report (default 400). */
   bootstrapIters?: number;
   /** Fired before each trial's instrument runs - for a live "now: +flick" HUD. */
-  onTrialStart?: (id: InstrumentId, index: number, cm360: Cm360) => void;
+  onTrialStart?: (id: InstrumentId, index: number, counts: Counts360) => void;
   /** Fired after each trial with the trial, all trials so far, and a cheap interim Report - for the
    *  live convergence view. The interim bootstrap uses its OWN seeded RNG, so setting this never
    *  perturbs the (deterministic) instrument-noise stream. */
@@ -239,27 +240,30 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
   const coldStart = config.coldStart ?? Math.max(4, 2 * schedule.length);
   const minTrials = config.minTrials ?? 8;
   const iters = config.bootstrapIters ?? 400;
-  const levelAt = (k: number): Cm360 => Math.exp(loX + ((k + 0.5) / coldStart) * (hiX - loX));
+  const levelAt = (k: number): Counts360 =>
+    counts360(Math.exp(loX + ((k + 0.5) / coldStart) * (hiX - loX)));
   const orderedLevel = coldStartOrder(coldStart);
-  const seedAt = (k: number): Cm360 => levelAt(orderedLevel[k] ?? k);
+  const seedAt = (k: number): Counts360 => levelAt(orderedLevel[k] ?? k);
 
   const trials: TrialResult[] = config.initialTrials ? [...config.initialTrials] : [];
   while (trials.length < config.maxTrials) {
     if (config.shouldStop?.()) break;
     const obs = trialsToObservations(trials, profile);
-    const cm360 =
-      trials.length < coldStart ? seedAt(trials.length) : clamp(engine.suggest(obs, bounds), lo, hi);
+    const counts =
+      trials.length < coldStart
+        ? seedAt(trials.length)
+        : counts360(clamp(engine.suggest(obs, bounds), lo, hi));
     const id = schedule[trials.length % schedule.length];
-    config.onTrialStart?.(id, trials.length, cm360);
+    config.onTrialStart?.(id, trials.length, counts);
     // The gain the player arrives at this trial holding. The acclimation lead-in sizes itself
-    // from |ln(cm360) - ln(prevCm360)|, because the cost of adapting scales with how far the
+    // from |ln(counts) - ln(prevCounts)|, because the cost of adapting scales with how far the
     // gain moved. Without this every trial spends the full worst-case budget, which is safe
     // (over-acclimating cannot bias a score) but charges the player time it does not need. On
     // the first trial there is no previous trial, so the honest answer is unknown and the
     // planner spends the full budget.
-    const prev = trials.length > 0 ? trials[trials.length - 1]!.cm360 : undefined;
+    const prev = trials.length > 0 ? trials[trials.length - 1]!.counts : undefined;
     const result = await config.instruments[id].run(
-      { cm360, dpi: config.dpi, rng, profile, ...(prev !== undefined ? { prevCm360: prev } : {}) },
+      { counts, rng, profile, ...(prev !== undefined ? { prevCounts: prev } : {}) },
       config.scene,
     );
     trials.push(result);
@@ -298,7 +302,7 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
   // cross-check peak; it never rescales y and never replaces the conservative CI, so it can only
   // WIDEN the honest CI. When the engine exposes no GP params we keep the unfitted posteriorPeak.
   const finalObs = trialsToObservations(trials, profile);
-  let gpPeak: Cm360 | undefined;
+  let gpPeak: Counts360 | undefined;
   if (engine.gpParams !== undefined && engine.posteriorPeakWith !== undefined) {
     const fitted = fitGpParams(finalObs, engine.gpParams, bounds);
     gpPeak = engine.posteriorPeakWith(finalObs, bounds, fitted);
@@ -311,7 +315,7 @@ export async function runSession(config: SessionConfig): Promise<SessionOutcome>
     // reports above never set this, so the deterministic mid-session RNG stream is untouched and the
     // trial sequence is byte-identical with or without the drift feature.
     detrendDrift: true,
-    ...(gpPeak !== undefined ? { gpPeakCm360: gpPeak } : {}),
+    ...(gpPeak !== undefined ? { gpPeakCounts: gpPeak } : {}),
   });
   return { report, trials };
 }

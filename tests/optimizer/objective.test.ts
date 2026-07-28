@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { trialsToObservations } from '../../src/optimizer/objective';
 import { fitPeak } from '../../src/stats/peak-fit';
 import { sampleStd } from '../../src/scoring/stats';
+import { counts360 } from '../../src/types';
 import type { InstrumentId, Profile, TrialResult } from '../../src/types';
 
 const prof = (weights: Partial<Record<InstrumentId, number>>): Profile => ({
@@ -9,8 +10,8 @@ const prof = (weights: Partial<Record<InstrumentId, number>>): Profile => ({
   instrumentWeights: { track: 0, flick: 0, calibrate: 0, strike: 0, ...weights },
 });
 
-function trial(instrument: InstrumentId, cm360: number, score: number, scoreSE?: number): TrialResult {
-  return { instrument, cm360, score, raw: {}, at: 0, ...(scoreSE !== undefined ? { scoreSE } : {}) };
+function trial(instrument: InstrumentId, counts: number, score: number, scoreSE?: number): TrialResult {
+  return { instrument, counts: counts360(counts), score, raw: {}, at: 0, ...(scoreSE !== undefined ? { scoreSE } : {}) };
 }
 
 describe('trialsToObservations', () => {
@@ -22,7 +23,7 @@ describe('trialsToObservations', () => {
     });
     const obs = trialsToObservations(trials, prof({ flick: 1 }));
     expect(obs.length).toBe(6);
-    expect(fitPeak(obs).optimalCm360).toBeCloseTo(35, 0);
+    expect(fitPeak(obs).optimalCounts).toBeCloseTo(35, 0);
   });
 
   it('drops instruments with no spread (≤1 trial or all-equal) - no NaN', () => {
@@ -189,7 +190,7 @@ describe('trialsToObservations', () => {
       ...sweep.map((cm) => mk('flick', cm, 24)),
       ...sweep.map((cm) => mk('track', cm, 48)),
     ];
-    const peak = fitPeak(trialsToObservations(trials, prof({ flick: 1, track: 1 }))).optimalCm360;
+    const peak = fitPeak(trialsToObservations(trials, prof({ flick: 1, track: 1 }))).optimalCounts;
     expect(peak).toBeGreaterThan(27);
     expect(peak).toBeLessThan(45);
   });

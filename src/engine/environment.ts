@@ -5,7 +5,7 @@ import { hex } from '../palette';
  * PURE CPU factory for the arena's warm procedural environment map (equirectangular IBL) and its
  * tuning constants. No WebGL, no renderer, no THREE.Scene reference - `createWarmEnvTexture()` builds
  * a plain `DataTexture` from arithmetic on `src/palette.ts` hex anchors. This module is a cosmetic
- * lighting/reflection layer only: it has NO scored API (no bearing/radiusDeg/cm360/sample/score/view)
+ * lighting/reflection layer only: it has NO scored API (no bearing/radiusDeg/counts/sample/score/view)
  * and never reads or writes the aim/scoring stream - it only shades pixels for `scene.environment`
  * and (via `arena.ts`) tunes `scene.fog`.
  */

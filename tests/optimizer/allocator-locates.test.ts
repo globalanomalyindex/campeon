@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { countsBounds } from '../../src/types';
+import type { Counts360 } from '../../src/types';
 import { makeEvolution } from '../../src/optimizer/evolution';
 import { finalizeReport } from '../../src/optimizer/session-controller';
 import { mulberry32 } from '../../src/stats/bootstrap';
@@ -30,7 +32,7 @@ const REPS = 120;
 /** One simulated session against the real engine, with the truth `peakOffset` from the band centre. */
 function locates(seed: number, peakOffset: number): boolean {
   const rng = mulberry32(seed);
-  const bounds: [number, number] = [34 / 1.7, 34 * 1.7];
+  const bounds: [Counts360, Counts360] = countsBounds(34 / 1.7, 34 * 1.7);
   const [lo, hi] = bounds;
   const loX = Math.log(lo), hiX = Math.log(hi), midX = (loX + hiX) / 2;
   // The configuration src/ui/session-view.ts ships.

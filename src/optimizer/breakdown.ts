@@ -1,11 +1,12 @@
-import type { Cm360, Concordance, Degrees, FacetConcordance, FacetPeak, InstrumentId, Ms, Observation, Profile, TrialResult } from '../types';
+import type { Counts360, Concordance, Degrees, FacetConcordance, FacetPeak, InstrumentId, Ms, Observation, Profile, TrialResult } from '../types';
+import { counts360 } from '../types';
 import { mean, sampleStd } from '../scoring/stats';
 import { fitPeak } from '../stats/peak-fit';
 import { bootstrapCi } from '../stats/bootstrap';
 
 export interface Breakdown {
-  /** cm/360 where the calibrate gain crosses 1 (the bias-zero sensitivity, spec §4.3). */
-  biasZeroCm360: Cm360;
+  /** counts per 360 where the calibrate gain crosses 1 (the bias-zero sensitivity, spec §4.3). */
+  biasZeroCounts: Counts360;
   /** Minimum calibrate σ_R observed - the precision floor (skill/hardware), not a recommendation. */
   precisionFloorDeg: Degrees;
   /** Strike time-to-kill at the optimum. */
@@ -24,20 +25,20 @@ export interface Breakdown {
 const byInstrument = (trials: readonly TrialResult[], id: TrialResult['instrument']) =>
   trials.filter((t) => t.instrument === id);
 
-/** cm/360 where gain = 1, interpolated in ln-space across the bracketing pair; else nearest-to-1. */
-function biasZero(cal: readonly TrialResult[]): Cm360 {
+/** counts per 360 where gain = 1, interpolated in ln-space across the bracketing pair; else nearest-to-1. */
+function biasZero(cal: readonly TrialResult[]): Counts360 {
   const pts = cal
-    .filter((t) => Number.isFinite(t.raw.gain) && t.cm360 > 0)
-    .map((t) => ({ lx: Math.log(t.cm360), g: t.raw.gain, cm: t.cm360 }))
+    .filter((t) => Number.isFinite(t.raw.gain) && t.counts > 0)
+    .map((t) => ({ lx: Math.log(t.counts), g: t.raw.gain, cm: t.counts }))
     .sort((a, b) => a.lx - b.lx);
-  if (pts.length === 0) return NaN;
+  if (pts.length === 0) return counts360(NaN);
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i];
     if ((a.g - 1) === 0) return a.cm;
     // Opposite signs ⇒ a.g and b.g straddle 1, so b.g ≠ a.g and the divisor below is nonzero.
     if ((a.g - 1) * (b.g - 1) < 0) {
       const f = (1 - a.g) / (b.g - a.g); // a.g + f·(b.g−a.g) = 1
-      return Math.exp(a.lx + f * (b.lx - a.lx));
+      return counts360(Math.exp(a.lx + f * (b.lx - a.lx)));
     }
   }
   // No crossing: report the trial whose gain is closest to 1 (honest nearest estimate).
@@ -53,7 +54,7 @@ function biasZero(cal: readonly TrialResult[]): Cm360 {
 function fusedContribAt(
   trials: readonly TrialResult[],
   id: InstrumentId,
-  optimalCm360: Cm360,
+  optimalCounts: Counts360,
   profile?: Profile,
 ): number {
   if (!profile) return NaN;
@@ -64,9 +65,9 @@ function fusedContribAt(
   const sd = sampleStd(scores);
   if (!(sd > 0)) return NaN; // <2 trials / all-equal / NaN-poisoned → no usable signal (mirror objective.ts)
   const mu = mean(scores);
-  const lOpt = Math.log(optimalCm360);
+  const lOpt = Math.log(optimalCounts);
   const nearest = own.reduce((best, t) =>
-    Math.abs(Math.log(t.cm360) - lOpt) < Math.abs(Math.log(best.cm360) - lOpt) ? t : best,
+    Math.abs(Math.log(t.counts) - lOpt) < Math.abs(Math.log(best.counts) - lOpt) ? t : best,
   );
   return w * ((nearest.score - mu) / sd);
 }
@@ -74,7 +75,7 @@ function fusedContribAt(
 /** Pure breakdown of the one answer into each facet's contribution. Missing data → NaN (no fabrication). */
 export function computeBreakdown(
   trials: readonly TrialResult[],
-  optimalCm360: Cm360,
+  optimalCounts: Counts360,
   profile?: Profile,
 ): Breakdown {
   const cal = byInstrument(trials, 'calibrate');
@@ -83,28 +84,28 @@ export function computeBreakdown(
   const sigmas = cal.map((t) => t.raw.sigmaR).filter((v): v is number => Number.isFinite(v));
   const precisionFloorDeg = sigmas.length ? Math.min(...sigmas) : NaN;
 
-  const lOpt = Math.log(optimalCm360);
+  const lOpt = Math.log(optimalCounts);
   const nearest = str
-    .filter((t) => t.cm360 > 0)
+    .filter((t) => t.counts > 0)
     .reduce<TrialResult | null>(
       (best, t) =>
-        best === null || Math.abs(Math.log(t.cm360) - lOpt) < Math.abs(Math.log(best.cm360) - lOpt)
+        best === null || Math.abs(Math.log(t.counts) - lOpt) < Math.abs(Math.log(best.counts) - lOpt)
           ? t
           : best,
       null,
     );
 
   return {
-    biasZeroCm360: biasZero(cal),
+    biasZeroCounts: biasZero(cal),
     precisionFloorDeg,
     ttkMs: nearest ? (nearest.raw.ttkMs ?? NaN) : NaN,
     hitRate: nearest ? (nearest.raw.hitRate ?? NaN) : NaN,
-    trackContribZ: fusedContribAt(trials, 'track', optimalCm360, profile),
-    flickContribZ: fusedContribAt(trials, 'flick', optimalCm360, profile),
+    trackContribZ: fusedContribAt(trials, 'track', optimalCounts, profile),
+    flickContribZ: fusedContribAt(trials, 'flick', optimalCounts, profile),
   };
 }
 
-// ── A5: facet concordance - testing the "one latent cm/360" thesis as a claim ────────────────────
+// ── A5: facet concordance - testing the one latent counts per 360 thesis as a claim ──────────────
 // The optimizer FUSES the four facets into one number. That fusion ASSUMES they are four views of one
 // latent constant; it never TESTS it. This readout does: it fits each facet's OWN concave peak from its
 // OWN trials (the same peak-fit machinery, on the affine per-instrument z-score, so the subset fit is
@@ -132,12 +133,12 @@ const DIVERGE_Z = 3.0;
  *  standardization objective.ts uses; weight is affine and irrelevant to the vertex, so it is omitted).
  *  Empty when the facet has no usable spread - then it simply cannot be fit. */
 function facetObservations(trials: readonly TrialResult[], id: InstrumentId): Observation[] {
-  const own = trials.filter((t) => t.instrument === id && Number.isFinite(t.score) && t.cm360 > 0);
+  const own = trials.filter((t) => t.instrument === id && Number.isFinite(t.score) && t.counts > 0);
   const scores = own.map((t) => t.score);
   const sd = sampleStd(scores);
   if (!(sd > 0)) return [];
   const mu = mean(scores);
-  return own.map((t) => ({ x: Math.log(t.cm360), y: (t.score - mu) / sd })).sort((a, b) => a.x - b.x);
+  return own.map((t) => ({ x: Math.log(t.counts), y: (t.score - mu) / sd })).sort((a, b) => a.x - b.x);
 }
 
 /** Fit one facet's own peak + a floored bootstrap spread, or dash it (peak/spread undefined) when its
@@ -147,9 +148,9 @@ function fitFacet(trials: readonly TrialResult[], id: InstrumentId, rng: () => n
   const laneConditioned = id === 'strike';
   const obs = facetObservations(trials, id);
   if (obs.length < MIN_FACET_OBS) return { instrument: id, laneConditioned };
-  let peakCm360: number;
+  let peakCounts: number;
   try {
-    peakCm360 = fitPeak(obs).optimalCm360; // throws when the facet's own curve is non-concave
+    peakCounts = fitPeak(obs).optimalCounts; // throws when the facet's own curve is non-concave
   } catch {
     return { instrument: id, laneConditioned };
   }
@@ -160,8 +161,8 @@ function fitFacet(trials: readonly TrialResult[], id: InstrumentId, rng: () => n
     return { instrument: id, laneConditioned }; // too unstable to trust the peak either - dash it
   }
   const spreadLn = Math.max((Math.log(band[1]) - Math.log(band[0])) / 2, MIN_FACET_SPREAD_LN);
-  if (!(peakCm360 > 0) || !Number.isFinite(spreadLn)) return { instrument: id, laneConditioned };
-  return { instrument: id, peakCm360, spreadLn, laneConditioned };
+  if (!(peakCounts > 0) || !Number.isFinite(spreadLn)) return { instrument: id, laneConditioned };
+  return { instrument: id, peakCounts: counts360(peakCounts), spreadLn, laneConditioned };
 }
 
 /**
@@ -173,14 +174,14 @@ function fitFacet(trials: readonly TrialResult[], id: InstrumentId, rng: () => n
 export function facetConcordance(trials: readonly TrialResult[], rng: () => number): FacetConcordance {
   const facets = CONCORDANCE_INSTRUMENTS.map((id) => fitFacet(trials, id, rng));
   const included = facets.filter(
-    (f): f is FacetPeak & { peakCm360: number; spreadLn: number } =>
-      !f.laneConditioned && f.peakCm360 !== undefined && f.spreadLn !== undefined,
+    (f): f is FacetPeak & { peakCounts: number; spreadLn: number } =>
+      !f.laneConditioned && f.peakCounts !== undefined && f.spreadLn !== undefined,
   );
   if (included.length < 2) return { facets }; // inconclusive - cannot compare fewer than two views
   let zMax = 0;
   for (let i = 0; i < included.length; i++) {
     for (let j = i + 1; j < included.length; j++) {
-      const sep = Math.abs(Math.log(included[i].peakCm360) - Math.log(included[j].peakCm360));
+      const sep = Math.abs(Math.log(included[i].peakCounts) - Math.log(included[j].peakCounts));
       const comb = Math.hypot(included[i].spreadLn, included[j].spreadLn) || MIN_FACET_SPREAD_LN;
       zMax = Math.max(zMax, sep / comb);
     }

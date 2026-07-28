@@ -1,4 +1,5 @@
 import type { GameId, PersistedPrefs, Result, Session, Storage } from '../types';
+import { countsBounds } from '../types';
 import { GAME_YAW } from '../convert/yaw-table';
 
 /** The known game ids, so a remembered currentGame is validated against the real table (not just
@@ -25,7 +26,6 @@ function validPrefs(p: unknown): PersistedPrefs | null {
   if (!p || typeof p !== 'object') return null;
   const c = p as Partial<PersistedPrefs>;
   const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-  if (!finite(c.dpi) || c.dpi <= 0) return null;
   if (!finite(c.currentSens) || c.currentSens <= 0) return null;
   if (!finite(c.speedAccuracy) || c.speedAccuracy < 0 || c.speedAccuracy > 1) return null;
   // Must be a REAL game id, not merely a non-empty string: a stale-schema or hand-edited id would
@@ -37,11 +37,10 @@ function validPrefs(p: unknown): PersistedPrefs | null {
   if (!finite(lo) || !finite(hi) || !(lo > 0) || !(hi > lo)) return null;
   if (c.lastSessionId !== undefined && typeof c.lastSessionId !== 'string') return null;
   return {
-    dpi: c.dpi,
     currentGame: c.currentGame as GameId,
     currentSens: c.currentSens,
     speedAccuracy: c.speedAccuracy,
-    bounds: [lo, hi],
+    bounds: countsBounds(lo, hi),
     ...(c.lastSessionId !== undefined ? { lastSessionId: c.lastSessionId } : {}),
   };
 }

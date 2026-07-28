@@ -18,7 +18,7 @@ function sweepOpts(over: Partial<Parameters<typeof createSweepView>[1]> = {}): P
     onLockFailed: () => {}, onManual: () => {}, onBack: () => {}, ...over };
 }
 function spinOpts(over: Partial<Parameters<typeof createSpinView>[1]> = {}): Parameters<typeof createSpinView>[1] {
-  return { dpi: 800, reducedMotion: false, onSeed: () => {}, onManual: () => {}, onBack: () => {}, ...over };
+  return { reducedMotion: false, onSeed: () => {}, onManual: () => {}, onBack: () => {}, ...over };
 }
 
 describe.each([

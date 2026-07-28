@@ -1,43 +1,43 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { range, announceCm360, stepLabel, type RangeDeps } from '../../src/ui/range';
+import { range, announceCounts, stepLabel, type RangeDeps } from '../../src/ui/range';
 import type { ArenaStage } from '../../src/ui/arena-stage';
 import type { AppContext, Route, SessionDraft } from '../../src/ui/shell';
+import { counts360, countsBounds } from '../../src/types';
 import type { Result } from '../../src/types';
 
 const MEASURED: Result = {
-  optimalCm360: 32.4, ci90: [29.1, 36.0],
-  perGameSens: { cs2: 1.59, valorant: 0.5, apex: 1.59, ow2: 5.3, cod: 5.3, fortnite: 6.3, r6: 6.1, pubg: 15.7 },
-  breakdown: { biasZeroCm360: 31.0, precisionFloorDeg: 0.42, ttkMs: 511, hitRate: 0.86, trackContribZ: 0.6, flickContribZ: -0.3 },
-  curve: [{ x: Math.log(20), mean: 0.2 }, { x: Math.log(32.4), mean: 0.9 }],
-  bounds: [15, 60],
+  optimalCounts: counts360(8240), ci90: countsBounds(7400, 9150),
+  breakdown: { biasZeroCounts: counts360(7900), precisionFloorDeg: 0.42, ttkMs: 511, hitRate: 0.86, trackContribZ: 0.6, flickContribZ: -0.3 },
+  curve: [{ x: Math.log(6000), mean: 0.2 }, { x: Math.log(8240), mean: 0.9 }],
+  bounds: countsBounds(4800, 19200),
 };
 
-/** A stage that records the cm/360 it was handed and never touches WebGL. */
-function fakeStage(): { stage: ArenaStage; setCm360: ReturnType<typeof vi.fn> } {
-  const setCm360 = vi.fn();
+/** A stage that records the count total it was handed and never touches WebGL. */
+function fakeStage(): { stage: ArenaStage; setCounts: ReturnType<typeof vi.fn> } {
+  const setCounts = vi.fn();
   const stage = {
     arena: {
       onFire: vi.fn(() => () => undefined), onFrame: vi.fn(() => () => undefined),
       view: () => [0, 0], spawnTarget: vi.fn(), removeTarget: vi.fn(),
     } as unknown as ArenaStage['arena'],
     requestLock: vi.fn(() => Promise.resolve('raw')), exitLock: vi.fn(),
-    isLocked: () => false, setCm360, setEnemyEnvironment: vi.fn(),
+    isLocked: () => false, setCounts, setEnemyEnvironment: vi.fn(),
     ready: Promise.resolve(), dispose: vi.fn(),
   } as unknown as ArenaStage;
-  return { stage, setCm360 };
+  return { stage, setCounts };
 }
 
 function mountRange(): {
-  root: HTMLElement; host: HTMLElement; nav: Route[]; setCm360: ReturnType<typeof vi.fn>;
+  root: HTMLElement; host: HTMLElement; nav: Route[]; setCounts: ReturnType<typeof vi.fn>;
   saved: Record<string, Result>; unmount(): void;
 } {
-  const { stage, setCm360 } = fakeStage();
+  const { stage, setCounts } = fakeStage();
   const deps: RangeDeps = { createStage: () => stage };
   const nav: Route[] = [];
   const saved: Record<string, Result> = {};
   const draft: SessionDraft = {
-    dpi: 800, currentGame: 'cs2', currentSens: 1, bounds: [15, 60],
+    currentGame: 'cs2', currentSens: 1, bounds: countsBounds(4800, 19200),
     profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
   };
   const ctx = {
@@ -56,7 +56,7 @@ function mountRange(): {
   const screen = range(host, ctx, deps);
   screen.mount();
   return {
-    root: host.querySelector('.range') as HTMLElement, host, nav, setCm360, saved,
+    root: host.querySelector('.range') as HTMLElement, host, nav, setCounts, saved,
     unmount() { screen.unmount(); host.remove(); },
   };
 }
@@ -64,26 +64,26 @@ function mountRange(): {
 const $ = (root: HTMLElement, name: string): HTMLElement => root.querySelector(`[data-range="${name}"]`) as HTMLElement;
 
 describe('range: the nudge controls say what they actually do', () => {
-  it('names the step buttons by the unit they move, cm/360, and never by an inverted "sensitivity"', () => {
-    // A higher cm/360 is a LOWER sensitivity, so "+ increases sensitivity" told a screen-reader
+  it('names the step buttons by the unit they move, counts per 360, and never by an inverted "sensitivity"', () => {
+    // A higher count total is a LOWER sensitivity, so "+ increases sensitivity" told a screen-reader
     // user the inverse of what the button does. The name has to track the number that moves.
     const { root, unmount } = mountRange();
     const up = $(root, 'up').getAttribute('aria-label')!;
     const down = $(root, 'down').getAttribute('aria-label')!;
 
-    expect(up).toBe('Increase cm/360 by 0.5, a lower sensitivity');
-    expect(down).toBe('Decrease cm/360 by 0.5, a higher sensitivity');
+    expect(up).toBe('Increase counts per 360 by 150, a lower sensitivity');
+    expect(down).toBe('Decrease counts per 360 by 150, a higher sensitivity');
     expect(up).not.toMatch(/increase sensitivity/i);
     expect(down).not.toMatch(/decrease sensitivity/i);
     unmount();
   });
 
-  it('the "+" button raises cm/360 and the "−" button lowers it, matching those names', () => {
-    const { root, setCm360, unmount } = mountRange();
+  it('the "+" button raises the count total and the "−" button lowers it, matching those names', () => {
+    const { root, setCounts, unmount } = mountRange();
     $(root, 'up').dispatchEvent(new MouseEvent('click'));
-    expect(setCm360).toHaveBeenLastCalledWith(32.9);
+    expect(setCounts).toHaveBeenLastCalledWith(8390);
     $(root, 'down').dispatchEvent(new MouseEvent('click'));
-    expect(setCm360).toHaveBeenLastCalledWith(32.4);
+    expect(setCounts).toHaveBeenLastCalledWith(8240);
     unmount();
   });
 
@@ -106,8 +106,8 @@ describe('range: the nudge controls say what they actually do', () => {
   });
 
   it('labels stepLabel off the same constant the nudge uses', () => {
-    expect(stepLabel(1)).toContain('0.5');
-    expect(stepLabel(-1)).toContain('0.5');
+    expect(stepLabel(1)).toContain('150');
+    expect(stepLabel(-1)).toContain('150');
   });
 });
 
@@ -121,26 +121,26 @@ describe('range: the live readout is spoken', () => {
 
     const announce = $(root, 'announce');
     expect(announce.classList.contains('sr-only')).toBe(true);
-    expect(announce.textContent).toBe('32.4 centimetres per 360. This is your measured value.');
+    expect(announce.textContent).toBe('8,240 counts per 360. This is your measured value.');
     unmount();
   });
 
   it('re-announces after a nudge, naming the distance from the measured number', () => {
     const { root, unmount } = mountRange();
     $(root, 'up').dispatchEvent(new MouseEvent('click'));
-    expect($(root, 'announce').textContent).toBe('32.9 centimetres per 360, 0.5 above your measured 32.4.');
+    expect($(root, 'announce').textContent).toBe('8,390 counts per 360, 150 above your measured 8,240.');
     $(root, 'down').dispatchEvent(new MouseEvent('click'));
     $(root, 'down').dispatchEvent(new MouseEvent('click'));
-    expect($(root, 'announce').textContent).toBe('31.9 centimetres per 360, 0.5 below your measured 32.4.');
+    expect($(root, 'announce').textContent).toBe('8,090 counts per 360, 150 below your measured 8,240.');
     unmount();
   });
 
   it('stays silent when a nudge clamps at a bound and the number does not move', () => {
     const { root, unmount } = mountRange();
-    // Walk down to the lower bound (15.0 with these draft bounds), then keep pressing.
+    // Walk down to the lower bound (4,800 with these draft bounds), then keep pressing.
     for (let i = 0; i < 40; i += 1) $(root, 'down').dispatchEvent(new MouseEvent('click'));
     const atBound = $(root, 'announce').textContent;
-    expect($(root, 'cm360').textContent).toBe('15.0');
+    expect($(root, 'counts').textContent).toBe('4,800');
 
     // A rewrite of a live region is what triggers an announcement, so watch for the mutation
     // itself: an identical string written again would still be read out.
@@ -155,13 +155,13 @@ describe('range: the live readout is spoken', () => {
   });
 
   it('spells the unit out, so nothing reads a slash aloud', () => {
-    expect(announceCm360(32.4, 32.4)).toContain('centimetres per 360');
-    expect(announceCm360(20, 32.4)).not.toContain('cm/360');
+    expect(announceCounts(8240, 8240)).toContain('counts per 360');
+    expect(announceCounts(5000, 8240)).not.toContain('cm/360');
   });
 
   it('reports the measured value as measured only inside the display rounding', () => {
-    expect(announceCm360(32.42, 32.4)).toContain('your measured value');
-    expect(announceCm360(32.5, 32.4)).toContain('0.1 above');
+    expect(announceCounts(8240.4, 8240)).toContain('your measured value');
+    expect(announceCounts(8270, 8240)).toContain('30 above');
   });
 });
 

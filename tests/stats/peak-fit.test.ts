@@ -17,7 +17,7 @@ describe('parabolic peak fit', () => {
   });
 
   it('recovers the optimal cm/360 ≈ 35', () => {
-    expect(fitPeak(obs).optimalCm360).toBeCloseTo(35, 1);
+    expect(fitPeak(obs).optimalCounts).toBeCloseTo(35, 1);
   });
 
   it('returns a curve for plotting', () => {
@@ -52,14 +52,14 @@ describe('ANCOVA drift fit (A4)', () => {
   it('recovers the true peak and the injected drift coefficient exactly (noise-free)', () => {
     const fit = fitPeakDrift(drifted(0.8));
     expect(fit).not.toBeNull();
-    expect(fit!.optimalCm360).toBeCloseTo(35, 3);
+    expect(fit!.optimalCounts).toBeCloseTo(35, 3);
     expect(fit!.driftZ).toBeCloseTo(0.8, 6);
   });
 
   it('the extended peak is closer to truth than the plain fit under injected drift (bias removed)', () => {
     const obs = drifted(0.8);
-    const plain = fitPeak(obs).optimalCm360;
-    const ext = fitPeakDrift(obs)!.optimalCm360;
+    const plain = fitPeak(obs).optimalCounts;
+    const ext = fitPeakDrift(obs)!.optimalCounts;
     expect(Math.abs(plain - 35)).toBeGreaterThan(1); // the drift genuinely biases the plain peak
     expect(Math.abs(ext - 35)).toBeLessThan(Math.abs(plain - 35));
   });

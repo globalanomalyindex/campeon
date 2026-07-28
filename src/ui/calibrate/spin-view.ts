@@ -7,13 +7,19 @@
 // helper. Runtime-verified, not unit-tested.
 import { createPointerLock } from '../../input/pointer-lock';
 import { SpinSeedAccumulator } from '../../input/dpi-sweep';
-import { degPerCountFor, cm360FromTurnCounts } from '../../convert/turn-rate';
 import { hex, rgba } from '../../palette';
-import type { Cm360 } from '../../types';
+import { counts360 } from '../../types';
+import type { Counts360 } from '../../types';
+
+/** The dial's rendered gain. In count space the seed IS the swept count total, so there is no DPI
+ *  and no 2.54 in the mapping any more: one 360 spans PROVISIONAL_COUNTS counts. Quarantined here
+ *  rather than added to convert/counts.ts because the whole dial is the defect phase 2 removes (it
+ *  measures its own constant), and nothing new should be able to import it. */
+const degPerCountForSpin = (counts: number): number => 360 / counts;
 
 export interface SpinView { dispose(): void; }
 
-const PROVISIONAL_CM360 = 30; // visual dial rate only; NOT the measured seed
+const PROVISIONAL_COUNTS = 9450; // visual dial rate only; NOT the measured seed
 const TAP_MS = 220;           // press shorter than this (with little movement) = a tap (done)
 const TAP_MOVE_MAX = 40;      // counts of movement during a press still considered "still" (a tap)
 const MIN_DONE_DEG = 270;     // must have swept >= this (at the provisional rate) for a tap to complete
@@ -23,9 +29,8 @@ const LEAD_START = 'This step measures one full turn. Click the box to begin.';
 export function createSpinView(
   host: HTMLElement,
   opts: {
-    dpi: number;
     reducedMotion: boolean;
-    onSeed: (cm360: Cm360) => void;
+    onSeed: (counts: Counts360) => void;
     /** The typed fallback, chosen deliberately. */
     onManual: () => void;
     /** Leave the guided flow entirely. Every step owes the visitor a way out. */
@@ -56,7 +61,7 @@ export function createSpinView(
   const canvas = $('canvas') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d');
   const pointer = createPointerLock(canvas);
-  const degPerCount = degPerCountFor(PROVISIONAL_CM360, opts.dpi);
+  const degPerCount = degPerCountForSpin(PROVISIONAL_COUNTS);
 
   const acc = new SpinSeedAccumulator(); // path-length seed + signed swept (dial visual only)
   let paused = false;        // counting suspended (set on mousedown until classified)
@@ -146,7 +151,7 @@ export function createSpinView(
       // Seed from horizontal PATH-LENGTH (sum of |dx|), not the signed sum: unheld wobble cancels in
       // a signed sum and under-counts the turn, biasing the seed fast. The seed flows ONLY into
       // boundsFromSeed (a guess to search around, not the answer).
-      const seed = cm360FromTurnCounts(acc.pathLength(), opts.dpi);
+      const seed = counts360(acc.pathLength());
       // Prescribe-not-readout: name the seed as a starting point, never a measured result.
       $('seed').textContent = `The search starts near ${seed.toFixed(1)} cm/360 and hunts from there.`;
       opts.onSeed(seed);
@@ -175,7 +180,7 @@ export function createSpinView(
 
   const onLock = (): void => updateUi();
   // A denied lock used to be a silent no-op, which left the spin unusable with nothing said. Say it,
-  // in the live region, and point at the typed route rather than discarding the measured dpi.
+  // in the live region, and point at the typed route.
   const onCanvasClick = (): void => {
     if (pointer.isLocked()) return;
     void pointer.request().catch(() => {

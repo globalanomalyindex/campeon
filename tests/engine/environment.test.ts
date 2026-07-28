@@ -127,7 +127,7 @@ describe('createWarmEnvTexture', () => {
       string,
       unknown
     >;
-    const banned = ['bearing', 'radiusDeg', 'cm360', 'sample', 'score', 'observation', 'view'];
+    const banned = ['bearing', 'radiusDeg', 'counts', 'sample', 'score', 'observation', 'view'];
     for (const k of banned) {
       expect(mod[k], `module.${k} must not exist`).toBeUndefined();
     }

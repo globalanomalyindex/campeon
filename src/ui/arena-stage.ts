@@ -7,7 +7,7 @@ import { mulberry32 } from '../stats/rng';
 import { createViewmodel3D, asViewmodelLayer } from './viewmodel/viewmodel-3d';
 import { createEnemyLayer, type EnemyLayerHandle } from './enemy/enemy-layer';
 import { createShotFeedback } from './feedback';
-import type { InstrumentId } from '../types';
+import type { Counts360, InstrumentId } from '../types';
 
 export interface ArenaStage {
   readonly arena: Arena;
@@ -17,8 +17,8 @@ export interface ArenaStage {
   exitLock(): void;
   /** Live pointer-lock state - relock affordances need to tell a shot-click from a lock-click. */
   isLocked(): boolean;
-  /** Live sensitivity change (range nudge) → arena.setSensitivity at the fixed dpi. */
-  setCm360(cm360: number): void;
+  /** Live sensitivity change (range nudge) → arena.setSensitivity */
+  setCounts(counts: Counts360): void;
   /** Skin subsequent target spawns with an environment's prey sheet (null-safe if not yet loaded). */
   setEnemyEnvironment(id: InstrumentId): void;
   /** Resolves once the async viewmodel + enemy layers have attached. */
@@ -37,15 +37,14 @@ export function createArenaStage(
   host: HTMLElement,
   opts: {
     canvas: HTMLCanvasElement;
-    cm360: number;
-    dpi: number;
+    counts: Counts360;
     reducedMotion: boolean;
     rngSeed?: number;
     /** Post-FX look: 'film' (cinematic, default) or 'retro' (the PS1 PSX pass). */
     postMode?: 'film' | 'retro';
   },
 ): ArenaStage {
-  const { canvas, cm360, dpi, reducedMotion } = opts;
+  const { canvas, counts, reducedMotion } = opts;
   const postMode = opts.postMode ?? 'film';
   let alive = true;
   let enemies: EnemyLayerHandle | null = null;
@@ -64,7 +63,7 @@ export function createArenaStage(
       : createFilmPass(renderer, size, { reducedMotion });
   const pointer = createPointerLock(canvas);
   const input: InputSource = { onSample: (cb) => pointer.onSample(cb), onFire: (cb) => pointer.onFire(cb) };
-  const arena = new Arena({ renderer, input, size, cm360, dpi, rng: mulberry32(opts.rngSeed ?? 7), postProcessor: post });
+  const arena = new Arena({ renderer, input, size, counts, rng: mulberry32(opts.rngSeed ?? 7), postProcessor: post });
 
   // The in-scene 3D revolver attaches through the arena's viewmodel seam (mirrors attachEnemies):
   // the arena drives its look/fire/tick from the rig camera + fire events, so its recoil/sway springs
@@ -103,7 +102,7 @@ export function createArenaStage(
     requestLock: () => pointer.request(),
     exitLock: () => pointer.exit(),
     isLocked: () => pointer.isLocked(),
-    setCm360: (next) => arena.setSensitivity(next, dpi),
+    setCounts: (next) => arena.setSensitivity(next),
     setEnemyEnvironment: (id) => enemies?.setEnvironment(id),
     ready,
     dispose() {

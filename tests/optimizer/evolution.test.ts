@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { countsBounds } from '../../src/types';
+import type { Counts360 } from '../../src/types';
 import { makeEvolution, vertexInfoScreen } from '../../src/optimizer/evolution';
 import { mulberry32 } from '../../src/stats/rng';
 import type { Observation, SearchEngine } from '../../src/types';
 
-const bounds: [number, number] = [15, 60];
+const bounds: [Counts360, Counts360] = countsBounds(15, 60);
 const loX = Math.log(bounds[0]);
 const hiX = Math.log(bounds[1]);
 

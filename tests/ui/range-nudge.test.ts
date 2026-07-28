@@ -1,17 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { nudgeCm360 } from '../../src/ui/range-nudge';
+import { nudgeCounts } from '../../src/ui/range-nudge';
+import { counts360, countsBounds } from '../../src/types';
 
-describe('nudgeCm360', () => {
-  const bounds: [number, number] = [15, 60];
+describe('nudgeCounts', () => {
+  const bounds = countsBounds(4800, 19200);
   it('applies a positive and negative step', () => {
-    expect(nudgeCm360(30, 0.5, bounds)).toBeCloseTo(30.5);
-    expect(nudgeCm360(30, -0.5, bounds)).toBeCloseTo(29.5);
+    expect(nudgeCounts(counts360(9000), 150, bounds)).toBeCloseTo(9150);
+    expect(nudgeCounts(counts360(9000), -150, bounds)).toBeCloseTo(8850);
   });
   it('clamps to the upper and lower bound, never inverts', () => {
-    expect(nudgeCm360(59.8, 0.5, bounds)).toBe(60);
-    expect(nudgeCm360(15.2, -0.5, bounds)).toBe(15);
+    expect(nudgeCounts(counts360(19100), 150, bounds)).toBe(19200);
+    expect(nudgeCounts(counts360(4900), -150, bounds)).toBe(4800);
   });
   it('honors a fine step', () => {
-    expect(nudgeCm360(30, 0.1, bounds)).toBeCloseTo(30.1);
+    expect(nudgeCounts(counts360(9000), 30, bounds)).toBeCloseTo(9030);
   });
 });

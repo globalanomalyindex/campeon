@@ -1,5 +1,5 @@
 import { rememberPrefs, type AppContext, type Screen } from './shell';
-import type { FacetConcordance, GameId, Result } from '../types';
+import type { Counts360, FacetConcordance, GameId, Result } from '../types';
 import { GAME_YAW } from '../convert/yaw-table';
 import { buildExportBundle, toJson, triggerDownload } from '../state/export';
 import { plotGeometry, plotLegendHtml, renderConvergencePlot } from './convergence-plot';
@@ -33,14 +33,14 @@ const driftNote = (v: number | undefined): string =>
 function thesisHtml(fc: FacetConcordance): string {
   const rows = fc.facets
     .map((f) => {
-      const peak = f.peakCm360 !== undefined && Number.isFinite(f.peakCm360) ? f.peakCm360.toFixed(1) : '-';
+      const peak = f.peakCounts !== undefined && Number.isFinite(f.peakCounts) ? f.peakCounts.toFixed(1) : '-';
       return `<span class="result__thesis-facet" data-thesis-facet="${f.instrument}"><span class="dot dot--${f.instrument}"></span> ${f.instrument} ${peak}${f.laneConditioned ? '<sup>*</sup>' : ''}</span>`;
     })
     .join(' · ');
-  const starred = fc.facets.some((f) => f.laneConditioned && f.peakCm360 !== undefined);
+  const starred = fc.facets.some((f) => f.laneConditioned && f.peakCounts !== undefined);
   return `<div class="result__thesis" data-result="thesis" data-thesis-tier="${fc.tier ?? 'inconclusive'}">
     <p class="result__thesis-line">${fc.tier ? THESIS_COPY[fc.tier] : THESIS_INCONCLUSIVE}</p>
-    <p class="result__thesis-facets mono">each probe's own peak (cm/360, marked ◆ on the plot): ${rows}</p>
+    <p class="result__thesis-facets mono">each probe's own peak (counts per 360, marked ◆ on the plot): ${rows}</p>
     ${starred ? `<p class="result__thesis-note"><sup>*</sup>Strike encodes the speed and accuracy lean you chose. It is shown here and excluded from the verdict.</p>` : ''}
   </div>`;
 }
@@ -48,12 +48,14 @@ function thesisHtml(fc: FacetConcordance): string {
 // A single screen-reader summary sentence rendered ONCE near the number (not a live region - the
 // result is static). The CI range is spelled " to " so no en-dash glyph is ever voiced; a tuned-by-feel
 // value carries NO measured-CI claim (honesty), so it is announced as tuned without a band.
-const srSummary = (r: Result, tuned: boolean, bounded?: 'low' | 'high'): string =>
+const srSummary = (r: Result, tuned: boolean, bounded?: 'low' | 'high', ci?: readonly [Counts360, Counts360]): string =>
   tuned
-    ? `Your sensitivity, tuned by feel: ${fmt(r.optimalCm360)} centimetres per 360. It carries no measured interval.`
+    ? `Your sensitivity, tuned by feel: ${fmt(r.optimalCounts)} counts per 360. It carries no measured interval.`
     : bounded
-      ? `Your number reads as ${bounded === 'high' ? 'at least' : 'at most'} ${fmt(r.optimalCm360)} centimetres per 360. The fitted curve peaks past the ${bounded === 'high' ? 'slow' : 'fast'} edge of the searched window, so the edge is a bound and no measured interval is reported.`
-      : `Your most-evolved sensitivity is ${fmt(r.optimalCm360)} centimetres per 360, with a 90% confidence interval from ${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}.`;
+      ? `Your number reads as ${bounded === 'high' ? 'at least' : 'at most'} ${fmt(r.optimalCounts)} counts per 360. The fitted curve peaks past the ${bounded === 'high' ? 'slow' : 'fast'} edge of the searched window, so the edge is a bound and no measured interval is reported.`
+      : ci
+        ? `Your most-evolved sensitivity is ${fmt(r.optimalCounts)} counts per 360, with a 90% confidence interval from ${fmt(ci[0])} to ${fmt(ci[1])}.`
+        : `Your most-evolved sensitivity is ${fmt(r.optimalCounts)} counts per 360. No measured interval was recorded with it.`;
 
 // Fixed viewBox: clientWidth is 0 before layout, so the geometry must use a constant design size.
 const PLOT_SIZE = { width: 360, height: 200 };
@@ -80,18 +82,18 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       // CI concord: a measured-only readout (gated !tuned - a hand-picked value has no measured CI/concord).
       // undefined for a degenerate/old CI so nothing is fabricated. Also gated !bounded: a clamped band's
       // width describes where the clamp cut it, so a width bucket would dress the truncation as a reading.
-      const concord = !tuned && !bounded ? ciConcord(r.optimalCm360, r.ci90) : undefined;
+      // `Result.ci90` is optional now: adoptResult drops it, because a value the player tuned by
+      // feel carries no measured interval (and the old code carried one into localStorage and the
+      // export, where this screen's gate could not reach it). Every read below was ALREADY gated on
+      // !tuned && !bounded at runtime; this binding is what lets the compiler see that gate, so it
+      // is undefined in exactly the cases the screen already refused to print a band in.
+      const ci = !tuned && !bounded ? r.ci90 : undefined;
+      const concord = ci ? ciConcord(r.optimalCounts, ci) : undefined;
       // The strike lean comes from the user's real taste knob (carried as r.speedAccuracy); OLD results lack
       // it (number-only), and it is the only facet that encodes a chosen lean rather than pure skill.
       const lean = r.speedAccuracy;
       const root = document.createElement('section');
       root.className = 'screen screen--shell result fade-in';
-      const rows = GAME_YAW.map((g) => {
-        const sens = r.perGameSens[g.id as GameId];
-        const current = g.id === ctx.draft.currentGame;
-        return `<tr data-game="${g.id}"${current ? ' data-current="true"' : ''}>
-          <td>${g.label}</td><td class="mono">${sens === undefined ? '-' : sens.toFixed(3)}</td></tr>`;
-      }).join('');
       // The A5 facet-concordance readout: adoptResult drops it for tuned values and old Results never
       // had it, so its presence is the gate - nothing is fabricated for either.
       const fc = !tuned ? r.facetConcordance : undefined;
@@ -101,13 +103,13 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       root.innerHTML = `
         <div class="wrap stack result__inner">
           <p class="result__lead reveal" data-reveal style="--reveal-i:0">${bounded ? BOUNDED_LEAD : 'Your number'}</p>
-          <h1 class="display result__number reveal" data-reveal style="--reveal-i:1"><span data-result="cm360">${fmt(r.optimalCm360)}</span><small> cm/360</small></h1>
-          <p class="result__sr-summary sr-only">${srSummary(r, tuned, bounded)}</p>
+          <h1 class="display result__number reveal" data-reveal style="--reveal-i:1"><span data-result="counts">${fmt(r.optimalCounts)}</span><small> counts per 360</small></h1>
+          <p class="result__sr-summary sr-only">${srSummary(r, tuned, bounded, ci)}</p>
           ${tuned
             ? `<p class="result__ci result__ci--tuned reveal" data-reveal style="--reveal-i:2">You picked this one by feel, so it carries no measured interval.</p>`
             : bounded
-              ? `<p class="result__ci result__ci--bounded reveal" data-result="bounded" data-bounded="${bounded}" data-reveal style="--reveal-i:2">${BOUNDED_COPY[bounded](fmt(r.optimalCm360))}</p>`
-              : `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% confidence interval <span data-result="ci">${fmt(r.ci90[0])} to ${fmt(r.ci90[1])}</span> cm/360</p>`}
+              ? `<p class="result__ci result__ci--bounded reveal" data-result="bounded" data-bounded="${bounded}" data-reveal style="--reveal-i:2">${BOUNDED_COPY[bounded](fmt(r.optimalCounts))}</p>`
+              : ci ? `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% confidence interval <span data-result="ci">${fmt(ci[0])} to ${fmt(ci[1])}</span> counts per 360</p>` : ''}
           ${concord
             ? `<p class="result__concord reveal" data-result="concord" data-concord="${concord}" data-reveal style="--reveal-i:3">${CONCORD_COPY[concord]}</p>`
             : ''}
@@ -121,7 +123,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
           <div class="result__tier reveal" data-tier="origin" data-reveal style="--reveal-i:6">
             <p class="result__tier-head t-label">Where the number comes from</p>
             <div class="result__breakdown">
-              <div><span class="result__bk-label"><span class="dot dot--calibrate"></span> Bias zero <em>archerfish</em></span><span data-breakdown="biasZeroCm360">${fmt(r.breakdown.biasZeroCm360)} cm/360</span></div>
+              <div><span class="result__bk-label"><span class="dot dot--calibrate"></span> Bias zero <em>archerfish</em></span><span data-breakdown="biasZeroCounts">${fmt(r.breakdown.biasZeroCounts)} counts per 360</span></div>
               ${!tuned
                 ? `<div><span class="result__bk-label">Session drift <em>practice or fatigue</em></span><span data-result="driftZ">${fmtZ(r.driftZ)}</span></div>`
                 : ''}
@@ -148,7 +150,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
           <div class="reveal" data-reveal style="--reveal-i:8">
             <label class="field result__game-pick"><span>Your game</span>
               <select data-action="your-game">${GAME_YAW.map((g) => `<option value="${g.id}"${g.id === ctx.draft.currentGame ? ' selected' : ''}>${g.label}</option>`).join('')}</select></label>
-            <table class="result__games"><thead><tr><th>Game</th><th>Sensitivity</th></tr></thead><tbody>${rows}</tbody></table>
+            <p class="result__saved">A native in-game number needs the factor between the browser's movement deltas and your mouse's own counts. Nothing here has measured that yet, so this screen stops at the count total.</p>
             <p class="result__saved">Saved locally. Nothing leaves your machine.</p>
           </div>
           <div class="result__actions reveal" data-reveal style="--reveal-i:9">
@@ -174,8 +176,6 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       });
       const sel = root.querySelector('[data-action="your-game"]') as HTMLSelectElement | null;
       sel?.addEventListener('change', () => {
-        root.querySelectorAll('tr[data-current="true"]').forEach((tr) => tr.removeAttribute('data-current'));
-        root.querySelector(`tr[data-game="${sel.value}"]`)?.setAttribute('data-current', 'true');
         // The deferred game pick previously never left this screen - now it writes the draft and is
         // remembered, so the next visit highlights the right game without re-asking.
         ctx.draft.currentGame = sel.value as GameId;
@@ -194,7 +194,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
           const trials = ctx.storage.loadSessions().find((s) => s.id === sessionId)?.trials ?? [];
           const g = plotGeometry({
             bounds: r.bounds, marks: marksFromTrials(trials),
-            curve: r.curve, ci90: r.ci90, peak: r.optimalCm360, size: PLOT_SIZE,
+            curve: r.curve, ...(ci ? { ci90: ci } : {}), peak: r.optimalCounts, size: PLOT_SIZE,
             // A5's per-facet peaks ride the top rail of the SAME plot, so the thesis copy below has
             // its visible counterpart: four probes, their own bests, one gold answer line.
             ...(fc ? { facetPeaks: fc.facets } : {}),
@@ -224,7 +224,7 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
             (m) => m.instrument === 'track' || m.instrument === 'flick',
           );
           const g = plotGeometry({
-            bounds: r.bounds, marks: facetMarks, peak: r.optimalCm360, size: FACET_SIZE,
+            bounds: r.bounds, marks: facetMarks, peak: r.optimalCounts, size: FACET_SIZE,
           });
           renderConvergencePlot(svg, g);
         }

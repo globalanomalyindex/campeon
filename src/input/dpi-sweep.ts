@@ -3,7 +3,12 @@
 // catches a mouse whose labeled DPI is wrong). Net horizontal travel is the reference width, so
 // we sum signed dx.
 import { isValidDpi } from './dpi';
-import type { AimSample, Dpi } from '../types';
+import type { AimSample } from '../types';
+/** Local to this module, which computes in a unit the tool no longer uses. `Cm360` and `Dpi` left
+ *  types.ts with the rest of the physical unit chain; these aliases exist so the module still
+ *  compiles until task 5 deletes it, and they are deliberately NOT exported so nothing new can
+ *  depend on them. */
+type Dpi = number;
 
 /** Standard wallet-card width: ISO/IEC 7810 ID-1 long edge (85.60 mm). Used as the sweep anchor. */
 export const CARD_WIDTH_CM = 8.56;

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { counts360 } from '../../src/types';
 import { Color, EquirectangularReflectionMapping, Fog, type Scene } from 'three';
 import type { AimSample, Degrees } from '../../src/types';
 import { Arena } from '../../src/engine/arena';
 import type { RendererLike, InputSource, EnemyLayer } from '../../src/engine/arena';
-import { degreesPerCount } from '../../src/engine/camera-rig';
+import { degreesPerCount } from '../../src/convert/counts';
 import { ENV_INTENSITY, FOG_FAR, FOG_NEAR } from '../../src/engine/environment';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { separation } from '../../src/engine/targets';
@@ -42,8 +43,7 @@ function harness() {
     renderer,
     input,
     size: () => [800, 600],
-    cm360: 34,
-    dpi: 800,
+    counts: counts360(9450),
     rng: mulberry32(1),
   });
   return {
@@ -61,7 +61,7 @@ describe('Arena (headless)', () => {
     const h = harness();
     const seen: Array<[AimSample, [Degrees, Degrees]]> = [];
     h.arena.onAim((s, v) => seen.push([s, v]));
-    const dpc = degreesPerCount(34, 800);
+    const dpc = degreesPerCount(counts360(9450));
     h.send({ t: 0, dx: 10 / dpc, dy: 0 });
     expect(seen).toHaveLength(1);
     expect(seen[0][1][0]).toBeCloseTo(10, 4); // yaw advanced 10°
@@ -98,7 +98,7 @@ describe('Arena (headless)', () => {
     });
     h.send({ t: 0, dx: 500, dy: 0 });
     const lo = yaw;
-    h.arena.setSensitivity(68, 800);
+    h.arena.setSensitivity(counts360(18900)); // double the counts is half the deg/count
     h.send({ t: 1, dx: 500, dy: 0 });
     expect(yaw - lo).toBeCloseTo(lo / 2, 4);
   });
@@ -132,7 +132,7 @@ describe('Arena instrument surface', () => {
 
   it('view() reflects the integrated aim', () => {
     const h = harness();
-    const dpc = degreesPerCount(34, 800);
+    const dpc = degreesPerCount(counts360(9450));
     h.send({ t: 0, dx: 12 / dpc, dy: 0 });
     expect(h.arena.view()[0]).toBeCloseTo(12, 4);
   });

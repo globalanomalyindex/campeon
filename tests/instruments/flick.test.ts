@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { counts360 } from '../../src/types';
 import { analyzeFlick, flick, FLICK_CONDITIONS, type FlickTap } from '../../src/instruments/flick';
 import { planAcclimation } from '../../src/instruments/acclimation';
 import type { FittsCondition, TrialContext } from '../../src/types';
@@ -8,8 +9,7 @@ import { separation } from '../../src/engine/targets';
 import { FakeScene } from './fake-scene';
 
 const ctx = (): TrialContext => ({
-  cm360: 34,
-  dpi: 800,
+  counts: counts360(34),
   rng: mulberry32(9),
   profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
 });
@@ -138,7 +138,7 @@ async function driveProjected(
   const scene = new FakeScene();
   // Same-sensitivity arrival → the minimum acclimation lead-in (1 unscored tap), which this
   // fixture plays out with an exact landing before the scored sequence begins.
-  const c: TrialContext = { ...ctx(), prevCm360: 34, rng: makeRng() };
+  const c: TrialContext = { ...ctx(), prevCounts: counts360(34), rng: makeRng() };
   const lead = planAcclimation(c, 'flick').reaches;
   const order = presentationOrder(makeRng()); // same seed → same shuffle as inside run
   const p = flick.run(c, scene);
@@ -270,7 +270,7 @@ describe('flick.run - A2 seam safety across the ±180 yaw wrap', () => {
     const scene = new FakeScene();
     // Same-sensitivity arrival → the minimum lead-in (1 unscored tap). The scored presents draw
     // their dirs from the SCRIPTED ctx.rng exactly as before (lead geometry is a private stream).
-    const c: TrialContext = { ...ctx(), prevCm360: 34, rng: makeScripted() };
+    const c: TrialContext = { ...ctx(), prevCounts: counts360(34), rng: makeScripted() };
     const lead = planAcclimation(c, 'flick').reaches;
     // Start the free-aim where the (deterministic, private-stream) lead tap will land the view
     // EXACTLY at [175, 0] near the seam - the same base the scored walk always used, so the

@@ -4,7 +4,7 @@ import { fitDrift, fitQuadratic, fitQuadraticDrift, leverageScale } from './peak
 export { mulberry32 } from './rng';
 
 /** Peak cm/360 of a fit, or NaN if the fit is non-concave (no interior maximum → not a valid peak). */
-const peakCm360 = (obs: Observation[]): number => {
+const peakCounts = (obs: Observation[]): number => {
   const { b1, b2 } = fitQuadratic(obs);
   if (b2 >= 0) return NaN;
   return Math.exp(-b1 / (2 * b2));
@@ -104,7 +104,7 @@ export function bootstrapCi(
       x: o.x,
       y: fitted(o.x) + resid[Math.floor(rng() * resid.length)],
     }));
-    const p = peakCm360(resampled);
+    const p = peakCounts(resampled);
     if (Number.isFinite(p) && p > 0) pooledPeaks.push(p);
   }
   const throwIfEmpty = (n: number) => {
@@ -135,7 +135,7 @@ export function bootstrapCi(
         x: o.x,
         y: fitted(o.x) + stdResid[Math.floor(rng() * resid.length)] * sd[j],
       }));
-      const p = peakCm360(resampled);
+      const p = peakCounts(resampled);
       if (Number.isFinite(p) && p > 0) heteroPeaks.push(p);
     }
     throwIfEmpty(pooledPeaks.length + heteroPeaks.length);

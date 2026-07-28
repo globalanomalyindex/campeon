@@ -1,9 +1,8 @@
 import type {
   AimSample,
   ArenaScene,
-  Cm360,
+  Counts360,
   Degrees,
-  Dpi,
   Ms,
   TargetHandle,
   TargetSpec,
@@ -19,7 +18,7 @@ export class FakeScene implements ArenaScene {
   private fireCbs = new Set<(now: Ms) => void>();
   private targets: FakeTarget[] = [];
 
-  setSensitivity(_c: Cm360, _d: Dpi): void {}
+  setSensitivity(_c: Counts360): void {}
   view(): [Degrees, Degrees] {
     return this.view_;
   }

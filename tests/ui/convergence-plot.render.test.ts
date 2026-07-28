@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
+import { counts360, countsBounds } from '../../src/types';
 import { plotGeometry, plotLegendHtml, renderConvergencePlot } from '../../src/ui/convergence-plot';
 
 describe('renderConvergencePlot', () => {
   it('renders a mark per observation and the curve path', () => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const g = plotGeometry({
-      bounds: [15, 60],
+      bounds: countsBounds(15, 60),
       marks: [
-        { cm360: 25, score: 0.1, instrument: 'track' },
-        { cm360: 35, score: 0.3, instrument: 'strike' },
+        { counts: counts360(25), score: 0.1, instrument: 'track' },
+        { counts: counts360(35), score: 0.3, instrument: 'strike' },
       ],
       curve: [{ x: Math.log(20), mean: 0 }, { x: Math.log(40), mean: 0.4 }],
       size: { width: 600, height: 300 },
@@ -22,12 +23,12 @@ describe('renderConvergencePlot', () => {
   it('renders A5 facet-peak diamonds on the top rail, hollow + dashed for the taste-conditioned lane', () => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const g = plotGeometry({
-      bounds: [15, 60],
+      bounds: countsBounds(15, 60),
       marks: [],
       size: { width: 600, height: 300 },
       facetPeaks: [
-        { instrument: 'track', peakCm360: 30, spreadLn: 0.1, laneConditioned: false },
-        { instrument: 'strike', peakCm360: 40, spreadLn: 0.2, laneConditioned: true },
+        { instrument: 'track', peakCounts: counts360(30), spreadLn: 0.1, laneConditioned: false },
+        { instrument: 'strike', peakCounts: counts360(40), spreadLn: 0.2, laneConditioned: true },
       ],
     });
     renderConvergencePlot(svg, g);
@@ -57,8 +58,8 @@ describe('renderConvergencePlot', () => {
   it('renders an optional rotated y-axis label when provided', () => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const g = plotGeometry({
-      bounds: [15, 60],
-      marks: [{ cm360: 25, score: 0.1, instrument: 'track' }],
+      bounds: countsBounds(15, 60),
+      marks: [{ counts: counts360(25), score: 0.1, instrument: 'track' }],
       size: { width: 600, height: 300 },
     });
     renderConvergencePlot(svg, g, 'blended score');

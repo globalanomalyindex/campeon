@@ -100,7 +100,7 @@ export function analyzeFlick(taps: readonly FlickTap[], ctx: TrialContext): Tria
 
   return {
     instrument: ID,
-    cm360: ctx.cm360,
+    counts: ctx.counts,
     score, // bits/s; higher = better. Phase 4 normalizes across the sweep.
     ...(scoreSE !== undefined && scoreSE > 0 ? { scoreSE } : {}),
     raw: {
@@ -121,7 +121,7 @@ const REPS = 3; // repetitions per condition
 export const flick = {
   id: ID,
   run(ctx: TrialContext, scene: ArenaScene): Promise<TrialResult> {
-    scene.setSensitivity(ctx.cm360, ctx.dpi);
+    scene.setSensitivity(ctx.counts);
     // Randomized presentation order (deterministic from ctx.rng).
     const order: FittsCondition[] = [];
     for (let r = 0; r < REPS; r++) for (const c of FLICK_CONDITIONS) order.push(c);

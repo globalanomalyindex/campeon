@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
+import { counts360, countsBounds } from '../../../src/types';
 import { options } from '../../../src/ui/options/options';
 import type { AppContext } from '../../../src/ui/shell';
 import type { PersistedPrefs, Result, Storage } from '../../../src/types';
@@ -17,15 +18,15 @@ function storage(prefs: PersistedPrefs | null): Storage & { saved: PersistedPref
 }
 
 const PREFS: PersistedPrefs = {
-  dpi: 800, currentGame: 'cs2', currentSens: 1, speedAccuracy: 0.5, bounds: [15, 60],
+  currentGame: 'cs2', currentSens: 1, speedAccuracy: 0.5, bounds: countsBounds(4800, 19200),
 };
 
 function ctx(store: Storage = storage(null)): AppContext {
   return {
     navigate: vi.fn(), route: 'options', storage: store,
-    draft: { dpi: 800, currentGame: 'cs2', currentSens: 1,
+    draft: { currentGame: 'cs2', currentSens: 1,
       profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
-      bounds: [15, 60] },
+      bounds: countsBounds(4800, 19200) },
   };
 }
 
@@ -61,16 +62,16 @@ describe('options screen', () => {
     const { host, screen } = mount(c);
     const lo = host.querySelector<HTMLInputElement>('[data-bound="lo"]')!;
     const hi = host.querySelector<HTMLInputElement>('[data-bound="hi"]')!;
-    lo.value = '40'; hi.value = '20';
+    lo.value = '12000'; hi.value = '6000';
     lo.dispatchEvent(new Event('input', { bubbles: true }));
 
-    expect(c.draft.bounds).toEqual([15, 60]);                                  // draft untouched
-    expect(host.querySelector('[data-bounds-out]')!.textContent).toBe('20 to 40'); // preview normalized
+    expect(c.draft.bounds).toEqual([4800, 19200]);                                     // draft untouched
+    expect(host.querySelector('[data-bounds-out]')!.textContent).toBe('6000 to 12000'); // preview normalized
 
     host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
-    expect(c.draft.bounds).toEqual([20, 40]);
-    expect(lo.value).toBe('20');  // inputs snap to the normalized window
-    expect(hi.value).toBe('40');
+    expect(c.draft.bounds).toEqual([6000, 12000]);
+    expect(lo.value).toBe('6000');  // inputs snap to the normalized window
+    expect(hi.value).toBe('12000');
     screen.unmount();
   });
 
@@ -78,12 +79,12 @@ describe('options screen', () => {
     const store = storage(PREFS);
     const c = ctx(store);
     const { host, screen } = mount(c);
-    host.querySelector<HTMLInputElement>('[data-bound="lo"]')!.value = '22';
-    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '44';
+    host.querySelector<HTMLInputElement>('[data-bound="lo"]')!.value = '7000';
+    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '14000';
     host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
 
-    expect(store.saved.at(-1)!.bounds).toEqual([22, 44]);
-    expect(store.loadPrefs!()!.bounds).toEqual([22, 44]);
+    expect(store.saved.at(-1)!.bounds).toEqual([7000, 14000]);
+    expect(store.loadPrefs!()!.bounds).toEqual([7000, 14000]);
     screen.unmount();
   });
 
@@ -97,7 +98,7 @@ describe('options screen', () => {
 
     expect(store.saved).toHaveLength(0);
     expect(store.loadPrefs!()).toBeNull();
-    expect(c.draft.bounds).toEqual([15, 60]);                     // still applied to this visit
+    expect(c.draft.bounds).toEqual([4800, 19200]);                 // still applied to this visit
     screen.unmount();
   });
 
@@ -111,7 +112,7 @@ describe('options screen', () => {
     host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
     const said = host.querySelector('[data-bounds-status]')!.textContent!;
 
-    expect(said).toContain('15 to 60');
+    expect(said).toContain('4800 to 19200');
     expect(said.toLowerCase()).toContain('calibration');
     expect(said.toLowerCase()).toContain('replace');
     expect(said).not.toMatch(/^Saved/);           // nothing was written
@@ -123,11 +124,11 @@ describe('options screen', () => {
   it('a calibrated visitor is told it is saved, and it is', () => {
     const store = storage(PREFS);
     const { host, screen } = mount(ctx(store));
-    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '45';
+    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '14400';
     host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
 
-    expect(host.querySelector('[data-bounds-status]')!.textContent).toBe('Saved. I search 15 to 45 cm/360.');
-    expect(store.loadPrefs!()!.bounds).toEqual([15, 45]);
+    expect(host.querySelector('[data-bounds-status]')!.textContent).toBe('Saved. I search 4800 to 14400 counts per 360.');
+    expect(store.loadPrefs!()!.bounds).toEqual([4800, 14400]);
     screen.unmount();
   });
 
@@ -138,20 +139,25 @@ describe('options screen', () => {
     expect(status.getAttribute('role')).toBe('status');
     expect(status.getAttribute('aria-live')).toBe('polite');
 
-    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '45';
+    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '14400';
     host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
-    expect(status.textContent).toContain('15 to 45');
+    expect(status.textContent).toContain('4800 to 14400');
     screen.unmount();
   });
 
-  it('the game table follows the applied window', () => {
+  it('the window midpoint follows the applied window, and no row emits a sensitivity', () => {
+    // A sensitivity column here would emit a native in-game number from browser counts with the
+    // convention factor assumed to be 1, which nothing on this screen measures. The yaw rows stay
+    // (they are reference constants); the midpoint readout is what tracks the applied window.
     const c = ctx(storage(PREFS));
     const { host, screen } = mount(c);
-    const before = host.querySelector('[data-sens="cs2"]')!.textContent;
-    host.querySelector<HTMLInputElement>('[data-bound="lo"]')!.value = '80';
-    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '120';
+    const before = host.querySelector('[data-mid-sub]')!.textContent;
+    host.querySelector<HTMLInputElement>('[data-bound="lo"]')!.value = '20000';
+    host.querySelector<HTMLInputElement>('[data-bound="hi"]')!.value = '30000';
     host.querySelector<HTMLButtonElement>('[data-action="apply-bounds"]')!.click();
-    expect(host.querySelector('[data-sens="cs2"]')!.textContent).not.toBe(before);
+    expect(host.querySelector('[data-mid-sub]')!.textContent).not.toBe(before);
+    expect(host.querySelectorAll('[data-yaw-row]').length).toBe(8);
+    expect(host.querySelector('[data-sens]')).toBeNull();
     screen.unmount();
   });
 
@@ -164,16 +170,16 @@ describe('options screen', () => {
     const target = host.querySelector<HTMLInputElement>('[data-fov="target"]')!;
     target.value = '120';
     target.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(out.textContent).not.toBe(first);         // a wider target FOV needs a smaller cm/360
+    expect(out.textContent).not.toBe(first);         // a wider target FOV needs a smaller count total
     expect(Number(out.textContent)).toBeLessThan(Number(first));
     screen.unmount();
   });
 
   it('the converter starts from the measured number when there is one', () => {
     const c = ctx();
-    c.lastResult = { sessionId: 's1', result: { optimalCm360: 32.4 } as Result };
+    c.lastResult = { sessionId: 's1', result: { optimalCounts: counts360(8240) } as Result };
     const { host, screen } = mount(c);
-    expect(host.querySelector<HTMLInputElement>('[data-fov="from"]')!.value).toBe('32.4');
+    expect(host.querySelector<HTMLInputElement>('[data-fov="from"]')!.value).toBe('8240');
     screen.unmount();
   });
 

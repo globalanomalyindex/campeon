@@ -177,7 +177,6 @@ describe('shell router: draft', () => {
     const root = document.getElementById('app')!;
     const shell = createShell(root, { screens: { hero: recordingScreen([], 'hero') } as never });
     shell.start();
-    expect(shell.context.draft.dpi).toBeGreaterThan(0);
     expect(shell.context.draft.bounds[0]).toBeLessThan(shell.context.draft.bounds[1]);
     expect(shell.context.draft.profile.speedAccuracy).toBeGreaterThanOrEqual(0);
   });
@@ -185,16 +184,17 @@ describe('shell router: draft', () => {
 
 // ── Phase C: remember-my-calibration (prefs restore + last-result deep links) ──
 
+import { counts360, countsBounds } from '../../src/types';
 import type { PersistedPrefs, Result, Storage } from '../../src/types';
 import { rememberPrefs } from '../../src/ui/shell';
 
 const SAVED_RESULT: Result = {
-  optimalCm360: 32.4, ci90: [29.1, 36.0], perGameSens: { cs2: 1.59 },
-  breakdown: { biasZeroCm360: 31, precisionFloorDeg: 0.42, ttkMs: 511, hitRate: 0.86 },
+  optimalCounts: counts360(8240), ci90: countsBounds(7400, 9150),
+  breakdown: { biasZeroCounts: counts360(7900), precisionFloorDeg: 0.42, ttkMs: 511, hitRate: 0.86 },
 };
 const PREFS: PersistedPrefs = {
-  dpi: 1600, currentGame: 'valorant', currentSens: 0.4,
-  speedAccuracy: 0.7, bounds: [18, 50], lastSessionId: 's-last',
+  currentGame: 'valorant', currentSens: 0.4,
+  speedAccuracy: 0.7, bounds: countsBounds(5670, 15750), lastSessionId: 's-last',
 };
 
 function prefsStorage(prefs: PersistedPrefs | null, results: Record<string, Result> = {}): Storage {
@@ -217,9 +217,8 @@ describe('shell: remembered prefs (Phase C)', () => {
       screens: { hero: recordingScreen([], 'hero') } as never,
     });
     shell.start();
-    expect(shell.context.draft.dpi).toBe(1600);
     expect(shell.context.draft.currentGame).toBe('valorant');
-    expect(shell.context.draft.bounds).toEqual([18, 50]);
+    expect(shell.context.draft.bounds).toEqual([5670, 15750]);
     expect(shell.context.draft.profile.speedAccuracy).toBe(0.7);
     // instrument weights stay the app's own defaults - taste is remembered, weights are not prefs
     expect(shell.context.draft.profile.instrumentWeights.track).toBe(1);
@@ -255,7 +254,6 @@ describe('shell: remembered prefs (Phase C)', () => {
     const bare: Storage = { saveSession() {}, loadSessions: () => [], saveResult() {}, exportJson: () => '{}' };
     const shell = createShell(root, { storage: bare, screens: { hero: recordingScreen([], 'hero') } as never });
     shell.start();
-    expect(shell.context.draft.dpi).toBe(800);
     expect(shell.context.lastResult).toBeUndefined();
   });
 

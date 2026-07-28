@@ -1,4 +1,5 @@
-import type { Cm360, Dpi, GameId, PersistedPrefs, Profile, Result, Session, Storage } from '../types';
+import type { Counts360, GameId, PersistedPrefs, Profile, Result, Session, Storage } from '../types';
+import { countsBounds } from '../types';
 
 export type Route = 'hero' | 'setup' | 'session' | 'result' | 'case-study' | 'options' | 'range';
 
@@ -9,11 +10,10 @@ export interface Screen {
 
 /** Cross-screen, in-memory draft of the session being configured. */
 export interface SessionDraft {
-  dpi: Dpi;
   currentGame: GameId;
   currentSens: number;
   profile: Profile;
-  bounds: [Cm360, Cm360];
+  bounds: [Counts360, Counts360];
 }
 
 export interface AppContext {
@@ -56,11 +56,10 @@ export const ROUTE_NAME: Record<Route, string> = {
 
 function defaultDraft(): SessionDraft {
   return {
-    dpi: 800,
     currentGame: 'cs2',
     currentSens: 1,
     profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
-    bounds: [15, 60],
+    bounds: countsBounds(4800, 19200),
   };
 }
 
@@ -69,7 +68,6 @@ function draftFromPrefs(prefs: PersistedPrefs | null): SessionDraft {
   const d = defaultDraft();
   if (!prefs) return d;
   return {
-    dpi: prefs.dpi,
     currentGame: prefs.currentGame,
     currentSens: prefs.currentSens,
     profile: { ...d.profile, speedAccuracy: prefs.speedAccuracy },
@@ -86,7 +84,6 @@ export function rememberPrefs(ctx: AppContext, lastSessionId?: string): void {
   const prev = ctx.storage.loadPrefs?.() ?? null;
   const pointer = lastSessionId ?? prev?.lastSessionId;
   ctx.storage.savePrefs?.({
-    dpi: ctx.draft.dpi,
     currentGame: ctx.draft.currentGame,
     currentSens: ctx.draft.currentSens,
     speedAccuracy: ctx.draft.profile.speedAccuracy,

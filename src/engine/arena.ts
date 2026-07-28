@@ -11,7 +11,7 @@ import {
   PlaneGeometry,
   Scene,
 } from 'three';
-import type { AimSample, ArenaScene, Cm360, Degrees, Dpi, Ms, TargetHandle, TargetSpec } from '../types';
+import type { AimSample, ArenaScene, Counts360, Degrees, Ms, TargetHandle, TargetSpec } from '../types';
 import { hex } from '../palette';
 import { CameraRig } from './camera-rig';
 import { createWarmEnvTexture, ENV_INTENSITY, FOG_FAR, FOG_NEAR } from './environment';
@@ -78,8 +78,7 @@ export interface ArenaOptions {
   renderer: RendererLike;
   input: InputSource;
   size: () => [number, number];
-  cm360: Cm360;
-  dpi: Dpi;
+  counts: Counts360;
   rng?: () => number;
   /** Optional cosmetic post-processor (e.g. the PSX pass). When present it owns the final draw. */
   postProcessor?: PostProcessor;
@@ -150,7 +149,7 @@ export class Arena implements ArenaScene {
     this.sizeFn = opts.size;
     this.rng = opts.rng ?? Math.random;
     const [w, h] = this.sizeFn();
-    this.rig = new CameraRig(opts.cm360, opts.dpi, w / Math.max(1, h));
+    this.rig = new CameraRig(opts.counts, w / Math.max(1, h));
     this.buildEnvironment();
     this.renderer.setSize(w, h);
     this.unsubInput = opts.input.onSample((sample) => this.handleSample(sample));
@@ -229,8 +228,8 @@ export class Arena implements ArenaScene {
     for (const cb of this.fireCbs) cb(this.nowMs);
   }
 
-  setSensitivity(cm360: Cm360, dpi: Dpi): void {
-    this.rig.setSensitivity(cm360, dpi);
+  setSensitivity(counts: Counts360): void {
+    this.rig.setSensitivity(counts);
   }
 
   /**
@@ -248,7 +247,7 @@ export class Arena implements ArenaScene {
    * exactly: the layer parents its weapon to the rig camera (and adds the camera to the scene so its
    * children render) and only READS view()/fire()/look() to react. It NEVER enters the targets map,
    * never replaces the scored sphere, and never writes a sample/score into the scored stream - so
-   * bearing()/radiusDeg()/cm360 stay byte-identical with or without the weapon.
+   * bearing()/radiusDeg()/counts stay byte-identical with or without the weapon.
    */
   attachViewmodel(vm: ViewmodelLayer): void {
     this.viewmodel = vm;

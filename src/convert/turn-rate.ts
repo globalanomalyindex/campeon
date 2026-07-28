@@ -1,7 +1,12 @@
 // Turn-rate math for the rendered calibration turn. cm/360 is the physical turn distance;
 // the panorama maps mouse counts to view degrees so one full 360 spans exactly that distance.
 import { TURN_CM } from './cm360';
-import type { Cm360, Dpi } from '../types';
+/** Local to this module, which computes in a unit the tool no longer uses. `Cm360` and `Dpi` left
+ *  types.ts with the rest of the physical unit chain; these aliases exist so the module still
+ *  compiles until task 5 deletes it, and they are deliberately NOT exported so nothing new can
+ *  depend on them. */
+type Cm360 = number;
+type Dpi = number;
 
 /** Degrees of view rotation per mouse count, so one 360 spans `cm360` cm at this DPI. Requires cm360 > 0 and dpi > 0. */
 export function degPerCountFor(cm360: Cm360, dpi: Dpi): number {

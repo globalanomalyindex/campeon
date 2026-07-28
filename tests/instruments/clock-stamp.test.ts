@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { counts360 } from '../../src/types';
 import { flick } from '../../src/instruments/flick';
 import { calibrate } from '../../src/instruments/calibrate';
 import { strike } from '../../src/instruments/strike';
@@ -26,8 +27,7 @@ import { FakeScene } from './fake-scene';
  */
 
 const ctx = (): TrialContext => ({
-  cm360: 34,
-  dpi: 800,
+  counts: counts360(34),
   rng: mulberry32(9),
   profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
 });

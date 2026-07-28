@@ -105,7 +105,14 @@ export function leverageScale(obs: readonly Observation[]): number[] {
   });
 }
 
-export interface PeakFit { optimalCm360: number; coeffs: Quadratic; curve: { x: number; mean: number }[]; }
+export interface PeakFit {
+  /** The fitted vertex, exponentiated out of ln space. Deliberately UNBRANDED: a least-squares
+   *  vertex is not yet a count total the tool will report, and the branding happens at the one
+   *  boundary that clamps it into the searched window (session-controller.finalizeReport). */
+  optimalCounts: number;
+  coeffs: Quadratic;
+  curve: { x: number; mean: number }[];
+}
 
 /** Sample the (detrended) quadratic over the observed x range - shared by the plain and drift fits. */
 function sampleCurve(obs: readonly Observation[], q: Quadratic): { x: number; mean: number }[] {
@@ -134,7 +141,7 @@ export function fitPeak(obs: Observation[]): PeakFit {
     );
   }
   const xStar = -coeffs.b1 / (2 * coeffs.b2);
-  return { optimalCm360: Math.exp(xStar), coeffs, curve: sampleCurve(obs, coeffs) };
+  return { optimalCounts: Math.exp(xStar), coeffs, curve: sampleCurve(obs, coeffs) };
 }
 
 /*
@@ -237,5 +244,5 @@ export function fitPeakDrift(obs: readonly Observation[]): DriftPeakFit | null {
   if (c === null) return null;
   const coeffs: Quadratic = { b0: c.b0, b1: c.b1, b2: c.b2 };
   const xStar = -c.b1 / (2 * c.b2);
-  return { optimalCm360: Math.exp(xStar), coeffs, curve: sampleCurve(obs, coeffs), driftZ: c.b3 };
+  return { optimalCounts: Math.exp(xStar), coeffs, curve: sampleCurve(obs, coeffs), driftZ: c.b3 };
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { counts360 } from '../../src/types';
 import { PerspectiveCamera, type Scene } from 'three';
 import { CameraRig, HORIZONTAL_FOV, verticalFovFor } from '../../src/engine/camera-rig';
 import { Arena, type InputSource, type RendererLike, type ViewmodelLayer } from '../../src/engine/arena';
@@ -37,7 +38,7 @@ describe('the arena field of view is a fixed HORIZONTAL fov (window shape cannot
   it('a target at a fixed bearing lands at the same fraction of the window width at every shape', () => {
     // The property: the on-screen geometry of the aiming task is a function of the target's
     // bearing alone. Two visitors on differently shaped windows must be aiming at the same thing.
-    const at = (aspect: number): number => screenX(new CameraRig(34, 800, aspect).camera, 20, 0);
+    const at = (aspect: number): number => screenX(new CameraRig(counts360(9450), aspect).camera, 20, 0);
     const reference = at(ASPECTS[0]!);
     for (const aspect of ASPECTS) expect(at(aspect)).toBeCloseTo(reference, 9);
   });
@@ -46,7 +47,7 @@ describe('the arena field of view is a fixed HORIZONTAL fov (window shape cannot
     // Fitts throughput is computed from angular width, so the width the player sees has to be a
     // function of that angular width and nothing else. Measured across the target's own edges.
     const width = (aspect: number): number => {
-      const { camera } = new CameraRig(34, 800, aspect);
+      const { camera } = new CameraRig(counts360(9450), aspect);
       return screenX(camera, 21.7, 0) - screenX(camera, 18.3, 0);
     };
     const reference = width(ASPECTS[0]!);
@@ -54,7 +55,7 @@ describe('the arena field of view is a fixed HORIZONTAL fov (window shape cannot
   });
 
   it('setAspect keeps the horizontal fov fixed when the window is reshaped', () => {
-    const rig = new CameraRig(34, 800, 4 / 3);
+    const rig = new CameraRig(counts360(9450), 4 / 3);
     const before = screenX(rig.camera, 20, 0);
     rig.setAspect(21 / 9);
     expect(horizontalFovOf(rig.camera)).toBeCloseTo(HORIZONTAL_FOV, 6);
@@ -91,7 +92,7 @@ describe('Arena.resize holds the fov invariant', () => {
     const input: InputSource = { onSample: () => () => {}, onFire: () => () => {} };
     const renderer: RendererLike = { render() {}, setSize() {}, dispose() {} };
     const arena = new Arena({
-      renderer, input, size: () => size, cm360: 34, dpi: 800, rng: mulberry32(1),
+      renderer, input, size: () => size, counts: counts360(9450), rng: mulberry32(1),
     });
     const camera = cameraOf(arena);
     expect(horizontalFovOf(camera)).toBeCloseTo(HORIZONTAL_FOV, 6);

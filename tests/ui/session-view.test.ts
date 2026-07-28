@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
+import { counts360, countsBounds } from '../../src/types';
 import {
   marksFromTrials, instructionFor, searchLabel, announceEstimate, sessionView,
   CURTAIN_LINE, ENV_BEATS, dialedBudget, segmentShape, type SessionViewDeps,
@@ -11,10 +12,10 @@ import type { ArenaStage } from '../../src/ui/arena-stage';
 describe('session-view helpers', () => {
   it('frames the loop as evolution - gene-pool seeding, then numbered generations testing a sensitivity', () => {
     // The thesis ("generations of sensitivities") must be visible: cold-start trials are Generation 0
-    // (the initial gene pool); after that each trial is a numbered generation testing one cm/360.
-    expect(searchLabel(0, 18, 8, 20)).toBe('Gen 0 · seeding the gene pool · trial 1 of 20 · testing 18.0 cm/360');
-    expect(searchLabel(8, 32.37, 8, 20)).toBe('Generation 1 · trial 9 of 20 · testing 32.4 cm/360');
-    expect(searchLabel(11, 30, 8, 20)).toBe('Generation 4 · trial 12 of 20 · testing 30.0 cm/360');
+    // (the initial gene pool); after that each trial is a numbered generation testing one count total.
+    expect(searchLabel(0, 18, 8, 20)).toBe('Gen 0 · seeding the gene pool · trial 1 of 20 · testing 18.0 counts per 360');
+    expect(searchLabel(8, 32.37, 8, 20)).toBe('Generation 1 · trial 9 of 20 · testing 32.4 counts per 360');
+    expect(searchLabel(11, 30, 8, 20)).toBe('Generation 4 · trial 12 of 20 · testing 30.0 counts per 360');
   });
 
   it('always carries a denominator, so the run never reads as open-ended', () => {
@@ -28,14 +29,14 @@ describe('session-view helpers', () => {
     expect(segmentShape(12, 20)).toMatch(/minutes/);
   });
 
-  it('maps trials to plot marks preserving cm360/score/instrument', () => {
+  it('maps trials to plot marks preserving counts/score/instrument', () => {
     const trials: TrialResult[] = [
-      { instrument: 'flick', cm360: 30, score: 0.4, raw: {}, at: 0 },
-      { instrument: 'track', cm360: 42, score: -0.1, raw: {}, at: 0 },
+      { instrument: 'flick', counts: counts360(30), score: 0.4, raw: {}, at: 0 },
+      { instrument: 'track', counts: counts360(42), score: -0.1, raw: {}, at: 0 },
     ];
     expect(marksFromTrials(trials)).toEqual([
-      { cm360: 30, score: 0.4, instrument: 'flick' },
-      { cm360: 42, score: -0.1, instrument: 'track' },
+      { counts: counts360(30), score: 0.4, instrument: 'flick' },
+      { counts: counts360(42), score: -0.1, instrument: 'track' },
     ]);
   });
 
@@ -74,7 +75,7 @@ function fakeStage(denyLock = false): { stage: ArenaStage; requestLock: ReturnTy
   const stage = {
     arena: { clearTargets: vi.fn() } as unknown as ArenaStage['arena'],
     requestLock, exitLock, dispose,
-    setCm360: vi.fn(), setEnemyEnvironment: vi.fn(), isLocked: () => false,
+    setCounts: vi.fn(), setEnemyEnvironment: vi.fn(), isLocked: () => false,
     ready: Promise.resolve(),
   } as unknown as ArenaStage;
   return { stage, requestLock, exitLock, dispose };
@@ -131,9 +132,9 @@ describe('session-view: assistive-tech narration (P4-3)', () => {
   });
 
   it('announces a concise summary using " to " for the range, never an en-dash glyph', () => {
-    expect(announceEstimate({ optimalCm360: 32.4, ci90: [29.1, 36.0] } as Report))
-      .toBe('Dialed in around 32.4 cm/360, 90% CI 29.1 to 36.0');
-    expect(announceEstimate({ optimalCm360: 32.4, ci90: [29.1, 36.0] } as Report)).not.toContain('–');
+    expect(announceEstimate({ optimalCounts: counts360(32.4), ci90: countsBounds(29.1, 36.0) } as Report))
+      .toBe('Dialed in around 32.4 counts per 360, 90% CI 29.1 to 36.0');
+    expect(announceEstimate({ optimalCounts: counts360(32.4), ci90: countsBounds(29.1, 36.0) } as Report)).not.toContain('–');
   });
 });
 
@@ -168,7 +169,7 @@ describe('session-view: pre-lock begin state (P4-2)', () => {
   it('begin is a one-shot: a stacked double-click launches exactly ONE segment (no interleaved ES lineage)', async () => {
     // Two queued clicks inside the async lock window must not start two concurrent segments that
     // share the stateful (1+lambda)-ES engine + trial buffer. The { once:true } listener plus the
-    // runSegment re-entry guard together collapse a double-click to a single launch. cm/360 is never
+    // runSegment re-entry guard together collapse a double-click to a single launch. The count total is never
     // at risk regardless (the gold sphere owns it); this protects the search lineage + live plot.
     const { root, screen, requestLock, runSegment } = mountWithRunningSegment();
     const begin = root.querySelector('[data-prelock="begin"]') as HTMLButtonElement;
@@ -481,12 +482,12 @@ describe('session-view: first-encounter beats + the seed curtain (Phase C)', () 
 
 describe('session-view: dialed-in decision support (Phase C)', () => {
   const REPORT: Report = {
-    optimalCm360: 32.4, ci90: [32.0, 32.6], // tight
+    optimalCounts: counts360(32.4), ci90: countsBounds(32.0, 32.6), // tight
     curve: [{ x: Math.log(20), mean: 0.1 }, { x: Math.log(40), mean: 0.4 }],
   } as Report;
   const TRIALS: TrialResult[] = [
-    { instrument: 'flick', cm360: 30, score: 0.4, raw: {}, at: 0 },
-    { instrument: 'track', cm360: 34, score: 0.5, raw: {}, at: 0 },
+    { instrument: 'flick', counts: counts360(30), score: 0.4, raw: {}, at: 0 },
+    { instrument: 'track', counts: counts360(34), score: 0.5, raw: {}, at: 0 },
   ];
 
   it('the panel shows the CI-concord line (width bucket, honesty copy) and the trial budget', async () => {
@@ -512,7 +513,7 @@ describe('session-view: dialed-in decision support (Phase C)', () => {
     const { root, screen, getResolve } = mountWithRunningSegment();
     (root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
     await flush();
-    getResolve()!({ report: { ...REPORT, ci90: [NaN, NaN] as [number, number] }, trials: TRIALS });
+    getResolve()!({ report: { ...REPORT, ci90: countsBounds(NaN, NaN) }, trials: TRIALS });
     await flush();
     await flush();
     expect((root.querySelector('[data-dialed="concord"]') as HTMLElement).hidden).toBe(true);

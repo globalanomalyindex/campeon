@@ -104,8 +104,8 @@ describe('createShadowBlob', () => {
     expect((b.material as MeshBasicMaterial).opacity).toBe(0);
   });
 
-  it('exposes NO scored API (no bearing/radiusDeg/cm360/sample/score/observation on the mesh)', () => {
-    const banned = ['bearing', 'radiusDeg', 'cm360', 'sample', 'score', 'observation', 'view'];
+  it('exposes NO scored API (no bearing/radiusDeg/counts/sample/score/observation on the mesh)', () => {
+    const banned = ['bearing', 'radiusDeg', 'counts', 'sample', 'score', 'observation', 'view'];
     const blob = createShadowBlob(tex) as unknown as Record<string, unknown>;
     for (const k of banned) {
       expect(blob[k], `blob.${k} must not exist`).toBeUndefined();

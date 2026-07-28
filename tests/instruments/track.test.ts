@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { analyzeTrack, bestLag, lagEstimator, track } from '../../src/instruments/track';
 import type { Frame } from '../../src/instruments/recording';
+import { counts360 } from '../../src/types';
 import type { TrialContext } from '../../src/types';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { FakeScene } from './fake-scene';
 
 const ctx = (): TrialContext => ({
-  cm360: 34,
-  dpi: 800,
+  counts: counts360(34),
   rng: mulberry32(5),
   profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
 });
@@ -83,7 +83,7 @@ describe('analyzeTrack', () => {
     const r = analyzeTrack({ frames: tracking(2), fires: [] }, ctx());
     expect(r.instrument).toBe('track');
     expect(Number.isFinite(r.score)).toBe(true);
-    expect(r.cm360).toBe(34);
+    expect(r.counts).toBe(34);
   });
 });
 
@@ -324,7 +324,7 @@ describe('track.run', () => {
   it('drives a moving target for the trial duration and resolves a scored result', async () => {
     const scene = new FakeScene();
     const p = track.run(ctx(), scene);
-    // No prevCm360 in ctx → the full 2400 ms acclimation lead-in precedes the 6000 ms scored
+    // No prevCounts in ctx → the full 2400 ms acclimation lead-in precedes the 6000 ms scored
     // window, so the script must cover 8400 ms of frames (about 525 ticks at 16 ms).
     for (let i = 0; i < 600; i++) {
       const b: [number, number] = [10 * Math.sin(i * 0.05), 3 * Math.sin(i * 0.04)];

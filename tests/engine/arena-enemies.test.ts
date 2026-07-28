@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { counts360 } from '../../src/types';
 import { PerspectiveCamera, type Object3D, type Scene } from 'three';
 import {
   Arena,
@@ -61,7 +62,7 @@ function harness(attachLayer = false) {
       disposes += 1;
     },
   };
-  const arena = new Arena({ renderer, input, size: () => [800, 600], cm360: 34, dpi: 800, rng: mulberry32(1) });
+  const arena = new Arena({ renderer, input, size: () => [800, 600], counts: counts360(9450), rng: mulberry32(1) });
   const layer = new FakeEnemyLayer();
   if (attachLayer) arena.attachEnemies(layer);
   return {
@@ -78,7 +79,7 @@ const SPEC = { kind: 'static' as const, yaw: 10, pitch: 3, distance: 20, worldRa
 // ── hardened integrity gate ───────────────────────────────────────────────
 //
 // cosmetic-overlay-reads-never-writes (HARD INVARIANT 1 + 2): the hidden gold
-// sphere is the SOLE owner of bearing()/radiusDeg()/cm360; an attached EnemyLayer
+// sphere is the SOLE owner of bearing()/radiusDeg()/counts; an attached EnemyLayer
 // is a cosmetic sibling that only READS the sphere transform + view. To prove that,
 // we drive the SAME scripted session twice - once with a layer attached, once
 // without - feeding identical samples/ticks/fire events in the same order, and
@@ -150,7 +151,7 @@ function scriptedSession(
     },
   };
   const renderer: RendererLike = { render() {}, setSize() {}, dispose() {} };
-  const arena = new Arena({ renderer, input, size: () => [800, 600], cm360: 34, dpi: 800, rng: mulberry32(7) });
+  const arena = new Arena({ renderer, input, size: () => [800, 600], counts: counts360(9450), rng: mulberry32(7) });
   if (layer) arena.attachEnemies(layer);
   if (viewmodel) arena.attachViewmodel(viewmodel);
 
@@ -204,7 +205,7 @@ function scriptedLifecycleSession(spec: TargetSpec, layer?: EnemyLayer): Recordi
     },
   };
   const renderer: RendererLike = { render() {}, setSize() {}, dispose() {} };
-  const arena = new Arena({ renderer, input, size: () => [800, 600], cm360: 34, dpi: 800, rng: mulberry32(11) });
+  const arena = new Arena({ renderer, input, size: () => [800, 600], counts: counts360(9450), rng: mulberry32(11) });
   if (layer) arena.attachEnemies(layer);
 
   let handle = arena.spawnTarget(spec);

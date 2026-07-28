@@ -1,39 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { perGameSens, monitorDistanceMatchCm360, CONVERSION_SCHOOLS } from '../../src/convert/schools';
-
-describe('per-game output (360-distance)', () => {
-  const out = perGameSens(34, 800);
-  it('emits a sens for every game', () => {
-    expect(Object.keys(out).sort()).toEqual(
-      ['apex', 'cod', 'cs2', 'fortnite', 'ow2', 'pubg', 'r6', 'valorant']
-    );
-  });
-  it('matches the spec worked examples', () => {
-    expect(out.valorant).toBeCloseTo(0.480, 2);
-    expect(out.cs2).toBeCloseTo(1.528, 2);
-    expect(out.ow2).toBeCloseTo(5.09, 2);
-    expect(out.fortnite).toBeCloseTo(6.05, 2);
-    expect(out.r6).toBeCloseTo(5.867, 2);
-    expect(out.pubg).toBeCloseTo(15.131, 2);
-  });
-});
+import { monitorDistanceMatchCounts, CONVERSION_SCHOOLS } from '../../src/convert/schools';
+import { counts360 } from '../../src/types';
 
 describe('monitor-distance conversion (FOV-aware)', () => {
   it('is identity when source and target FOV match (any fraction)', () => {
-    expect(monitorDistanceMatchCm360(30, 103, 103, 0.5)).toBeCloseTo(30, 6);
+    expect(monitorDistanceMatchCounts(counts360(30), 103, 103, 0.5)).toBeCloseTo(30, 6);
   });
   it('at fraction → 0 reduces to the focal-length (tangent) ratio tan(src/2)/tan(tgt/2)', () => {
-    // cm360_tgt = cm360_src · θ_src/θ_tgt; as m→0, θ→m·tan(fov/2) ⇒ ratio = tan(src/2)/tan(tgt/2).
+    // counts_tgt = counts_src · θ_src/θ_tgt; as m→0, θ→m·tan(fov/2) ⇒ ratio = tan(src/2)/tan(tgt/2).
     const rad = (d: number): number => (d * Math.PI) / 180;
-    const out = monitorDistanceMatchCm360(30, 90, 106.26, 0.0001);
+    const out = monitorDistanceMatchCounts(counts360(30), 90, 106.26, 0.0001);
     expect(out / 30).toBeCloseTo(Math.tan(rad(45)) / Math.tan(rad(53.13)), 3);
-    expect(monitorDistanceMatchCm360(30, 90, 106.26, 0)).toBeCloseTo(30 * Math.tan(rad(45)) / Math.tan(rad(53.13)), 4);
+    expect(monitorDistanceMatchCounts(counts360(30), 90, 106.26, 0)).toBeCloseTo(30 * Math.tan(rad(45)) / Math.tan(rad(53.13)), 4);
   });
   it('a WIDER target FOV yields a smaller cm/360 (more sensitive); a narrower one, larger', () => {
     // Load-bearing direction (the original formula was inverted): matching the physical flick to a
     // fixed screen point, a wider FOV puts that point more degrees away ⇒ fewer cm/deg ⇒ less cm/360.
-    expect(monitorDistanceMatchCm360(30, 90, 110, 0.5)).toBeLessThan(30);
-    expect(monitorDistanceMatchCm360(30, 90, 70, 0.5)).toBeGreaterThan(30);
+    expect(monitorDistanceMatchCounts(counts360(30), 90, 110, 0.5)).toBeLessThan(30);
+    expect(monitorDistanceMatchCounts(counts360(30), 90, 70, 0.5)).toBeGreaterThan(30);
   });
   it('exposes both schools with 360-distance as the default', () => {
     expect(CONVERSION_SCHOOLS.map((s) => s.id)).toEqual(['360', 'monitor']);

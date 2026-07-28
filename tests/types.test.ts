@@ -1,13 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { counts360, countsBounds } from '../src/types';
-import type { Cm360, Counts360, GameId, TrialResult, YawEntry } from '../src/types';
+import type { Counts360, GameId, TrialResult, YawEntry } from '../src/types';
 
 describe('types', () => {
   it('contract objects are constructible', () => {
-    const cm: Cm360 = 34;
     const game: GameId = 'valorant';
     const yaw: YawEntry = { id: game, label: 'Valorant', yaw: 0.07 };
-    const trial: TrialResult = { instrument: 'track', cm360: cm, score: 0.8, raw: { eLead: 1.2 }, at: 0 };
+    const trial: TrialResult = { instrument: 'track', counts: counts360(8240), score: 0.8, raw: { eLead: 1.2 }, at: 0 };
     expect(yaw.yaw).toBe(0.07);
     expect(trial.instrument).toBe('track');
   });
@@ -20,7 +19,7 @@ describe('Counts360, the branded unit', () => {
   });
 
   it('refuses a bare number where a count total is required', () => {
-    // The defect the brand exists to catch. While the unit was `type Cm360 = number` the compiler
+    // The defect the brand exists to catch. While the unit was `type Counts360 = number` the compiler
     // had no way to tell 34 (centimetres) from 8240 (counts), so a migration that changed the
     // MEANING of the parameter would have compiled everywhere and reported wrong numbers silently.
     // This directive is the assertion: if the brand is ever weakened back to a bare alias, tsc

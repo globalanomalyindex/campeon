@@ -2,12 +2,12 @@
 // mounts the sweep + spin views and writes the session draft. The game pick is deferred to the
 // result; the speed/accuracy goal defaults to balanced. Retires the typed setup + the gate.
 import { rememberPrefs, type AppContext, type Screen } from './shell';
+import { counts360 } from '../types';
 import type { GameId } from '../types';
 import { GAME_YAW, yawFor } from '../convert/yaw-table';
-import { cmPer360 } from '../convert/cm360';
+import { countsForSens } from '../convert/counts';
 import { boundsFromSeed } from './options/settings';
 import { CARD_WIDTH_CM } from '../input/dpi-sweep';
-import { isValidDpi, parseDpi, MIN_DPI, MAX_DPI } from '../input/dpi';
 import { calibrateReducer, initialCalState, type CalState } from './calibrate-flow';
 import { createSweepView, type SweepView } from './calibrate/sweep-view';
 import { createSpinView, type SpinView } from './calibrate/spin-view';
@@ -50,30 +50,29 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     return GAME_YAW.map((g) => `<option value="${g.id}"${g.id === sel ? ' selected' : ''}>${g.label}</option>`).join('');
   }
 
-  function commitGuided(seedCm360: number): void {
-    const dpi = state.dpi;
-    if (dpi !== null) ctx.draft.dpi = dpi;
+  function commitGuided(seedCounts: number): void {
     ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: 0.5 }; // balanced default; tune later on options
-    ctx.draft.bounds = boundsFromSeed(seedCm360); // the spin always supplies a seed
+    ctx.draft.bounds = boundsFromSeed(counts360(seedCounts)); // the spin always supplies a seed
     rememberPrefs(ctx); // a returning visitor never redoes a calibration they already earned
     ctx.navigate('session');
   }
 
-  /** True when this pair can safely reach the arena. A zero or negative dpi divides by zero in
-   *  degreesPerCount, so the boundary is here: nothing invalid enters the draft or localStorage. */
-  function usableNumbers(dpi: number, sens: number): boolean {
-    return isValidDpi(dpi) && Number.isFinite(sens) && sens > 0;
+  /** True when this sensitivity can safely reach the arena. Zero or negative divides by zero in
+   *  `countsForSens`, and the tool no longer asks for a DPI, so this is the whole gate now. */
+  function usableNumbers(sens: number): boolean {
+    return Number.isFinite(sens) && sens > 0;
   }
 
-  /** Returns false and writes nothing when the numbers are unusable, so no caller can poison the
-   *  draft (and, through rememberPrefs, every later visit) with a dpi the arena cannot use. */
-  function commitManual(dpi: number, sens: number, game: GameId, goal: number): boolean {
-    if (!usableNumbers(dpi, sens)) return false;
-    ctx.draft.dpi = dpi;
+  /** Commit the typed route. `countsForSens` is exact rather than estimated: given the game and the
+   *  sensitivity the player is currently using, 360 / (yaw * sens) IS their counts per 360. Returns
+   *  false without committing on an unusable number, so a bad value cannot poison the draft (and,
+   *  through rememberPrefs, every later visit). */
+  function commitManual(sens: number, game: GameId, goal: number): boolean {
+    if (!usableNumbers(sens)) return false;
     ctx.draft.currentSens = sens;
     ctx.draft.currentGame = game;
     ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: goal };
-    ctx.draft.bounds = boundsFromSeed(cmPer360(dpi, sens, yawFor(game)));
+    ctx.draft.bounds = boundsFromSeed(countsForSens(sens, yawFor(game)));
     rememberPrefs(ctx);
     ctx.navigate('session');
     return true;
@@ -94,8 +93,7 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       return;
     }
     if (state.step === 'spin' && state.dpi !== null) {
-      const dpi = state.dpi;
-      view = createSpinView(host, { dpi, reducedMotion: reduced, onSeed: (cm) => commitGuided(cm),
+      view = createSpinView(host, { reducedMotion: reduced, onSeed: (cm) => commitGuided(cm),
         onManual: () => dispatch({ type: 'start-manual' }),
         onBack: () => dispatch({ type: 'back-to-intro' }) });
       host.insertAdjacentHTML('beforeend', calibrationProgress('spin'));
@@ -117,10 +115,10 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       // A stored dpi the arena cannot use is not offered as a fast path: it would route straight to a
       // divide by zero. Recalibrating is the only honest option in that case.
       const stored = ctx.storage.loadPrefs?.() ?? null;
-      const remembered = stored !== null && isValidDpi(stored.dpi) ? stored : null;
+      const remembered = stored;
       const rememberedBlock = remembered
         ? `<div class="setup__remembered" data-remembered>
-            <p class="setup__lead">You've calibrated before. <span class="mono">${remembered.dpi} dpi</span>, searching ${remembered.bounds[0]} to ${remembered.bounds[1]} cm/360.</p>
+            <p class="setup__lead">You've calibrated before. Searching ${remembered.bounds[0]} to ${remembered.bounds[1]} counts per 360.</p>
             <button class="action action--primary" data-action="use-saved">Start from your saved calibration</button>
           </div>`
         : '';
@@ -161,7 +159,6 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     if (state.step === 'manual') return `
       <div class="wrap stack setup__inner">
         <h1 class="display setup__title">Your numbers</h1>
-        <label class="field">Mouse DPI<input class="mono" type="number" min="${MIN_DPI}" max="${MAX_DPI}" step="50" data-field="dpi" value="${ctx.draft.dpi}" aria-describedby="setup-error"></label>
         <label class="field">Current game<select data-field="game">${gameOptions(ctx.draft.currentGame)}</select></label>
         <label class="field">In-game sensitivity<input class="mono" type="number" min="0.01" step="0.01" data-field="sens" value="${ctx.draft.currentSens}" aria-describedby="setup-error"></label>
         <label class="field">Goal, precision to speed<input type="range" min="0" max="1" step="0.01" data-field="goal" value="${ctx.draft.profile.speedAccuracy}"></label>
@@ -180,8 +177,7 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       // Re-apply the remembered prefs to the draft (the shell already merged them at boot, but a
       // mid-session edit may have drifted the draft) and go straight to the hunt.
       const p = ctx.storage.loadPrefs?.();
-      if (!p || !usableNumbers(p.dpi, p.currentSens)) return; // a poisoned pref never reaches the arena
-      ctx.draft.dpi = p.dpi;
+      if (!p || !usableNumbers(p.currentSens)) return; // a poisoned pref never reaches the arena
       ctx.draft.currentGame = p.currentGame;
       ctx.draft.currentSens = p.currentSens;
       ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: p.speedAccuracy };
@@ -204,12 +200,10 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     const begin = root.querySelector('[data-action="manual-begin"]') as HTMLButtonElement | null;
     const errEl = root.querySelector('[data-error]') as HTMLElement | null;
     if (!begin || !errEl) return;
-    const fields = ['dpi', 'sens'] as const;
+    const fields = ['sens'] as const;
     let attempted = false;
 
-    const problem = (): { field: 'dpi' | 'sens'; msg: string } | null => {
-      const dpi = parseDpi(val('dpi'));
-      if (!isValidDpi(dpi)) return { field: 'dpi', msg: `Mouse DPI needs to be a number between ${MIN_DPI} and ${MAX_DPI}. You'll find it in your mouse software.` };
+    const problem = (): { field: 'sens'; msg: string } | null => {
       const sens = Number(val('sens'));
       if (!Number.isFinite(sens) || sens <= 0) return { field: 'sens', msg: 'In-game sensitivity needs to be a number above zero.' };
       return null;
@@ -229,7 +223,7 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       const p = problem();
       show(p);
       if (p !== null) { (root.querySelector(`[data-field="${p.field}"]`) as HTMLElement | null)?.focus(); return; }
-      commitManual(parseDpi(val('dpi')), Number(val('sens')), val('game') as GameId, Number(val('goal')));
+      commitManual(Number(val('sens')), val('game') as GameId, Number(val('goal')));
     });
   }
 

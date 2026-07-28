@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { countsBounds } from '../../src/types';
+import type { Counts360 } from '../../src/types';
 import { normPdf, normCdf, expectedImprovement, ucb } from '../../src/optimizer/bayesopt';
 
 describe('normal helpers', () => {
@@ -43,7 +45,7 @@ describe('ucb', () => {
 import { makeBo } from '../../src/optimizer/bayesopt';
 import type { Observation } from '../../src/types';
 
-const bounds: [number, number] = [15, 60];
+const bounds: [Counts360, Counts360] = countsBounds(15, 60);
 
 describe('makeBo', () => {
   // Observations from a concave objective peaked at ln(32).

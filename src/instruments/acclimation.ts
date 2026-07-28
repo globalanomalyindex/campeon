@@ -30,11 +30,11 @@ import { mulberry32 } from '../stats/rng';
  * seed across the whole search range. The floor is deliberately not zero: every trial opens
  * with a task-onset transient (re-engaging after the between-trial pause) that would otherwise
  * land in the scored set, and one discarded reach absorbs it for every trial equally. With the
- * arrival gain unknown (`ctx.prevCm360` absent) the full budget is spent - an unknown is
+ * arrival gain unknown (`ctx.prevCounts` absent) the full budget is spent - an unknown is
  * treated as a far jump, never a near one.
  *
  * Determinism: lead-in target geometry draws from a PRIVATE rng seeded from the trial's own
- * identity (cm/360, dpi, instrument), never from the shared `ctx.rng` session stream. Drawing
+ * identity (counts per 360, instrument), never from the shared `ctx.rng` session stream. Drawing
  * from the shared stream would shift every scored draw after it, changing target geometry the
  * player would otherwise have seen - which the determinism suite pins.
  */
@@ -65,21 +65,24 @@ export interface AcclimationPlan {
  * Unknown or degenerate arrival → 1 (a far jump, never a near one).
  */
 export function acclimationScale(ctx: TrialContext): number {
-  const prev = ctx.prevCm360;
-  if (prev === undefined || !(prev > 0) || !(ctx.cm360 > 0)) return 1;
-  const octaves = Math.abs(Math.log(ctx.cm360 / prev)) / Math.LN2;
+  const prev = ctx.prevCounts;
+  if (prev === undefined || !(prev > 0) || !(ctx.counts > 0)) return 1;
+  const octaves = Math.abs(Math.log(ctx.counts / prev)) / Math.LN2;
   return Math.min(1, octaves / SATURATION_OCTAVES);
 }
 
-/** Deterministic private seed from the trial's identity - independent of the session stream. */
+/** Deterministic private seed from the trial's identity - independent of the session stream. The
+ *  DPI used to be mixed in here as a second identity component. It cannot be: the tool no longer
+ *  measures one. It never distinguished two trials of the same session anyway, since it was constant
+ *  across all of them, so removing it changes which lead-in geometry each trial draws but not how
+ *  much of it: the seed is still a pure function of (count total, instrument). */
 function leadSeed(ctx: TrialContext, id: InstrumentId): number {
   let h = 0x9e3779b9;
   const mix = (v: number): void => {
     h ^= Math.imul(v | 0, 0x85ebca6b);
     h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   };
-  mix(Math.round(ctx.cm360 * 1e4));
-  mix(Math.round(ctx.dpi));
+  mix(Math.round(ctx.counts * 1e4));
   for (let i = 0; i < id.length; i++) mix(id.charCodeAt(i));
   return h >>> 0;
 }

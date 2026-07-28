@@ -88,7 +88,6 @@
   --color-primary:        var(--lapis);
   --color-primary-hover:  color-mix(in oklab, var(--lapis) 88%, var(--stone-900));
   --color-primary-active: color-mix(in oklab, var(--lapis) 78%, var(--stone-900));
-  --color-primary-wash:   var(--lapis-wash);
   --text-on-primary:      var(--stone-0);
 
   --color-success: var(--malachite); --color-success-wash: var(--malachite-wash); --text-on-success: var(--stone-0);

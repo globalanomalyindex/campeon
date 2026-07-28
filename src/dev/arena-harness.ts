@@ -4,17 +4,17 @@ import { Arena } from '../engine/arena';
 import { createPsxPass } from '../engine/psx-pass';
 import { createFilmPass } from '../engine/film-pass';
 import type { InputSource } from '../engine/arena';
-import { degreesPerCount } from '../engine/camera-rig';
+import { degreesPerCount } from '../convert/counts';
 import { createPointerLock } from '../input/pointer-lock';
 import { createEnemyLayer, type EnemyLayerHandle } from '../ui/enemy/enemy-layer';
 import { createViewmodel3D, asViewmodelLayer } from '../ui/viewmodel/viewmodel-3d';
 import { createShotFeedback } from '../ui/feedback';
 import { AccelMeter, accelVerdict } from '../input/accel-check';
 import { mulberry32 } from '../stats/bootstrap';
+import { counts360, countsBounds } from '../types';
 import type { AimSample, PointerLockMode, InstrumentId, TrialResult, Report } from '../types';
 
-const CM360 = 34;
-const DPI = 800;
+const COUNTS360 = counts360(9450);
 
 interface ArenaDebug {
   feed(dx: number, dy: number): [number, number];
@@ -100,7 +100,7 @@ export function mountArenaHarness(root: HTMLElement): void {
     postMode === 'retro'
       ? createPsxPass(renderer, size)
       : createFilmPass(renderer, size, { reducedMotion });
-  const arena = new Arena({ renderer, input, size, cm360: CM360, dpi: DPI, rng: mulberry32(7), postProcessor: post });
+  const arena = new Arena({ renderer, input, size, counts: COUNTS360, rng: mulberry32(7), postProcessor: post });
 
   const feedback = createShotFeedback(root); // miss tick - fire aimed off-target to see it
   let enemyLayer: EnemyLayerHandle | null = null;
@@ -145,11 +145,11 @@ export function mountArenaHarness(root: HTMLElement): void {
   const offMeter = pointer.onSample((s) => meter?.add(s));
 
   const refreshHud = (): void => {
-    const dpc = degreesPerCount(CM360, DPI);
+    const dpc = degreesPerCount(COUNTS360);
     const verdict = slow && fast ? accelVerdict(slow, fast) : null;
     hud.textContent =
       `campeón · input + engine harness\n` +
-      `cm/360 ${CM360}   dpi ${DPI}   deg/count ${dpc.toFixed(4)}\n` +
+      `counts/360 ${COUNTS360}   deg/count ${dpc.toFixed(4)}\n` +
       `lock ${pointer.isLocked() ? 'on' : 'off'}   mode ${pointer.mode() ?? '-'}\n` +
       `view  yaw ${view[0].toFixed(1)}°  pitch ${view[1].toFixed(1)}°\n` +
       `accel slow ${slow.toFixed(0)} / fast ${fast.toFixed(0)}` +
@@ -202,7 +202,7 @@ export function mountArenaHarness(root: HTMLElement): void {
       pushSynthetic({ t: 0, dx, dy });
       return view;
     },
-    degPerCount: () => degreesPerCount(CM360, DPI),
+    degPerCount: () => degreesPerCount(COUNTS360),
     view: () => view,
     mode: () => pointer.mode(),
     fire() {
@@ -230,8 +230,7 @@ export function mountArenaHarness(root: HTMLElement): void {
       arena.clearTargets();
       return getInstrument(id).run(
         {
-          cm360: CM360,
-          dpi: DPI,
+          counts: COUNTS360,
           rng: mulberry32(42),
           profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
         },
@@ -251,9 +250,8 @@ export function mountArenaHarness(root: HTMLElement): void {
       const autofire = window.setInterval(() => pushFire(), 220);
       try {
         const { report } = await runSession({
-          dpi: DPI,
           profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
-          bounds: [18, 50],
+          bounds: countsBounds(5670, 15750),
           engine,
           instruments: INSTRUMENTS,
           scene: arena,

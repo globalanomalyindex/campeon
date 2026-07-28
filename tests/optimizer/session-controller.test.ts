@@ -3,9 +3,15 @@ import { finalizeReport, runSession } from '../../src/optimizer/session-controll
 import { makeBo } from '../../src/optimizer/bayesopt';
 import { mulberry32 } from '../../src/stats/bootstrap';
 import { FakeScene } from '../instruments/fake-scene';
-import type { Cm360, Instrument, InstrumentId, Observation, Profile, SearchEngine, TrialResult } from '../../src/types';
+import { counts360, countsBounds } from '../../src/types';
+import type { Counts360, Instrument, InstrumentId, Observation, Profile, SearchEngine, TrialResult } from '../../src/types';
 
-const bounds: [number, number] = [15, 60];
+// These fixtures use small count totals (15 to 60) because the search is scale free in ln space, and
+// keeping the numbers small keeps the fitted peaks in this file comparable to the ones it was written
+// against. Nothing here depends on them being physically plausible; tests/convert/
+// counts-invariance.test.ts is the test that pins scale freedom as a property.
+
+const bounds: [Counts360, Counts360] = countsBounds(15, 60);
 
 const concave = (peakCm: number, noise = 0): Observation[] => {
   const c = Math.log(peakCm);
@@ -19,17 +25,17 @@ const concave = (peakCm: number, noise = 0): Observation[] => {
 describe('finalizeReport', () => {
   it('reports the curve peak with a CI that contains it', () => {
     const r = finalizeReport(concave(34, 0.02), bounds, mulberry32(1), { bootstrapIters: 200 });
-    expect(r.optimalCm360).toBeGreaterThan(28);
-    expect(r.optimalCm360).toBeLessThan(40);
-    expect(r.ci90[0]).toBeLessThanOrEqual(r.optimalCm360);
-    expect(r.ci90[1]).toBeGreaterThanOrEqual(r.optimalCm360);
+    expect(r.optimalCounts).toBeGreaterThan(28);
+    expect(r.optimalCounts).toBeLessThan(40);
+    expect(r.ci90[0]).toBeLessThanOrEqual(r.optimalCounts);
+    expect(r.ci90[1]).toBeGreaterThanOrEqual(r.optimalCounts);
     expect(r.curve.length).toBeGreaterThan(0);
   });
 
   it('clamps the optimum and CI to the bounds', () => {
     const r = finalizeReport(concave(34, 0.02), bounds, mulberry32(2), { bootstrapIters: 200 });
-    expect(r.optimalCm360).toBeGreaterThanOrEqual(15);
-    expect(r.optimalCm360).toBeLessThanOrEqual(60);
+    expect(r.optimalCounts).toBeGreaterThanOrEqual(15);
+    expect(r.optimalCounts).toBeLessThanOrEqual(60);
     expect(r.ci90[0]).toBeGreaterThanOrEqual(15);
     expect(r.ci90[1]).toBeLessThanOrEqual(60);
   });
@@ -44,10 +50,10 @@ describe('finalizeReport', () => {
       // ln(90), past the high edge. The session concluded "best is beyond the range searched".
       const high = finalizeReport(concave(90, 0.02), bounds, mulberry32(21), { bootstrapIters: 200 });
       expect(high.peakAtBound).toBe('high');
-      expect(high.optimalCm360).toBe(bounds[1]); // the number IS the edge; the flag says so
+      expect(high.optimalCounts).toBe(bounds[1]); // the number IS the edge; the flag says so
       const low = finalizeReport(concave(8, 0.02), bounds, mulberry32(22), { bootstrapIters: 200 });
       expect(low.peakAtBound).toBe('low');
-      expect(low.optimalCm360).toBe(bounds[0]);
+      expect(low.optimalCounts).toBe(bounds[0]);
     });
 
     it('an interior vertex carries NO flag: absence means located, and is never fabricated', () => {
@@ -80,7 +86,7 @@ describe('finalizeReport', () => {
       const ext = finalizeReport(obs, bounds, mulberry32(25), { bootstrapIters: 200, detrendDrift: true });
       expect(ext.driftZ).toBeDefined(); // the extended fit is the one that ran
       expect(ext.peakAtBound).toBe('high');
-      expect(ext.optimalCm360).toBe(bounds[1]);
+      expect(ext.optimalCounts).toBe(bounds[1]);
     });
   });
 
@@ -88,14 +94,14 @@ describe('finalizeReport', () => {
     const flat: Observation[] = [15, 25, 35, 45, 60].map((cm, i) => ({ x: Math.log(cm), y: 0.1 * i }));
     const r = finalizeReport(flat, bounds, mulberry32(3));
     expect(r.ci90).toEqual([15, 60]);
-    expect(Number.isFinite(r.optimalCm360)).toBe(true);
+    expect(Number.isFinite(r.optimalCounts)).toBe(true);
   });
 
   it('widens the CI when a supplied GP peak disagrees with the curve peak', () => {
     const base = finalizeReport(concave(34, 0.02), bounds, mulberry32(4), { bootstrapIters: 200 });
     const widened = finalizeReport(concave(34, 0.02), bounds, mulberry32(4), {
       bootstrapIters: 200,
-      gpPeakCm360: 55,
+      gpPeakCounts: 55,
     });
     expect(widened.ci90[1]).toBeGreaterThanOrEqual(55 - 1e-9);
     expect(widened.ci90[1]).toBeGreaterThanOrEqual(base.ci90[1]);
@@ -105,7 +111,7 @@ describe('finalizeReport', () => {
     const base = finalizeReport(concave(34, 0.02), bounds, mulberry32(8), { bootstrapIters: 200 });
     const agree = finalizeReport(concave(34, 0.02), bounds, mulberry32(8), {
       bootstrapIters: 200,
-      gpPeakCm360: base.optimalCm360, // identical → log-distance 0, below threshold
+      gpPeakCounts: base.optimalCounts, // identical → log-distance 0, below threshold
     });
     expect(agree.ci90).toEqual(base.ci90);
   });
@@ -113,7 +119,7 @@ describe('finalizeReport', () => {
   it('handles empty observations without throwing (honest full-bounds report)', () => {
     const r = finalizeReport([], bounds, mulberry32(1));
     expect(r.ci90).toEqual([15, 60]);
-    expect(Number.isFinite(r.optimalCm360)).toBe(true);
+    expect(Number.isFinite(r.optimalCounts)).toBe(true);
     expect(r.curve).toEqual([]);
   });
 
@@ -188,8 +194,8 @@ describe('finalizeReport', () => {
       const obs = driftObs(0.8);
       const plain = finalizeReport(obs, bounds, mulberry32(1), { bootstrapIters: 200 });
       const ext = finalizeReport(obs, bounds, mulberry32(1), { bootstrapIters: 200, detrendDrift: true });
-      expect(Math.abs(ext.optimalCm360 - 35)).toBeLessThan(Math.abs(plain.optimalCm360 - 35));
-      expect(ext.optimalCm360).toBeCloseTo(35, 1);
+      expect(Math.abs(ext.optimalCounts - 35)).toBeLessThan(Math.abs(plain.optimalCounts - 35));
+      expect(ext.optimalCounts).toBeCloseTo(35, 1);
       expect(ext.driftZ).toBeCloseTo(0.8, 4);
       expect(plain.driftZ).toBeUndefined(); // drift is opt-in at finalize, never ambient
     });
@@ -248,7 +254,7 @@ describe('finalizeReport', () => {
   });
 });
 
-const sessionBounds: [Cm360, Cm360] = [15, 60];
+const sessionBounds: [Counts360, Counts360] = countsBounds(15, 60);
 
 const profile = (weights: Partial<Record<InstrumentId, number>>): Profile => ({
   speedAccuracy: 0.5,
@@ -261,10 +267,10 @@ function synthetic(id: InstrumentId, peakCm: number): Instrument {
   return {
     id,
     run(ctx) {
-      const x = Math.log(ctx.cm360);
+      const x = Math.log(ctx.counts);
       const noise = (ctx.rng() * 2 - 1) * 0.04;
       const score = -(x - c) * (x - c) + noise;
-      return Promise.resolve<TrialResult>({ instrument: id, cm360: ctx.cm360, score, raw: {}, at: 0 });
+      return Promise.resolve<TrialResult>({ instrument: id, counts: ctx.counts, score, raw: {}, at: 0 });
     },
   };
 }
@@ -282,7 +288,6 @@ describe('runSession - convergence on synthetic players', () => {
   it('finds a single instrument latent optimum, with a sub-bounds CI containing the estimate', async () => {
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
     const { report, trials } = await runSession({
-      dpi: 800,
       profile: profile({ flick: 1 }),
       bounds: sessionBounds,
       engine: bo,
@@ -294,17 +299,16 @@ describe('runSession - convergence on synthetic players', () => {
       bootstrapIters: 300,
     });
     expect(trials.length).toBe(22);
-    expect(report.optimalCm360).toBeGreaterThan(33);
-    expect(report.optimalCm360).toBeLessThan(47);
-    expect(report.ci90[0]).toBeLessThanOrEqual(report.optimalCm360);
-    expect(report.ci90[1]).toBeGreaterThanOrEqual(report.optimalCm360);
+    expect(report.optimalCounts).toBeGreaterThan(33);
+    expect(report.optimalCounts).toBeLessThan(47);
+    expect(report.ci90[0]).toBeLessThanOrEqual(report.optimalCounts);
+    expect(report.ci90[1]).toBeGreaterThanOrEqual(report.optimalCounts);
     expect(report.ci90[1] - report.ci90[0]).toBeLessThan(45); // tighter than the full bounds
   });
 
   it('blends two instruments toward an optimum between their peaks', async () => {
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
     const { report } = await runSession({
-      dpi: 800,
       profile: profile({ flick: 1, track: 1 }),
       bounds: sessionBounds,
       engine: bo,
@@ -315,22 +319,21 @@ describe('runSession - convergence on synthetic players', () => {
       rng: mulberry32(7),
       bootstrapIters: 300,
     });
-    expect(report.optimalCm360).toBeGreaterThan(27);
-    expect(report.optimalCm360).toBeLessThan(45);
+    expect(report.optimalCounts).toBeGreaterThan(27);
+    expect(report.optimalCounts).toBeLessThan(45);
   });
 
   it('wires the engine posteriorPeak into the final report - CI widens on GP/parabola disagreement', async () => {
     // Stub engine whose posteriorPeak sits far from the parabola peak (~30): the final CI must span
     // it, proving runSession forwards posteriorPeak → finalizeReport (spec §5.3). Load-bearing -
     // remove the wiring and ci90[1] falls back near the bootstrap upper, failing this.
-    const SENTINEL = 58;
+    const SENTINEL = counts360(58);
     const stub: SearchEngine = {
-      suggest: (_o, b) => Math.sqrt(b[0] * b[1]),
+      suggest: (_o, b) => counts360(Math.sqrt(b[0] * b[1])),
       isDone: () => false,
       posteriorPeak: () => SENTINEL,
     };
     const { report } = await runSession({
-      dpi: 800,
       profile: profile({ flick: 1 }),
       bounds: sessionBounds,
       engine: stub,
@@ -341,7 +344,7 @@ describe('runSession - convergence on synthetic players', () => {
       rng: mulberry32(11),
       bootstrapIters: 200,
     });
-    expect(report.optimalCm360).toBeLessThan(45); // parabola peak ~30, far from the sentinel
+    expect(report.optimalCounts).toBeLessThan(45); // parabola peak ~30, far from the sentinel
     expect(report.ci90[1]).toBeGreaterThanOrEqual(SENTINEL - 1e-9);
   });
 
@@ -355,19 +358,19 @@ describe('runSession - convergence on synthetic players', () => {
     let plainPeakCalls = 0;
     let fittedSeen: typeof baseGp | undefined;
     const suggestParams: (typeof baseGp)[] = [];
-    const SENTINEL = 57;
+    const SENTINEL = counts360(57);
     const engine: SearchEngine = {
       gpParams: baseGp,
       // suggest must always run on the base params (it does not even receive the fitted set; we
       // record the params it would use to prove finalize-fitting never leaks into the lineage).
       suggest: (_o, b) => {
         suggestParams.push(baseGp);
-        return Math.sqrt(b[0] * b[1]);
+        return counts360(Math.sqrt(b[0] * b[1]));
       },
       isDone: () => false,
       posteriorPeak: () => {
         plainPeakCalls += 1;
-        return 30; // if wrongly used, it would AGREE with the parabola and NOT widen
+        return counts360(30); // if wrongly used, it would AGREE with the parabola and NOT widen
       },
       posteriorPeakWith: (_o, _b, params) => {
         peakWithCalls += 1;
@@ -376,7 +379,6 @@ describe('runSession - convergence on synthetic players', () => {
       },
     };
     const { report } = await runSession({
-      dpi: 800,
       profile: profile({ flick: 1 }),
       bounds: sessionBounds,
       engine,
@@ -403,16 +405,15 @@ describe('runSession - convergence on synthetic players', () => {
     const drifting: Instrument = {
       id: 'flick',
       run(ctx) {
-        const x = Math.log(ctx.cm360);
+        const x = Math.log(ctx.counts);
         const noise = (ctx.rng() * 2 - 1) * 0.04;
         const score = -(x - c) * (x - c) + 0.08 * k++ + noise;
-        return Promise.resolve<TrialResult>({ instrument: 'flick', cm360: ctx.cm360, score, raw: {}, at: 0 });
+        return Promise.resolve<TrialResult>({ instrument: 'flick', counts: ctx.counts, score, raw: {}, at: 0 });
       },
     };
     const interimDrifts: (number | undefined)[] = [];
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
     const { report } = await runSession({
-      dpi: 800,
       profile: profile({ flick: 1 }),
       bounds: sessionBounds,
       engine: bo,
@@ -432,7 +433,6 @@ describe('runSession - convergence on synthetic players', () => {
   it('stops early once the CI is tight enough', async () => {
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
     const { trials } = await runSession({
-      dpi: 800,
       profile: profile({ flick: 1 }),
       bounds: sessionBounds,
       engine: bo,
@@ -456,7 +456,6 @@ describe('runSession - convergence on synthetic players', () => {
     const coldStart = 4;
     const bo = makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' });
     const { trials } = await runSession({
-      dpi: 800,
       profile: profile({ flick: 1 }),
       bounds: sessionBounds,
       engine: bo,
@@ -468,7 +467,7 @@ describe('runSession - convergence on synthetic players', () => {
       coldStart,
       bootstrapIters: 100,
     });
-    const post = trials.slice(coldStart).map((t) => t.cm360);
+    const post = trials.slice(coldStart).map((t) => t.counts);
     const nearPeak = post.filter((c) => c >= 35 && c <= 45).length;
     expect(nearPeak / post.length).toBeGreaterThan(0.7); // EI concentration, far above uniform's ~0.22
     expect(Math.min(...post.map((c) => Math.abs(c - 40)))).toBeLessThan(2); // homed in on the true peak
@@ -477,7 +476,6 @@ describe('runSession - convergence on synthetic players', () => {
 
 describe('runSession - shouldStop / initialTrials', () => {
   const cfg = (extra: Record<string, unknown>) => ({
-    dpi: 800,
     profile: profile({ flick: 1 }),
     bounds: sessionBounds,
     engine: makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' as const }),
@@ -492,7 +490,7 @@ describe('runSession - shouldStop / initialTrials', () => {
   });
 
   it('threads the arrival gain, so the acclimation lead-in can size itself to the change', async () => {
-    // The lead-in budget scales with |ln(cm360) - ln(prevCm360)|, because the cost of adapting
+    // The lead-in budget scales with |ln(counts) - ln(prevCounts)|, because the cost of adapting
     // to an unfamiliar gain scales with how far the gain moved. If the controller does not hand
     // over the previous trial's sensitivity, every trial spends the full worst-case budget: safe,
     // since over-acclimating cannot bias a score, but it charges the player time for nothing.
@@ -500,8 +498,8 @@ describe('runSession - shouldStop / initialTrials', () => {
     const spy: Instrument = {
       id: 'flick',
       run: async (ctx) => {
-        seen.push(ctx.prevCm360);
-        return { instrument: 'flick', cm360: ctx.cm360, score: 0.5, raw: {}, at: 0 } as TrialResult;
+        seen.push(ctx.prevCounts);
+        return { instrument: 'flick', counts: ctx.counts, score: 0.5, raw: {}, at: 0 } as TrialResult;
       },
     };
     const { trials } = await runSession(cfg({
@@ -514,7 +512,7 @@ describe('runSession - shouldStop / initialTrials', () => {
     expect(seen[0]).toBeUndefined();
     // Every later trial receives exactly the sensitivity the previous trial ran at.
     for (let i = 1; i < seen.length; i++) {
-      expect(seen[i], `trial ${i} arrival gain`).toBe(trials[i - 1]!.cm360);
+      expect(seen[i], `trial ${i} arrival gain`).toBe(trials[i - 1]!.counts);
     }
   });
 
@@ -526,22 +524,21 @@ describe('runSession - shouldStop / initialTrials', () => {
 
   it('resumes from initialTrials and skips cold-start (the seeds are preserved, new trials use suggest)', async () => {
     const seed: TrialResult[] = Array.from({ length: 8 }, (_, i) => (
-      { instrument: 'flick', cm360: 28 + i, score: 0.5, raw: {}, at: 0 }
+      { instrument: 'flick', counts: counts360(28 + i), score: 0.5, raw: {}, at: 0 }
     ));
-    const stub: SearchEngine = { suggest: () => 30, isDone: () => false };
+    const stub: SearchEngine = { suggest: () => counts360(30), isDone: () => false };
     const { trials } = await runSession(cfg({ engine: stub, initialTrials: seed, maxTrials: 10, coldStart: 4 }));
     expect(trials.length).toBe(10);          // 8 seeded + 2 new
-    expect(trials[0]!.cm360).toBe(28);       // seed preserved at the front (proves resume, not a fresh run)
-    expect(trials[7]!.cm360).toBe(35);       // last seed preserved
+    expect(trials[0]!.counts).toBe(28);       // seed preserved at the front (proves resume, not a fresh run)
+    expect(trials[7]!.counts).toBe(35);       // last seed preserved
     // the 2 NEW trials use the engine's suggest (30), not log-spaced cold-start seeds → cold-start skipped
-    expect(trials[8]!.cm360).toBe(30);
-    expect(trials[9]!.cm360).toBe(30);
+    expect(trials[8]!.counts).toBe(30);
+    expect(trials[9]!.counts).toBe(30);
   });
 });
 
 describe('runSession - live callbacks', () => {
   const base = () => ({
-    dpi: 800,
     profile: profile({ flick: 1 }),
     bounds: sessionBounds,
     engine: makeBo({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.05 }, acquisition: 'ei' as const }),
@@ -561,7 +558,7 @@ describe('runSession - live callbacks', () => {
       onTrialStart: (_id, i) => starts.push(i),
       onTrial: (_t, trials, interim) => {
         afters.push(trials.length);
-        expect(Number.isFinite(interim.optimalCm360)).toBe(true);
+        expect(Number.isFinite(interim.optimalCounts)).toBe(true);
       },
     });
     expect(starts).toEqual([0, 1, 2, 3, 4, 5]);
@@ -571,6 +568,6 @@ describe('runSession - live callbacks', () => {
   it('the trial sequence is identical whether or not onTrial is set (interim uses its own RNG)', async () => {
     const a = await runSession({ ...base(), rng: mulberry32(5) });
     const b = await runSession({ ...base(), rng: mulberry32(5), onTrial: () => {} });
-    expect(b.trials.map((t) => t.cm360)).toEqual(a.trials.map((t) => t.cm360));
+    expect(b.trials.map((t) => t.counts)).toEqual(a.trials.map((t) => t.counts));
   });
 });

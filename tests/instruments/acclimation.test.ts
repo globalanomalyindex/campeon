@@ -12,6 +12,7 @@ import {
   LEAD_REACHES_MIN,
 } from '../../src/instruments/acclimation';
 import { mulberry32 } from '../../src/stats/bootstrap';
+import { counts360 } from '../../src/types';
 import type { InstrumentId, TrialContext, TrialResult } from '../../src/types';
 import { FakeScene } from './fake-scene';
 
@@ -33,17 +34,16 @@ import { FakeScene } from './fake-scene';
  * MUST still differ, proving the instruments are not simply blind to the errors we inject.
  */
 
-const CM = 34;
+const CM = counts360(34);
 const FAR = CM * 4; // two octaves out - well past the full-budget threshold
 const BETA = 0.35; // per-reach retention of the log-gain error (fast-process adaptation)
 const TAU_MS = 500; // continuous-tracking decay time constant
 
-const ctx = (rngSeed: number, prevCm360?: number): TrialContext => ({
-  cm360: CM,
-  dpi: 800,
+const ctx = (rngSeed: number, prevCounts?: number): TrialContext => ({
+  counts: CM,
   rng: mulberry32(rngSeed),
   profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
-  ...(prevCm360 !== undefined ? { prevCm360 } : {}),
+  ...(prevCounts !== undefined ? { prevCounts: counts360(prevCounts) } : {}),
 });
 
 /** Deterministic per-reach motor noise keyed on the TARGET OFFSET, so two runs whose scored
@@ -72,14 +72,14 @@ async function driveDiscrete(
   instrument: { run(c: TrialContext, s: FakeScene): Promise<TrialResult> },
   prev: number,
   beta: number,
-  prevCm360: number | undefined,
+  prevCounts: number | undefined,
   leadReaches: number,
 ): Promise<DiscreteDrive> {
   const scene = new FakeScene();
   const rngLog: number[] = [];
   const base = mulberry32(7);
   const c: TrialContext = {
-    ...ctx(7, prevCm360),
+    ...ctx(7, prevCounts),
     rng: () => {
       const v = base();
       rngLog.push(v);
@@ -120,12 +120,12 @@ async function driveDiscrete(
 }
 
 /** Drive track with a pursuit player whose closing gain is wrong by e^eps, eps decaying in time. */
-async function driveTrack(prev: number, tauMs: number, prevCm360?: number): Promise<DiscreteDrive> {
+async function driveTrack(prev: number, tauMs: number, prevCounts?: number): Promise<DiscreteDrive> {
   const scene = new FakeScene();
   const rngLog: number[] = [];
   const base = mulberry32(7);
   const c: TrialContext = {
-    ...ctx(7, prevCm360),
+    ...ctx(7, prevCounts),
     rng: () => {
       const v = base();
       rngLog.push(v);

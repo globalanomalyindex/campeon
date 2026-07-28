@@ -1,6 +1,6 @@
 import { MathUtils, PerspectiveCamera } from 'three';
-import type { AimSample, Cm360, Degrees, Dpi } from '../types';
-import { TURN_CM } from '../convert/cm360';
+import type { AimSample, Counts360, Degrees } from '../types';
+import { degreesPerCount } from '../convert/counts';
 
 /** Max look-up/down angle (degrees) so the view cannot flip over the pole. */
 export const PITCH_LIMIT: Degrees = 89;
@@ -36,21 +36,6 @@ export function verticalFovFor(aspect: number): Degrees {
   return MathUtils.radToDeg(2 * Math.atan(halfWidth / a));
 }
 
-/**
- * View rotation (degrees) per one normalized mouse count, so that a full 360°
- * turn equals `cm360` of physical mouse travel at `dpi`.
- *   deg/count = 914.4 / (cm360 · dpi)
- * Independent of any internal yaw constant - this is the measured observable.
- * Throws RangeError on a non-positive cm360 or dpi: an invalid sensitivity must
- * fail loudly here rather than propagate Infinity/NaN into the view rotation.
- */
-export function degreesPerCount(cm360: Cm360, dpi: Dpi): Degrees {
-  if (!(cm360 > 0) || !(dpi > 0)) {
-    throw new RangeError(`degreesPerCount: cm360 and dpi must be positive (got ${cm360}, ${dpi})`);
-  }
-  return TURN_CM / (cm360 * dpi);
-}
-
 /** Wrap a yaw angle into [-180, 180). */
 export function wrapYaw(deg: Degrees): Degrees {
   return (((deg + 180) % 360) + 360) % 360 - 180;
@@ -83,15 +68,15 @@ export class CameraRig {
   private state: LookState = { yaw: 0, pitch: 0 };
   private degPerCount: Degrees;
 
-  constructor(cm360: Cm360, dpi: Dpi, aspect = 1) {
+  constructor(counts: Counts360, aspect = 1) {
     this.camera = new PerspectiveCamera(verticalFovFor(aspect), aspect, 0.1, 1000);
     this.camera.rotation.order = 'YXZ';
-    this.degPerCount = degreesPerCount(cm360, dpi);
+    this.degPerCount = degreesPerCount(counts);
     this.sync();
   }
 
-  setSensitivity(cm360: Cm360, dpi: Dpi): void {
-    this.degPerCount = degreesPerCount(cm360, dpi);
+  setSensitivity(counts: Counts360): void {
+    this.degPerCount = degreesPerCount(counts);
   }
 
   /**

@@ -1,4 +1,5 @@
-import type { Cm360, Observation, SearchEngine } from '../types';
+import type { Counts360, Observation, SearchEngine } from '../types';
+import { counts360 } from '../types';
 import { GP, type GpParams } from './gp';
 
 /** Standard-normal pdf. */
@@ -64,10 +65,10 @@ export function makeBo(config: BoConfig): SearchEngine {
   const maxTrials = config.maxTrials ?? 20;
 
   return {
-    suggest(history: Observation[], bounds: [Cm360, Cm360]): Cm360 {
+    suggest(history: Observation[], bounds: [Counts360, Counts360]): Counts360 {
       const loX = Math.log(bounds[0]);
       const hiX = Math.log(bounds[1]);
-      if (history.length === 0) return Math.exp((loX + hiX) / 2);
+      if (history.length === 0) return counts360(Math.exp((loX + hiX) / 2));
       const gp = new GP(config.gp, history);
       // Incumbent = best posterior mean over the grid (not the raw noisy max).
       let best = -Infinity;
@@ -87,24 +88,24 @@ export function makeBo(config: BoConfig): SearchEngine {
           bestX = x;
         }
       }
-      return Math.exp(bestX);
+      return counts360(Math.exp(bestX));
     },
     isDone(history: Observation[]): boolean {
       return history.length >= maxTrials;
     },
     /** The GP posterior-mean argmax over the grid - the surrogate's own best-guess optimum,
      *  used by the controller to cross-check (and widen the CI against) the parabola peak. */
-    posteriorPeak(history: Observation[], bounds: [Cm360, Cm360]): Cm360 {
+    posteriorPeak(history: Observation[], bounds: [Counts360, Counts360]): Counts360 {
       return this.posteriorPeakWith!(history, bounds, config.gp);
     },
     /** The base GP hyperparameters - exposed so the controller can fit sharper ones at FINALIZE
      *  ONLY (the per-trial `suggest` always uses `config.gp`). */
     gpParams: config.gp,
     /** Posterior-mean argmax under EXPLICIT params (finalize-only cross-check under fitted params). */
-    posteriorPeakWith(history: Observation[], bounds: [Cm360, Cm360], params: GpParams): Cm360 {
+    posteriorPeakWith(history: Observation[], bounds: [Counts360, Counts360], params: GpParams): Counts360 {
       const loX = Math.log(bounds[0]);
       const hiX = Math.log(bounds[1]);
-      if (history.length === 0) return Math.exp((loX + hiX) / 2);
+      if (history.length === 0) return counts360(Math.exp((loX + hiX) / 2));
       const gp = new GP(params, history);
       let bestX = loX;
       let best = -Infinity;
@@ -116,7 +117,7 @@ export function makeBo(config: BoConfig): SearchEngine {
           bestX = x;
         }
       }
-      return Math.exp(bestX);
+      return counts360(Math.exp(bestX));
     },
   };
 }

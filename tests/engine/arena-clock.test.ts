@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { counts360 } from '../../src/types';
 import { Arena, MAX_FRAME_MS, type InputSource, type RendererLike } from '../../src/engine/arena';
 import { TrialRecorder, type Recording } from '../../src/instruments/recording';
 import { separation } from '../../src/engine/targets';
@@ -20,7 +21,7 @@ function harness(seed = 1) {
   };
   const renderer: RendererLike = { render() {}, setSize() {}, dispose() {} };
   const arena = new Arena({
-    renderer, input, size: () => [1600, 900], cm360: 34, dpi: 800, rng: mulberry32(seed),
+    renderer, input, size: () => [1600, 900], counts: counts360(9450), rng: mulberry32(seed),
   });
   return { arena, send: (s: AimSample) => emit(s), fire: () => pull() };
 }

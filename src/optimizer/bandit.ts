@@ -1,8 +1,8 @@
-import type { Cm360, Observation, SearchEngine } from '../types';
+import type { Counts360, Observation, SearchEngine } from '../types';
 
 export interface BanditConfig {
   /** Discretized cm/360 arms. */
-  arms: Cm360[];
+  arms: Counts360[];
   /** isDone budget (default arms.length × 3). */
   maxPulls?: number;
 }
@@ -32,7 +32,7 @@ export function makeUcb1Bandit(config: BanditConfig): SearchEngine {
   const maxPulls = config.maxPulls ?? arms.length * 3;
 
   return {
-    suggest(history: Observation[]): Cm360 {
+    suggest(history: Observation[]): Counts360 {
       const n = arms.map(() => 0);
       const sum = arms.map(() => 0);
       for (const o of history) {

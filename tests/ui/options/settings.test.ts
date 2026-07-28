@@ -1,42 +1,53 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeBounds, DEFAULT_BOUNDS, boundsFromSeed } from '../../../src/ui/options/settings';
+import { normalizeBounds, DEFAULT_BOUNDS, boundsFromSeed, midOf } from '../../../src/ui/options/settings';
+import { counts360, countsBounds } from '../../../src/types';
 
 describe('options settings helpers', () => {
-  it('normalizeBounds orders, clamps to [5,150], guarantees a >=5 span, and never inverts', () => {
-    expect(normalizeBounds(60, 15)).toEqual([15, 60]);     // reorders
-    expect(normalizeBounds(1, 9)).toEqual([5, 10]);        // lo clamped to 5; span widened to >=5
-    expect(normalizeBounds(30, 30)).toEqual([30, 35]);     // degenerate equal inputs
-    expect(normalizeBounds(NaN, 40)).toEqual(DEFAULT_BOUNDS);
-    expect(normalizeBounds(200, 201)).toEqual([145, 150]); // both above HI: clamp, NEVER invert (was [200,150])
-    expect(normalizeBounds(148, 149)).toEqual([145, 150]); // near ceiling: pull lo down to keep the span
-    expect(normalizeBounds(20, 21)).toEqual([20, 25]);     // tiny valid range widened to >=5
+  it('normalizeBounds orders, clamps to [1600,47200], guarantees a >=1600 span, and never inverts', () => {
+    expect(normalizeBounds(19200, 4800)).toEqual([4800, 19200]); // reorders
+    expect(normalizeBounds(300, 2900)).toEqual([1600, 3200]);    // lo clamped; span widened to >=1600
+    expect(normalizeBounds(9600, 9600)).toEqual([9600, 11200]);  // degenerate equal inputs
+    expect(normalizeBounds(NaN, 12000)).toEqual(DEFAULT_BOUNDS);
+    expect(normalizeBounds(60000, 61000)).toEqual([45600, 47200]); // both above HI: clamp, NEVER invert
+    expect(normalizeBounds(46800, 47000)).toEqual([45600, 47200]); // near ceiling: pull lo down for the span
+    expect(normalizeBounds(6400, 6600)).toEqual([6400, 8000]);     // tiny valid range widened to >=1600
     // invariants for every output
-    for (const [a, b] of [[60, 15], [1, 9], [30, 30], [200, 201], [148, 149], [20, 21], [3, 4]] as const) {
+    for (const [a, b] of [
+      [19200, 4800], [300, 2900], [9600, 9600], [60000, 61000], [46800, 47000], [6400, 6600], [900, 1000],
+    ] as const) {
       const [lo, hi] = normalizeBounds(a, b);
-      expect(lo).toBeGreaterThanOrEqual(5);
-      expect(hi).toBeLessThanOrEqual(150);
-      expect(hi - lo).toBeGreaterThanOrEqual(5);
+      expect(lo).toBeGreaterThanOrEqual(1600);
+      expect(hi).toBeLessThanOrEqual(47200);
+      expect(hi - lo).toBeGreaterThanOrEqual(1600);
     }
   });
 });
 
 describe('boundsFromSeed', () => {
   it('centers a window on the seed within sane bounds', () => {
-    const [lo, hi] = boundsFromSeed(30); // 30/1.7 = 17.65 (2 dp) .. 30*1.7 = 51
-    expect(lo).toBeCloseTo(17.65, 1);
-    expect(hi).toBeCloseTo(51, 1);
-    expect(lo).toBeGreaterThanOrEqual(5);
-    expect(hi).toBeLessThanOrEqual(150);
+    const [lo, hi] = boundsFromSeed(counts360(9450)); // 9450/1.7 = 5558.8 .. 9450*1.7 = 16065
+    expect(lo).toBeCloseTo(5558.8, 1);
+    expect(hi).toBeCloseTo(16065, 1);
+    expect(lo).toBeGreaterThanOrEqual(1600);
+    expect(hi).toBeLessThanOrEqual(47200);
   });
 
   it('clamps a tiny seed to the minimum span', () => {
-    const [lo, hi] = boundsFromSeed(3);
-    expect(lo).toBe(5);
-    expect(hi - lo).toBeGreaterThanOrEqual(5);
+    const [lo, hi] = boundsFromSeed(counts360(900));
+    expect(lo).toBe(1600);
+    expect(hi).toBe(3200);
   });
 
   it('falls back to the default window for a bad seed', () => {
-    expect(boundsFromSeed(NaN)).toEqual(DEFAULT_BOUNDS);
-    expect(boundsFromSeed(0)).toEqual(DEFAULT_BOUNDS);
+    expect(boundsFromSeed(counts360(NaN))).toEqual(DEFAULT_BOUNDS);
+    expect(boundsFromSeed(counts360(0))).toEqual(DEFAULT_BOUNDS);
+  });
+});
+
+describe('midOf', () => {
+  it('reports the geometric midpoint of a window', () => {
+    // The geometric midpoint, exact here because 4800 * 19200 is a perfect square; the arithmetic
+    // mean would be 12000, a third of an octave high.
+    expect(midOf(countsBounds(4800, 19200))).toBe(9600);
   });
 });

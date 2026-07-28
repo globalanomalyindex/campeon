@@ -1,4 +1,8 @@
-import type { Dpi } from '../types';
+/** Local to this module, which computes in a unit the tool no longer uses. `Cm360` and `Dpi` left
+ *  types.ts with the rest of the physical unit chain; these aliases exist so the module still
+ *  compiles until task 5 deletes it, and they are deliberately NOT exported so nothing new can
+ *  depend on them. */
+type Dpi = number;
 
 /** Plausible mouse DPI bounds (CPI). Below ~100 or above ~32000 is almost certainly a typo. */
 export const MIN_DPI = 100;

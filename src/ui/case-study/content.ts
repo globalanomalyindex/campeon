@@ -1,4 +1,5 @@
-import type { InstrumentId } from '../../types';
+import { counts360, countsBounds } from '../../types';
+import type { Counts360, InstrumentId } from '../../types';
 import type { PlotInput } from '../convergence-plot';
 
 export interface CaseSection {
@@ -238,25 +239,30 @@ export const CREDIT = {
  * A WORKED EXAMPLE with invented numbers, drawn so the shape of a converged sweep is legible on a
  * page a reader may reach before ever playing. Nothing here is measured, and every surface that
  * renders it labels it as an illustration (see `buildFigure` in case-study.ts). Four mark-sets
- * scattered across the sweep, a concave fit peaked near 29 cm/360, and four per-facet peaks that
- * sit near one another without fully agreeing, which is the ordinary case.
+ * scattered across the sweep, a concave fit peaked near 9150 counts per 360, and four per-facet
+ * peaks that sit near one another without fully agreeing, which is the ordinary case.
  */
 export function demoConvergence(): PlotInput {
-  const bounds: [number, number] = [15, 60];
-  const peak = 29;
-  const at = (cm: number) => -Math.pow(Math.log(cm) - Math.log(peak), 2);
+  // Branded at every boundary, because the sed brands `PlotInput` too: `bounds`, `ci90`, `peak` and
+  // `PlotMark.counts` are all `Counts360` by the time this file compiles, and a plain literal there
+  // is a TS2322. The plain locals below (`v`, `c`) are the arithmetic side, where a count total
+  // widens back to a number anyway.
+  const bounds: [Counts360, Counts360] = countsBounds(4800, 19200);
+  const peakValue = 9150;
+  const peak = counts360(peakValue);
+  const at = (counts: number) => -Math.pow(Math.log(counts) - Math.log(peakValue), 2);
   const insts: InstrumentId[] = ['track', 'flick', 'calibrate', 'strike'];
-  const xs = [18, 23, 29, 37, 47];
+  const xs = [5650, 7250, 9150, 11650, 14800];
   const jitter: Record<InstrumentId, number> = { track: 0.04, flick: -0.05, calibrate: 0.02, strike: -0.03 };
   const marks = insts.flatMap((instrument) =>
-    xs.map((cm360) => ({ cm360, instrument, score: at(cm360) + jitter[instrument] })),
+    xs.map((v) => ({ counts: counts360(v), instrument, score: at(v) + jitter[instrument] })),
   );
-  const curve = [16, 20, 25, 29, 34, 42, 55].map((cm) => ({ x: Math.log(cm), mean: at(cm) }));
+  const curve = [5050, 6300, 7875, 9150, 10700, 13225, 17325].map((c) => ({ x: Math.log(c), mean: at(c) }));
   const facetPeaks = [
-    { instrument: 'track' as InstrumentId, peakCm360: 28.1, spreadLn: 0.07, laneConditioned: false },
-    { instrument: 'flick' as InstrumentId, peakCm360: 30.4, spreadLn: 0.08, laneConditioned: false },
-    { instrument: 'calibrate' as InstrumentId, peakCm360: 29.2, spreadLn: 0.06, laneConditioned: false },
-    { instrument: 'strike' as InstrumentId, peakCm360: 33.0, spreadLn: 0.11, laneConditioned: true },
+    { instrument: 'track' as InstrumentId, peakCounts: counts360(8850), spreadLn: 0.07, laneConditioned: false },
+    { instrument: 'flick' as InstrumentId, peakCounts: counts360(9575), spreadLn: 0.08, laneConditioned: false },
+    { instrument: 'calibrate' as InstrumentId, peakCounts: counts360(9200), spreadLn: 0.06, laneConditioned: false },
+    { instrument: 'strike' as InstrumentId, peakCounts: counts360(10400), spreadLn: 0.11, laneConditioned: true },
   ];
-  return { bounds, marks, curve, ci90: [27.4, 31.1], peak, facetPeaks, size: { width: 640, height: 280 } };
+  return { bounds, marks, curve, ci90: countsBounds(8650, 9800), peak, facetPeaks, size: { width: 640, height: 280 } };
 }

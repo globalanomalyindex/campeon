@@ -6,7 +6,7 @@ import { partRest } from './meshes';
  * PURE per-part secondary-motion module for the cosmetic quarry.
  *
  * This is a cosmetic-only READ of the quarry's rest pose: it never reads view()/bearing()/
- * radiusDeg()/cm360(), never writes a sample/score/Observation, and never touches the scored
+ * radiusDeg()/counts(), never writes a sample/score/Observation, and never touches the scored
  * stream in any way. It is a pure function of (id, partName, tSec, phase) plus a pose-application
  * helper that writes ONLY position/rotation on already-built cosmetic Object3Ds - it never creates
  * geometry, never mutates userData.rest, and never reads/writes anything outside the quarry group.

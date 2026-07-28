@@ -136,19 +136,19 @@ export interface FacetRow { instrument: InstrumentId; label: string; value: stri
  * rule beneath it rather than a coloured badge, and the four facets as a mineral-coded rail.
  */
 export function specimenCard(o: {
-  cm360: string; ci: string; facets: readonly FacetRow[]; note: string;
+  counts: string; ci: string; facets: readonly FacetRow[]; note: string;
 }): HTMLElement {
   const card = document.createElement('div');
   card.className = 'cs-ui cs-ui--card';
 
   const tag = document.createElement('span');
   tag.className = 'cs-ui-tag mono';
-  tag.textContent = 'your cm/360';
+  tag.textContent = 'your counts per 360';
   card.appendChild(tag);
 
   const num = document.createElement('span');
   num.className = 'cs-ui-figure';
-  num.textContent = o.cm360;
+  num.textContent = o.counts;
   card.appendChild(num);
 
   const ci = document.createElement('span');

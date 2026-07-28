@@ -2,27 +2,27 @@
 import { describe, it, expect } from 'vitest';
 import { result as resultScreen } from '../../src/ui/result';
 import type { AppContext, Route, SessionDraft } from '../../src/ui/shell';
+import { counts360, countsBounds } from '../../src/types';
 import type { Result, Session, TrialResult } from '../../src/types';
 
 const RESULT: Result = {
-  optimalCm360: 32.4, ci90: [29.1, 36.0],
-  perGameSens: { cs2: 1.59, valorant: 0.5, apex: 1.59, ow2: 5.3, cod: 5.3, fortnite: 6.3, r6: 6.1, pubg: 15.7 },
-  breakdown: { biasZeroCm360: 31.0, precisionFloorDeg: 0.42, ttkMs: 511, hitRate: 0.86, trackContribZ: 0.6, flickContribZ: -0.3 },
+  optimalCounts: counts360(32.4), ci90: countsBounds(29.1, 36.0),
+  breakdown: { biasZeroCounts: counts360(31.0), precisionFloorDeg: 0.42, ttkMs: 511, hitRate: 0.86, trackContribZ: 0.6, flickContribZ: -0.3 },
   curve: [{ x: Math.log(20), mean: 0.2 }, { x: Math.log(32.4), mean: 0.9 }, { x: Math.log(50), mean: 0.3 }],
-  bounds: [15, 60],
+  bounds: countsBounds(15, 60),
 };
 const TRIALS: TrialResult[] = [
-  { instrument: 'flick', cm360: 22, score: 0.4, raw: {}, at: 0 },
-  { instrument: 'track', cm360: 31, score: 0.8, raw: {}, at: 0 },
-  { instrument: 'strike', cm360: 40, score: 0.5, raw: {}, at: 0 },
+  { instrument: 'flick', counts: counts360(22), score: 0.4, raw: {}, at: 0 },
+  { instrument: 'track', counts: counts360(31), score: 0.8, raw: {}, at: 0 },
+  { instrument: 'strike', counts: counts360(40), score: 0.5, raw: {}, at: 0 },
 ];
 function session(id: string, trials: TrialResult[]): Session {
-  return { id, dpi: 800, profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
+  return { id, profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
     trials, status: 'complete', createdAt: 0 };
 }
 function fakeCtx(sessions: Session[] = [session('s1', TRIALS)]): AppContext & { nav: Route[] } {
   const nav: Route[] = [];
-  const draft: SessionDraft = { dpi: 800, currentGame: 'cs2', currentSens: 1, bounds: [15, 60],
+  const draft: SessionDraft = { currentGame: 'cs2', currentSens: 1, bounds: countsBounds(15, 60),
     profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } } };
   return {
     nav, route: 'result', draft,
@@ -36,7 +36,7 @@ describe('result screen', () => {
   it('shows the one cm/360 number and the 90% CI range', () => {
     const host = document.createElement('div');
     resultScreen(host, fakeCtx()).mount();
-    expect(host.querySelector('[data-result="cm360"]')!.textContent).toContain('32.4');
+    expect(host.querySelector('[data-result="counts"]')!.textContent).toContain('32.4');
     const ci = host.querySelector('[data-result="ci"]')!.textContent!;
     expect(ci).toContain('29.1');
     expect(ci).toContain('36.0');
@@ -55,13 +55,6 @@ describe('result screen', () => {
     expect(sr.textContent).not.toContain('–');
   });
 
-  it('renders a per-game row for every game and highlights the current one', () => {
-    const host = document.createElement('div');
-    resultScreen(host, fakeCtx()).mount();
-    expect(host.querySelectorAll('[data-game]').length).toBe(8);
-    expect(host.querySelector('[data-game="cs2"]')!.getAttribute('data-current')).toBe('true');
-  });
-
   it('shows breakdown contributions and renders NaN as -', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
@@ -69,17 +62,6 @@ describe('result screen', () => {
     resultScreen(host, ctx).mount();
     expect(host.querySelector('[data-breakdown="ttkMs"]')!.textContent).toContain('511');
     expect(host.querySelector('[data-breakdown="precisionFloorDeg"]')!.textContent).toContain('-');
-  });
-
-  it('the your-game selector re-highlights the matching row (deferred game pick)', () => {
-    const host = document.createElement('div');
-    resultScreen(host, fakeCtx()).mount();
-    const select = host.querySelector('[data-action="your-game"]') as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    select.value = 'valorant';
-    select.dispatchEvent(new Event('change'));
-    expect(host.querySelector('tr[data-game="valorant"]')!.getAttribute('data-current')).toBe('true');
-    expect(host.querySelectorAll('tr[data-current="true"]').length).toBe(1); // only one row current
   });
 
   it('the game pick writes the draft and is REMEMBERED for the next visit (Phase C)', () => {
@@ -152,7 +134,7 @@ describe('result screen', () => {
     resultScreen(host, ctx).mount();
     expect(host.querySelector('figure svg')).toBeNull();
     // the number still renders
-    expect(host.querySelector('[data-result="cm360"]')!.textContent).toContain('32.4');
+    expect(host.querySelector('[data-result="counts"]')!.textContent).toContain('32.4');
   });
 
   it('does NOT draw the plot for a tuned-by-feel result (no measured curve claim - honesty)', () => {
@@ -170,7 +152,7 @@ describe('result screen', () => {
     const origin = host.querySelector('[data-tier="origin"]')!;
     const readings = host.querySelector('[data-tier="readings"]')!;
     // bias-zero is where the number comes from; the rest are readings AT that sensitivity
-    expect(origin.querySelector('[data-breakdown="biasZeroCm360"]')).toBeTruthy();
+    expect(origin.querySelector('[data-breakdown="biasZeroCounts"]')).toBeTruthy();
     expect(readings.querySelector('[data-breakdown="precisionFloorDeg"]')).toBeTruthy();
     expect(readings.querySelector('[data-breakdown="ttkMs"]')).toBeTruthy();
     expect(readings.querySelector('[data-breakdown="hitRate"]')).toBeTruthy();
@@ -181,7 +163,7 @@ describe('result screen', () => {
   it('keeps every legacy data-breakdown value span byte-identical (storage/export pinning)', () => {
     const host = document.createElement('div');
     resultScreen(host, fakeCtx()).mount();
-    expect(host.querySelector('[data-breakdown="biasZeroCm360"]')!.textContent).toBe('31.0 cm/360');
+    expect(host.querySelector('[data-breakdown="biasZeroCounts"]')!.textContent).toBe('31.0 counts per 360');
     expect(host.querySelector('[data-breakdown="precisionFloorDeg"]')!.textContent).toBe('0.42°');
     expect(host.querySelector('[data-breakdown="ttkMs"]')!.textContent).toBe('511 ms');
     expect(host.querySelector('[data-breakdown="hitRate"]')!.textContent).toBe('86%');
@@ -218,13 +200,13 @@ describe('result screen', () => {
     // graceful: no facet plot, no contribution numbers, but the number still renders
     expect(host.querySelector('svg[data-facets]')).toBeNull();
     expect(host.querySelector('[data-breakdown="trackContribZ"]')).toBeNull();
-    expect(host.querySelector('[data-result="cm360"]')!.textContent).toContain('32.4');
+    expect(host.querySelector('[data-result="counts"]')!.textContent).toContain('32.4');
   });
 
   it('shows the CI-concord readout (tight) for a sharp measured CI', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
-    ctx.lastResult!.result = { ...RESULT, ci90: [32.0, 32.6] }; // tight
+    ctx.lastResult!.result = { ...RESULT, ci90: countsBounds(32.0, 32.6) }; // tight
     resultScreen(host, ctx).mount();
     const concord = host.querySelector('[data-result="concord"]')!;
     expect(concord).toBeTruthy();
@@ -234,7 +216,7 @@ describe('result screen', () => {
   it('frames a wide CI as a possibility LIST naming BOTH causes (never asserts one)', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
-    ctx.lastResult!.result = { ...RESULT, ci90: [18, 50] }; // wide
+    ctx.lastResult!.result = { ...RESULT, ci90: countsBounds(18, 50) }; // wide
     resultScreen(host, ctx).mount();
     const txt = host.querySelector('[data-result="concord"]')!.textContent!.toLowerCase();
     // a wide CI cannot distinguish sampling noise from facet disagreement - copy must name BOTH
@@ -255,7 +237,7 @@ describe('result screen', () => {
   it('omits the concord readout for an OLD result whose CI is degenerate', () => {
     const host = document.createElement('div');
     const ctx = fakeCtx();
-    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, ci90: [NaN, NaN] } };
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, ci90: countsBounds(NaN, NaN) } };
     resultScreen(host, ctx).mount();
     expect(host.querySelector('[data-result="concord"]')).toBeNull();
   });
@@ -337,10 +319,10 @@ describe('result screen', () => {
 // ── Phase C: the result as showpiece - A5 thesis block, facet markers, CTA hierarchy, staged reveal ──
 const FC: NonNullable<Result['facetConcordance']> = {
   facets: [
-    { instrument: 'track', peakCm360: 31.2, spreadLn: 0.08, laneConditioned: false },
-    { instrument: 'flick', peakCm360: 33.0, spreadLn: 0.11, laneConditioned: false },
+    { instrument: 'track', peakCounts: counts360(31.2), spreadLn: 0.08, laneConditioned: false },
+    { instrument: 'flick', peakCounts: counts360(33.0), spreadLn: 0.11, laneConditioned: false },
     { instrument: 'calibrate', laneConditioned: false }, // unfittable - dashed, never faked
-    { instrument: 'strike', peakCm360: 40.1, spreadLn: 0.2, laneConditioned: true },
+    { instrument: 'strike', peakCounts: counts360(40.1), spreadLn: 0.2, laneConditioned: true },
   ],
   tier: 'some-spread',
 };

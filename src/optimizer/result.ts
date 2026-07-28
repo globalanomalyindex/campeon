@@ -1,5 +1,4 @@
-import type { Cm360, Dpi, GameId, Profile, Report, Result, TrialResult } from '../types';
-import { perGameSens } from '../convert/schools';
+import type { Counts360, GameId, Profile, Report, Result, TrialResult } from '../types';
 import { computeBreakdown, facetConcordance } from './breakdown';
 import { mulberry32 } from '../stats/rng';
 
@@ -13,13 +12,55 @@ export type CiConcord = 'tight' | 'moderate' | 'wide';
  * CI cannot distinguish short-session sampling noise from facet disagreement). Returns undefined for a
  * degenerate/non-finite CI so no descriptor is fabricated for an unmeasurable bound.
  */
-export function ciConcord(_optimal: Cm360, ci90: readonly [Cm360, Cm360]): CiConcord | undefined {
+export function ciConcord(_optimal: Counts360, ci90: readonly [Counts360, Counts360]): CiConcord | undefined {
   const [lo, hi] = ci90;
   if (!(lo > 0) || !(hi > 0) || !(hi > lo)) return undefined;
   const w = Math.log(hi) - Math.log(lo); // CI width in ln space (scale-invariant)
   if (w <= 0.18) return 'tight';   // ratio hi/lo ≲ 1.20
   if (w >= 0.55) return 'wide';    // ratio hi/lo ≳ 1.73
   return 'moderate';
+}
+
+/**
+ * The three-tier prescription. Authored here in phase 1a because `Result.prescription` needs it in
+ * the same commit that deletes `Result.perGameSens`; phase 1b owns `buildPrescription` and every
+ * field it fills, and phases 3 and 4 fill the k and anchor sides.
+ *
+ * `ratio` and `ratioCi90` are OPTIONAL. As required fields they blocked tier two whenever k was
+ * pinned but the anchor refused, which is a reachable state (a player who typed their game and
+ * sensitivity but whose turn passes disagreed). `kLogSd` exists because the typed-sensitivity route
+ * inherits the anchor's spread whole, so tier two has to widen rather than borrow tier one's
+ * precision.
+ */
+export interface Prescription {
+  /** anchor.counts / report.optimalCounts: the factor to multiply the current in-game sensitivity
+   *  by. A ratio of two quantities counted in the same browser units, so k, yaw and any unit
+   *  convention cancel exactly - the one claim on the payoff screen that assumes nothing. OPTIONAL
+   *  (A5): absent exactly when the anchor refused; a session can still earn tier two without it. */
+  ratio?: number;
+  /** Conservative 90% band on the ratio: [anchor.lo / counts.hi, anchor.hi / counts.lo]. The
+   *  endpoint quotient is wider than an independence-assuming error product on purpose: the
+   *  dependence between the two CIs is not measured, and intervals widen, never narrow. Present
+   *  exactly when `ratio` is. */
+  ratioCi90?: [number, number];
+  /** C*, the located optimum in browser counts per 360, copied verbatim from the Report. */
+  counts: Counts360;
+  countsCi90: [Counts360, Counts360];
+  /** ONLY when k is pinned (lattice `scaled(k)` or a typed in-game sensitivity). Absent means
+   *  unpinned and tier two is withheld - never a table computed from a guessed k. Computed by
+   *  phase 3's tierTwoFrom, the single implementation of tier two (A4). */
+  perGameSens?: Partial<Record<GameId, number>>;
+  /** Absent exactly when `perGameSens` is: an unpinned k costs the tier, never the answer. */
+  kSource?: 'lattice' | 'typed-sens';
+  /** k's own uncertainty in ln space, inherited whole from the pin (A5). On the typed-sens route
+   *  this is the anchor's reproduction spread landing whole on k, so it is not small; the screen
+   *  must WIDEN each per-game row by it rather than borrowing tier one's precision. 0 on the
+   *  lattice route as phase 3 currently pins it. Present exactly when `perGameSens` is. */
+  kLogSd?: number;
+  /** C* / k: the located optimum in the mouse's OWN counts (A6). Present exactly when k is
+   *  pinned. Tier three renders THIS as convertible hardware counts; without it the screen keeps
+   *  browser counts and must disclose the second unmeasured factor in any centimetre arithmetic. */
+  hardwareCounts?: Counts360;
 }
 
 /**
@@ -40,20 +81,13 @@ export function ciConcord(_optimal: Cm360, ci90: readonly [Cm360, Cm360]): CiCon
 export function buildResult(
   report: Report,
   trials: readonly TrialResult[],
-  dpi: Dpi,
-  games?: readonly GameId[],
-  bounds?: [Cm360, Cm360],
+  bounds?: [Counts360, Counts360],
   profile?: Profile,
 ): Result {
-  const all = perGameSens(report.optimalCm360, dpi);
-  const perGameSensOut = games
-    ? (Object.fromEntries(games.map((g) => [g, all[g]])) as Partial<Record<GameId, number>>)
-    : all;
   return {
-    optimalCm360: report.optimalCm360,
+    optimalCounts: report.optimalCounts,
     ci90: report.ci90,
-    perGameSens: perGameSensOut,
-    breakdown: computeBreakdown(trials, report.optimalCm360, profile),
+    breakdown: computeBreakdown(trials, report.optimalCounts, profile),
     ...(bounds ? { curve: report.curve, bounds } : {}),
     // The strike lean is the user's REAL taste knob (profile.speedAccuracy), not the hardcoded
     // instrumentWeights.strike (=1). Carry it so the result screen can label the strike rows. Omit it

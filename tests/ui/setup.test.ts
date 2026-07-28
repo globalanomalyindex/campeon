@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { setup, calibrationProgress } from '../../src/ui/setup';
-import { cmPer360 } from '../../src/convert/cm360';
+import { countsForSens } from '../../src/convert/counts';
 import { yawFor } from '../../src/convert/yaw-table';
 import { boundsFromSeed } from '../../src/ui/options/settings';
+import { counts360, countsBounds } from '../../src/types';
 import type { AppContext, Route, SessionDraft } from '../../src/ui/shell';
 
 type SweepOpts = Parameters<typeof import('../../src/ui/calibrate/sweep-view').createSweepView>[1];
@@ -11,7 +12,7 @@ type SpinOpts = Parameters<typeof import('../../src/ui/calibrate/spin-view').cre
 
 function fakeCtx(): AppContext & { nav: Route[] } {
   const nav: Route[] = [];
-  const draft: SessionDraft = { dpi: 800, currentGame: 'cs2', currentSens: 1, bounds: [15, 60],
+  const draft: SessionDraft = { currentGame: 'cs2', currentSens: 1, bounds: countsBounds(4800, 19200),
     profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } } };
   return { route: 'setup', navigate(r: Route) { nav.push(r); }, draft, nav,
     storage: { saveSession() {}, loadSessions: () => [], saveResult() {}, exportJson: () => '' } } as AppContext & { nav: Route[] };
@@ -52,19 +53,17 @@ describe('setup (guided calibration orchestrator)', () => {
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();
     (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    expect(host.querySelector('[data-field="dpi"]')).toBeTruthy(); // the typed form is still reachable
+    expect(host.querySelector('[data-field="sens"]')).toBeTruthy(); // the typed form is still reachable
   });
 
-  it('the typed fast path writes dpi/sens/game + seeded bounds and navigates to session', () => {
+  it('the typed fast path writes sens/game + seeded bounds and navigates to session', () => {
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();
     (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    (host.querySelector('[data-field="dpi"]') as HTMLInputElement).value = '1600';
     (host.querySelector('[data-field="sens"]') as HTMLInputElement).value = '0.5';
     (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
-    expect(ctx.draft.dpi).toBe(1600);
     expect(ctx.draft.currentSens).toBe(0.5);
-    const seed = cmPer360(1600, 0.5, yawFor(ctx.draft.currentGame));
+    const seed = countsForSens(0.5, yawFor(ctx.draft.currentGame));
     expect(ctx.draft.bounds).toEqual(boundsFromSeed(seed));
     expect(ctx.nav).toContain('session');
   });
@@ -124,19 +123,6 @@ describe('setup: the typed step refuses numbers the arena cannot use', () => {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
-  it.each([['', 'empty'], ['0', 'zero'], ['-5', 'negative'], ['40000', 'above the supported range']])(
-    'a %s dpi (%s) neither navigates nor reaches the draft, and says why', (bad) => {
-      const ctx = fakeCtx(); const host = manualStep(ctx);
-      type(host, 'dpi', bad);
-      (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
-      expect(ctx.nav).toEqual([]);
-      expect(ctx.draft.dpi).toBe(800); // the draft is untouched
-      const err = host.querySelector('[data-error]')!;
-      expect(err.getAttribute('role')).toBe('alert');
-      expect(err.textContent!.toLowerCase()).toContain('dpi');
-      expect(host.querySelector('[data-field="dpi"]')!.getAttribute('aria-invalid')).toBe('true');
-    });
-
   it('a zero or missing sensitivity is refused too, and names the sensitivity field', () => {
     const ctx = fakeCtx(); const host = manualStep(ctx);
     type(host, 'sens', '0');
@@ -144,28 +130,20 @@ describe('setup: the typed step refuses numbers the arena cannot use', () => {
     expect(ctx.nav).toEqual([]);
     expect(host.querySelector('[data-error]')!.textContent!.toLowerCase()).toContain('sensitivity');
     expect(host.querySelector('[data-field="sens"]')!.getAttribute('aria-invalid')).toBe('true');
-    expect(host.querySelector('[data-field="dpi"]')!.getAttribute('aria-invalid')).toBe('false');
   });
 
   it('clears the message as soon as the number is corrected, then commits', () => {
     const ctx = fakeCtx(); const host = manualStep(ctx);
     const begin = host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement;
-    type(host, 'dpi', '0');
+    type(host, 'sens', '0');
     begin.click();
     expect(begin.getAttribute('aria-disabled')).toBe('true');
-    type(host, 'dpi', '1600');
+    type(host, 'sens', '0.5');
     expect(host.querySelector('[data-error]')!.textContent).toBe('');
     expect(begin.getAttribute('aria-disabled')).toBe('false');
     begin.click();
-    expect(ctx.draft.dpi).toBe(1600);
+    expect(ctx.draft.currentSens).toBe(0.5);
     expect(ctx.nav).toEqual(['session']);
-  });
-
-  it('never persists a dpi the arena cannot use', () => {
-    const ctx = rememberingCtx(null); const host = manualStep(ctx);
-    type(host, 'dpi', '0');
-    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
-    expect(ctx.savedPrefs()).toBeNull();
   });
 });
 
@@ -174,8 +152,8 @@ describe('setup: the typed step refuses numbers the arena cannot use', () => {
 import type { PersistedPrefs } from '../../src/types';
 
 const PREFS: PersistedPrefs = {
-  dpi: 1600, currentGame: 'valorant', currentSens: 0.4,
-  speedAccuracy: 0.7, bounds: [18, 50],
+  currentGame: 'valorant', currentSens: 0.4,
+  speedAccuracy: 0.7, bounds: countsBounds(5670, 15750),
 };
 
 function rememberingCtx(prefs: PersistedPrefs | null): ReturnType<typeof fakeCtx> & { savedPrefs: () => PersistedPrefs | null } {
@@ -193,7 +171,7 @@ describe('setup: remembered calibration (Phase C)', () => {
     const useSaved = host.querySelector('[data-action="use-saved"]') as HTMLButtonElement;
     expect(useSaved).toBeTruthy();
     expect(useSaved.className).toContain('action--primary');
-    expect(host.querySelector('[data-remembered]')!.textContent).toContain('1600');
+    expect(host.querySelector('[data-remembered]')!.textContent).toContain('5670');
     const recal = host.querySelector('[data-action="start-guided"]')!;
     expect(recal.className).toContain('action--ghost');
     expect(recal.textContent!.toLowerCase()).toContain('recalibrate');
@@ -208,12 +186,10 @@ describe('setup: remembered calibration (Phase C)', () => {
 
   it('use-saved re-applies the remembered prefs to the draft and goes straight to the hunt', () => {
     const ctx = rememberingCtx(PREFS); const host = document.createElement('div');
-    ctx.draft.dpi = 999; // a drifted draft must not leak into the session
     setup(host, ctx).mount();
     (host.querySelector('[data-action="use-saved"]') as HTMLButtonElement).click();
-    expect(ctx.draft.dpi).toBe(1600);
     expect(ctx.draft.currentGame).toBe('valorant');
-    expect(ctx.draft.bounds).toEqual([18, 50]);
+    expect(ctx.draft.bounds).toEqual([5670, 15750]);
     expect(ctx.draft.profile.speedAccuracy).toBe(0.7);
     expect(ctx.nav).toEqual(['session']);
   });
@@ -222,9 +198,9 @@ describe('setup: remembered calibration (Phase C)', () => {
     const ctx = rememberingCtx(null); const host = document.createElement('div');
     setup(host, ctx).mount();
     (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    (host.querySelector('[data-field="dpi"]') as HTMLInputElement).value = '3200';
+    (host.querySelector('[data-field="sens"]') as HTMLInputElement).value = '0.4';
     (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
-    expect(ctx.savedPrefs()).toMatchObject({ dpi: 3200 });
+    expect(ctx.savedPrefs()).toMatchObject({ currentSens: 0.4 });
   });
 
   it('the GUIDED (sweep -> spin) commit also remembers the calibration and heads to the hunt', () => {
@@ -244,20 +220,12 @@ describe('setup: remembered calibration (Phase C)', () => {
     expect(sweepOpts, 'sweep view mounted on start-guided').toBeTruthy();
     sweepOpts!.onResult({ dpi: 1600, accelerated: false }); // sweep measured a dpi -> advance to spin
     expect(spinOpts, 'spin view mounted after a valid sweep').toBeTruthy();
-    spinOpts!.onSeed(30); // the spin supplies the seed -> commitGuided
+    spinOpts!.onSeed(counts360(9450)); // the spin supplies the seed -> commitGuided
 
-    expect(ctx.savedPrefs()).toMatchObject({ dpi: 1600 });
+    expect(ctx.draft.bounds).toEqual(boundsFromSeed(counts360(9450)));
     expect(ctx.nav).toEqual(['session']);
   });
 
-  it('hides the saved-calibration fast path when the stored dpi is unusable', () => {
-    // A pref poisoned before the boundary check existed must not route straight into a divide by
-    // zero on every later visit. Recalibrating is the only offer left.
-    const ctx = rememberingCtx({ ...PREFS, dpi: 0 }); const host = document.createElement('div');
-    setup(host, ctx).mount();
-    expect(host.querySelector('[data-action="use-saved"]')).toBeNull();
-    expect(host.querySelector('[data-action="start-guided"]')!.className).toContain('action--primary');
-  });
 });
 
 // ── The guided steps are not a corridor ──
@@ -282,7 +250,7 @@ describe('setup: the sweep and the spin can be left', () => {
 
     (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
     cap.sweep().onManual();
-    expect(host.querySelector('[data-field="dpi"]'), 'manual reaches the typed step').toBeTruthy();
+    expect(host.querySelector('[data-field="sens"]'), 'manual reaches the typed step').toBeTruthy();
   });
 
   it('the spin can go back to the intro and can hand off to the typed step', () => {

@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { Arena, type RendererLike } from '../../src/engine/arena';
+import { counts360 } from '../../src/types';
 
 const renderer: RendererLike = { render() {}, setSize() {}, dispose() {} };
 const input = { onSample: () => () => {}, onFire: () => () => {} };
 const makeArena = (): Arena =>
-  new Arena({ renderer, input, size: () => [800, 600], cm360: 30, dpi: 800 });
+  new Arena({ renderer, input, size: () => [800, 600], counts: counts360(9450) });
 
 describe('Arena.removeTarget', () => {
   it('removes a single target by id, leaving others', () => {

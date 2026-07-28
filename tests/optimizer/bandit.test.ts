@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { counts360, countsBounds } from '../../src/types';
+import type { Counts360 } from '../../src/types';
 import { makeUcb1Bandit } from '../../src/optimizer/bandit';
 import type { Observation } from '../../src/types';
 
-const bounds: [number, number] = [15, 60];
-const arms = [16, 24, 32, 44, 58];
+const bounds: [Counts360, Counts360] = countsBounds(15, 60);
+const arms: Counts360[] = [16, 24, 32, 44, 58].map(counts360);
 
 describe('makeUcb1Bandit', () => {
   it('plays each unplayed arm once before repeating', () => {

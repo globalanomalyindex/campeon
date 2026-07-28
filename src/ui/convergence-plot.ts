@@ -1,13 +1,14 @@
-import type { Cm360, FacetPeak, InstrumentId } from '../types';
+import { counts360 } from '../types';
+import type { Counts360, FacetPeak, InstrumentId } from '../types';
 
 export interface PlotSize { width: number; height: number; }
-export interface PlotMark { cm360: Cm360; score: number; instrument: InstrumentId; }
+export interface PlotMark { counts: Counts360; score: number; instrument: InstrumentId; }
 export interface PlotInput {
-  bounds: [Cm360, Cm360];
+  bounds: [Counts360, Counts360];
   marks: readonly PlotMark[];
   curve?: readonly { x: number; mean: number }[]; // x = ln(cm/360)
-  ci90?: [Cm360, Cm360];
-  peak?: Cm360;
+  ci90?: [Counts360, Counts360];
+  peak?: Counts360;
   /**
    * A5's per-facet peaks, drawn as markers along the top of the plot: each probe's OWN best
    * sensitivity, so the eye can SEE the one-number thesis being tested against the blended peak
@@ -30,8 +31,8 @@ export interface FacetPeakPx {
 export interface PlotGeometry {
   size: PlotSize;
   pad: number;
-  xToPx(cm360: Cm360): number;
-  xTicks: { cm360: Cm360; px: number }[];
+  xToPx(counts: Counts360): number;
+  xTicks: { counts: Counts360; px: number }[];
   marks: PlotMarkPx[];
   curvePath: string | null;
   ciRectPx: { x: number; width: number } | null;
@@ -50,8 +51,8 @@ export function plotGeometry(input: PlotInput): PlotGeometry {
   const x0 = pad, x1 = size.width - pad;
   const y0 = size.height - pad, y1 = pad;
 
-  const xToPx = (cm360: number): number =>
-    x0 + ((Math.log(cm360) - lLo) / (lHi - lLo)) * (x1 - x0);
+  const xToPx = (counts: number): number =>
+    x0 + ((Math.log(counts) - lLo) / (lHi - lLo)) * (x1 - x0);
 
   const ys = [...marks.map((m) => m.score), ...(curve?.map((c) => c.mean) ?? [])];
   let yMin = ys.length ? Math.min(...ys) : 0;
@@ -62,8 +63,8 @@ export function plotGeometry(input: PlotInput): PlotGeometry {
   const yToPx = (score: number): number =>
     y0 + ((score - yMin) / (yMax - yMin)) * (y1 - y0);
 
-  const xTicks = NICE_TICKS.filter((t) => t >= lo && t <= hi).map((t) => ({ cm360: t, px: xToPx(t) }));
-  const marksPx: PlotMarkPx[] = marks.map((m) => ({ ...m, px: xToPx(m.cm360), py: yToPx(m.score) }));
+  const xTicks = NICE_TICKS.filter((t) => t >= lo && t <= hi).map((t) => ({ counts: counts360(t), px: xToPx(t) }));
+  const marksPx: PlotMarkPx[] = marks.map((m) => ({ ...m, px: xToPx(m.counts), py: yToPx(m.score) }));
 
   let curvePath: string | null = null;
   if (curve && curve.length >= 2) {
@@ -81,15 +82,15 @@ export function plotGeometry(input: PlotInput): PlotGeometry {
 
   const clampX = (px: number): number => Math.max(x0, Math.min(x1, px));
   const facetPeaks: FacetPeakPx[] = (input.facetPeaks ?? [])
-    .filter((f): f is FacetPeak & { peakCm360: number } => f.peakCm360 !== undefined && Number.isFinite(f.peakCm360))
+    .filter((f): f is FacetPeak & { peakCounts: number } => f.peakCounts !== undefined && Number.isFinite(f.peakCounts))
     .map((f) => ({
       instrument: f.instrument,
-      px: clampX(xToPx(f.peakCm360)),
+      px: clampX(xToPx(f.peakCounts)),
       whisker:
         f.spreadLn !== undefined && Number.isFinite(f.spreadLn) && f.spreadLn > 0
           ? {
-              x0: clampX(xToPx(Math.exp(Math.log(f.peakCm360) - f.spreadLn))),
-              x1: clampX(xToPx(Math.exp(Math.log(f.peakCm360) + f.spreadLn))),
+              x0: clampX(xToPx(Math.exp(Math.log(f.peakCounts) - f.spreadLn))),
+              x1: clampX(xToPx(Math.exp(Math.log(f.peakCounts) + f.spreadLn))),
             }
           : null,
       laneConditioned: f.laneConditioned,
@@ -181,7 +182,7 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
       x: t.px.toFixed(2), y: String(g.size.height - 8), 'text-anchor': 'middle',
       fill: 'var(--text-muted)', 'font-size': '10', 'font-family': 'var(--font-mono)',
     });
-    label.textContent = String(t.cm360);
+    label.textContent = String(t.counts);
     svg.appendChild(label);
   }
 

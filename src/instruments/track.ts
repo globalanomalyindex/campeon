@@ -295,7 +295,7 @@ export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
 
   return {
     instrument: ID,
-    cm360: ctx.cm360,
+    counts: ctx.counts,
     score,
     ...(scoreSE !== undefined && scoreSE > 0 ? { scoreSE } : {}),
     raw: { tot, predErr, pi, jitter, slip: slipRms, latencySec },
@@ -306,7 +306,7 @@ export function analyzeTrack(rec: Recording, ctx: TrialContext): TrialResult {
 export const track = {
   id: ID,
   run(ctx: TrialContext, scene: ArenaScene): Promise<TrialResult> {
-    scene.setSensitivity(ctx.cm360, ctx.dpi);
+    scene.setSensitivity(ctx.counts);
     // Unscored acclimation lead-in (see acclimation.ts): the player tracks the same weaving prey
     // for plan.ms before the recorder attaches, so the fast gain-adaptation transient is spent
     // before a single scored frame exists. The target and its motion seed are drawn EXACTLY as

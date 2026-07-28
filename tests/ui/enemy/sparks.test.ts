@@ -59,7 +59,7 @@ describe('sparkBurst factory', () => {
   });
 
   it('exposes NO scored API', () => {
-    const banned = ['bearing', 'radiusDeg', 'cm360', 'sample', 'score', 'observation', 'view'];
+    const banned = ['bearing', 'radiusDeg', 'counts', 'sample', 'score', 'observation', 'view'];
     const g = sparkBurst() as unknown as Record<string, unknown>;
     for (const k of banned) expect(g[k], `${k} must not exist`).toBeUndefined();
   });

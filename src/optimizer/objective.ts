@@ -77,7 +77,7 @@ export function trialsToObservations(
     if (!w) continue; // weight 0 or missing → no contribution
     const s = stats.get(t.instrument);
     if (!s || !(s.sd > 0)) continue; // no spread / NaN → no usable signal (never fabricate one)
-    const obs: Observation = { x: Math.log(t.cm360), y: w * ((t.score - s.mu) / s.sd) };
+    const obs: Observation = { x: Math.log(t.counts), y: w * ((t.score - s.mu) / s.sd) };
     if (t.scoreSE !== undefined && Number.isFinite(t.scoreSE) && t.scoreSE > 0) {
       const stdSE = (w * t.scoreSE) / s.sd; // standardized SE on the affine y scale
       obs.noise = Math.min(Math.max(stdSE * stdSE, floor), ceil);

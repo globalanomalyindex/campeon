@@ -54,7 +54,7 @@ export function analyzeStrike(shots: readonly StrikeShot[], ctx: TrialContext): 
 
   return {
     instrument: ID,
-    cm360: ctx.cm360,
+    counts: ctx.counts,
     score,
     ...(scoreSE !== undefined && scoreSE > 0 ? { scoreSE } : {}),
     raw: { ttkMs, tR, tS, vPeak, sigmaTheta, hitRate },
@@ -65,7 +65,7 @@ export function analyzeStrike(shots: readonly StrikeShot[], ctx: TrialContext): 
 export const strike = {
   id: ID,
   run(ctx: TrialContext, scene: ArenaScene): Promise<TrialResult> {
-    scene.setSensitivity(ctx.cm360, ctx.dpi);
+    scene.setSensitivity(ctx.counts);
     // Unscored acclimation lead-in (see acclimation.ts): the first `lead` shots are real reaches
     // at the new gain, discarded before scoring. Their geometry draws from the plan's PRIVATE rng
     // so the scored spawns consume exactly the ctx.rng draws they consumed before the lead-in.

@@ -92,8 +92,8 @@ describe('quarryMesh factory', () => {
     }
   });
 
-  it('exposes NO scored API (no bearing/radiusDeg/cm360/sample/score/observation on the group)', () => {
-    const banned = ['bearing', 'radiusDeg', 'cm360', 'sample', 'score', 'observation', 'view'];
+  it('exposes NO scored API (no bearing/radiusDeg/counts/sample/score/observation on the group)', () => {
+    const banned = ['bearing', 'radiusDeg', 'counts', 'sample', 'score', 'observation', 'view'];
     for (const id of ALL) {
       const g = quarryMesh(id) as unknown as Record<string, unknown>;
       for (const k of banned) {

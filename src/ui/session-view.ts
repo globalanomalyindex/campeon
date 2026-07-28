@@ -13,13 +13,13 @@ import type { InstrumentId, Report, TrialResult } from '../types';
 const SCHEDULE: InstrumentId[] = ['flick', 'track', 'calibrate', 'strike'];
 const MAX_TRIALS = 30;     // hard cap across all segments
 const COLD_START = 8;      // Generation 0 - the initial gene pool
-const FIRST_STOP_CI = 6;   // a segment converges when the 90% CI (cm/360) is tighter than this
+const FIRST_STOP_CI = 1900;   // a segment converges when the 90% CI, in counts per 360, is tighter than this
 const REFINE_GENS = 6;     // extra generations per "keep refining"
 const MIN_TRIALS = 12;     // the segment never stops short of this, however tight the CI gets
 const FIRST_SEGMENT = Math.min(MAX_TRIALS, COLD_START + 12); // the first segment's hard ceiling
 
 export function marksFromTrials(trials: readonly TrialResult[]): PlotMark[] {
-  return trials.map((t) => ({ cm360: t.cm360, score: t.score, instrument: t.instrument }));
+  return trials.map((t) => ({ counts: t.counts, score: t.score, instrument: t.instrument }));
 }
 
 const COPY: Record<InstrumentId, string> = {
@@ -34,8 +34,8 @@ export function instructionFor(id: InstrumentId): string { return COPY[id]; }
  *  pool); after that, each trial is a numbered generation testing one mutated sensitivity. The
  *  `of total` denominator is the segment's hard ceiling, so the line always says how far in you
  *  are: without it the run reads as open-ended and there is no way to judge whether to stop. */
-export function searchLabel(index: number, cm360: number, coldStart: number, total: number): string {
-  const where = `trial ${index + 1} of ${total} · testing ${cm360.toFixed(1)} cm/360`;
+export function searchLabel(index: number, counts: number, coldStart: number, total: number): string {
+  const where = `trial ${index + 1} of ${total} · testing ${counts.toFixed(1)} counts per 360`;
   return index < coldStart
     ? `Gen 0 · seeding the gene pool · ${where}`
     : `Generation ${index - coldStart + 1} · ${where}`;
@@ -49,8 +49,8 @@ export function segmentShape(minTrials: number, maxTrials: number): string {
 
 /** Concise spoken summary for the estimate live region (P4-3). The CI range is spelled " to " so a
  *  screen reader never voices a raw en-dash glyph; announced only at segment-meaningful moments. */
-export function announceEstimate(report: Pick<Report, 'optimalCm360' | 'ci90'>): string {
-  return `Dialed in around ${report.optimalCm360.toFixed(1)} cm/360, 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
+export function announceEstimate(report: Pick<Report, 'optimalCounts' | 'ci90'>): string {
+  return `Dialed in around ${report.optimalCounts.toFixed(1)} counts per 360, 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
 }
 
 /** The curtain line: announced ONCE, at the trial where the search leaves Generation 0 - the moment
@@ -109,7 +109,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
           <span class="cal-pulse"><span class="cal-pulse__dot"></span></span>
           <p class="mono session__prelock-label">The hunt</p>
           <p class="session__prelock-lead" data-prelock-lead>Watch the prey break cover, then snap on and fire. Each
-            round tests one sensitivity; the search evolves toward your sharpest cm/360.</p>
+            round tests one sensitivity; the search evolves toward your sharpest counts per 360.</p>
           <p class="session__prelock-lead session__prelock-sub">${segmentShape(MIN_TRIALS, FIRST_SEGMENT)} When the
             search settles you can lock it in or keep refining. Press <kbd>Esc</kbd> any time to pause.</p>
           <div class="session__prelock-actions">
@@ -123,7 +123,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         </div>
         <div class="session__dialed" data-panel role="dialog" aria-label="Dialed in" hidden>
           <p class="mono session__dialed-label">Dialed in</p>
-          <p class="display session__dialed-num"><span data-dialed="num"></span><small> cm/360</small></p>
+          <p class="display session__dialed-num"><span data-dialed="num"></span><small> counts per 360</small></p>
           <p class="mono session__dialed-ci">90% CI <span data-dialed="ci"></span></p>
           <p class="session__dialed-concord" data-dialed="concord" hidden></p>
           <p class="mono session__dialed-budget" data-dialed="budget"></p>
@@ -184,7 +184,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       const behind = [hudBar, plotFig];
 
       const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const stage = createStage(root, { canvas, cm360: ctx.draft.bounds[0], dpi: ctx.draft.dpi, reducedMotion: reduced });
+      const stage = createStage(root, { canvas, counts: ctx.draft.bounds[0], reducedMotion: reduced });
       const engine = makeEvolution({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 }, sigma0: 0.3, maxTrials: MAX_TRIALS });
 
       let allTrials: TrialResult[] = [];
@@ -224,20 +224,20 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       const drawPlot = (report: Report, trials: readonly TrialResult[]): void => {
         const g = plotGeometry({
           bounds: ctx.draft.bounds, marks: marksFromTrials(trials),
-          curve: report.curve, ci90: report.ci90, peak: report.optimalCm360,
+          curve: report.curve, ci90: report.ci90, peak: report.optimalCounts,
           size: { width: svg.clientWidth || 360, height: svg.clientHeight || 180 },
         });
         renderConvergencePlot(svg, g, 'blended score');
         // Per-trial visual readout only (aria-hidden): the live region stays quiet until a meaningful
         // moment. Range spelled " to " so no en-dash glyph ever reaches assistive tech.
-        hudEstimateVisual.textContent = `Most-evolved · ${report.optimalCm360.toFixed(1)} cm/360 · 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
+        hudEstimateVisual.textContent = `Most-evolved · ${report.optimalCounts.toFixed(1)} counts per 360 · 90% CI ${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)}`;
       };
 
       const runSegment = async (maxTrials: number, ciStopWidth: number | undefined): Promise<void> => {
         if (running) return; // re-entry guard at the source: a second concurrent launch (a stacked
         // begin double-click inside the async lock window, or any future caller) must never interleave
         // the SHARED stateful (1+lambda)-ES engine + allTrials buffer. `running` is set synchronously
-        // below before the first await, so the second microtask sees it true and bails. cm/360 is never
+        // below before the first await, so the second microtask sees it true and bails. counts per 360 is never
         // at risk (the gold sphere owns it); this protects the search lineage + live plot consistency.
         running = true;
         // try/finally, so a throw anywhere under here releases `running`. Without it one failure
@@ -245,14 +245,14 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         // is dead behind its own guard, and the session freezes with nothing on screen to say so.
         try {
           const { report, trials } = await runSession({
-            dpi: ctx.draft.dpi, profile: ctx.draft.profile, bounds: ctx.draft.bounds,
+            profile: ctx.draft.profile, bounds: ctx.draft.bounds,
             engine, instruments: INSTRUMENTS, scene: stage.arena, schedule: SCHEDULE,
             maxTrials, coldStart: COLD_START, rng: mulberry32(2026), minTrials: MIN_TRIALS,
             ...(ciStopWidth !== undefined ? { ciStopWidth } : {}),
             bootstrapIters: 300, initialTrials: allTrials, shouldStop: () => lockedIn,
-            onTrialStart: (id, i, cm360) => {
+            onTrialStart: (id, i, counts) => {
               hudInstruction.textContent = instructionFor(id);
-              hudProgress.textContent = searchLabel(i, cm360, COLD_START, maxTrials);
+              hudProgress.textContent = searchLabel(i, counts, COLD_START, maxTrials);
               // Announce ONLY when the instrument changes (a segment-meaningful moment), not every trial.
               if (id !== announcedInstrument) { announcedInstrument = id; hudEstimate.textContent = instructionFor(id); }
               // First encounter of an environment: a one-time title-card beat naming the probe.
@@ -286,8 +286,8 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         // createdAt: 0 left every record unsortable and unprunable.
         const now = Date.now();
         const sessionId = `s-${now}-${allTrials.length}`;
-        const result = buildResult(report, allTrials, ctx.draft.dpi, undefined, ctx.draft.bounds, ctx.draft.profile);
-        ctx.storage.saveSession({ id: sessionId, dpi: ctx.draft.dpi, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: now });
+        const result = buildResult(report, allTrials, ctx.draft.bounds, ctx.draft.profile);
+        ctx.storage.saveSession({ id: sessionId, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: now });
         ctx.storage.saveResult(sessionId, result);
         ctx.lastResult = { sessionId, result };
         rememberPrefs(ctx, sessionId); // point the returning-visitor restore at this result
@@ -303,12 +303,12 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         stage.exitLock(); // hand the cursor back so the panel buttons are clickable
         drawPlot(report, allTrials);
         hudEstimate.textContent = announceEstimate(report); // dialed-in: a meaningful moment to announce
-        $d('num').textContent = report.optimalCm360.toFixed(1);
+        $d('num').textContent = report.optimalCounts.toFixed(1);
         // " to ", never an en-dash: the range is read aloud as well as seen.
-        $d('ci').textContent = `${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)} cm/360`;
+        $d('ci').textContent = `${report.ci90[0].toFixed(1)} to ${report.ci90[1].toFixed(1)} counts per 360`;
         // Decision support for lock-vs-refine: the CI-width bucket in its honesty-vetted copy (a
         // width observation, never a single-cause claim) plus the plain trial-budget facts.
-        const concord = ciConcord(report.optimalCm360, report.ci90);
+        const concord = ciConcord(report.optimalCounts, report.ci90);
         const concordEl = $d('concord');
         if (concord) {
           concordEl.textContent = CONCORD_COPY[concord];
@@ -381,7 +381,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
 
       // Reveal the abort scrim ONLY when the lock dropped while a segment is mid-flight: lock dropped
       // AND running AND the dialed-in panel is hidden AND the user hasn't already committed. This is
-      // pure SHELL wiring - it appends NO scored trial and never touches the gold target / cm360.
+      // pure SHELL wiring - it appends NO scored trial and never touches the gold target / counts.
       const syncAbort = (): void => {
         const lockDropped = document.pointerLockElement !== canvas;
         setAbort(lockDropped && running && panel.hidden && errorEl.hidden && !lockedIn);
