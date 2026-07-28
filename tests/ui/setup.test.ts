@@ -1,116 +1,264 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { setup, calibrationProgress } from '../../src/ui/setup';
+import { setup, type SetupDeps } from '../../src/ui/setup';
 import { countsForSens } from '../../src/convert/counts';
 import { yawFor } from '../../src/convert/yaw-table';
 import { boundsFromSeed } from '../../src/ui/options/settings';
-import { counts360, countsBounds } from '../../src/types';
+import { counts360, type PersistedPrefs } from '../../src/types';
+import type { TurnEstimate } from '../../src/anchor/reference-turn';
+import type { Convention } from '../../src/input/lattice';
 import type { AppContext, Route, SessionDraft } from '../../src/ui/shell';
 
-type SweepOpts = Parameters<typeof import('../../src/ui/calibrate/sweep-view').createSweepView>[1];
-type SpinOpts = Parameters<typeof import('../../src/ui/calibrate/spin-view').createSpinView>[1];
+type TurnOpts = Parameters<typeof import('../../src/ui/calibrate/turn-view').createTurnView>[1];
 
 function fakeCtx(): AppContext & { nav: Route[] } {
   const nav: Route[] = [];
-  const draft: SessionDraft = { currentGame: 'cs2', currentSens: 1, bounds: countsBounds(4800, 19200),
-    profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } } };
+  // Typed as SessionDraft, no cast: phase 1a already deleted dpi, so the honest fixture simply
+  // does not have one. counts360() is required by the brand and harmless if bounds stayed plain.
+  const draft: SessionDraft = {
+    currentGame: 'cs2', currentSens: 1,
+    bounds: [counts360(4000), counts360(16000)],
+    profile: { speedAccuracy: 0.5, instrumentWeights: { track: 1, flick: 1, calibrate: 1, strike: 1 } },
+  };
   return { route: 'setup', navigate(r: Route) { nav.push(r); }, draft, nav,
     storage: { saveSession() {}, loadSessions: () => [], saveResult() {}, exportJson: () => '' } } as AppContext & { nav: Route[] };
 }
 
-describe('setup (guided calibration orchestrator)', () => {
-  it('offers a guided start and a typed fast path on the intro step', () => {
+const EST: TurnEstimate = { counts: counts360(8000), spreadPct: 2.1, logSd: 0.08, agreed: true, passes: 3 };
+const SCALED: Convention = { state: 'scaled', k: 2, purity: 1 };
+
+function captureTurn(): { deps: SetupDeps; turn: () => TurnOpts; mounts: () => number } {
+  let turnOpts: TurnOpts | null = null;
+  let n = 0;
+  const deps: SetupDeps = {
+    createTurnView: ((_h: HTMLElement, o: TurnOpts) => {
+      turnOpts = o; n += 1; return { dispose() {} };
+    }) as SetupDeps['createTurnView'],
+  };
+  return { deps, turn: () => turnOpts!, mounts: () => n };
+}
+
+function rememberingCtx(prefs: PersistedPrefs | null): ReturnType<typeof fakeCtx> & { savedPrefs: () => PersistedPrefs | null } {
+  const ctx = fakeCtx();
+  let saved = prefs;
+  ctx.storage.loadPrefs = () => saved;
+  ctx.storage.savePrefs = (p) => { saved = p; };
+  return Object.assign(ctx, { savedPrefs: () => saved });
+}
+
+const PREFS: PersistedPrefs = {
+  currentGame: 'valorant', currentSens: 0.4, speedAccuracy: 0.7,
+  bounds: [counts360(5000), counts360(14000)],
+};
+
+/** Walk the guided path to a mounted turn view: intro -> offer -> (accept | skip) -> turn.
+ *  The offer opens with BOTH halves empty, so accepting means filling both: no test may lean on a
+ *  prefill, because there is none to lean on. */
+function startTurn(host: HTMLElement, accept?: { game: string; sens: string }): void {
+  (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+  if (accept) {
+    const game = host.querySelector('[data-field="game"]') as HTMLSelectElement;
+    game.value = accept.game;
+    const sens = host.querySelector('[data-field="sens"]') as HTMLInputElement;
+    sens.value = accept.sens;
+    sens.dispatchEvent(new Event('input', { bubbles: true }));
+    (host.querySelector('[data-action="offer-accept"]') as HTMLButtonElement).click();
+  } else {
+    (host.querySelector('[data-action="offer-skip"]') as HTMLButtonElement).click();
+  }
+}
+
+describe('setup: the guided flow (the offer, then the blind turn)', () => {
+  it('offers the guided path and the typed fork, with no card and no DPI anywhere', () => {
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();
     expect(host.querySelector('[data-action="start-guided"]')).toBeTruthy();
     expect(host.querySelector('[data-action="start-manual"]')).toBeTruthy();
-    expect(host.querySelector('[data-field="pad"]')).toBeNull(); // no typed mousepad width
-    // a novice-friendly intro: a 2-step preview and a card-grab confirm on the primary button
-    expect(host.querySelectorAll('.cal-preview li').length).toBe(2);
-    expect(host.querySelector('[data-action="start-guided"]')!.textContent!.toLowerCase()).toContain('card');
+    expect(host.querySelectorAll('.cal-preview li').length).toBe(1); // one measured step; the offer is a question, not a step
+    const text = host.textContent!.toLowerCase();
+    expect(text).not.toContain('card'); // the prop is gone, not merely optional
+    expect(text).not.toContain('dpi');  // the unit chain is gone with it
   });
 
-  it('the progress tracker marks the active step and checks off a finished one', () => {
-    const onSweep = calibrationProgress('sweep');
-    expect(onSweep).toContain('The sweep');
-    expect(onSweep).toContain('The spin');
-    expect(onSweep).toMatch(/data-state="active"[^>]*><span[^>]*>1<\/span>The sweep/); // sweep active on the sweep step
-    const onSpin = calibrationProgress('spin');
-    expect(onSpin).toMatch(/data-state="done"[^>]*><span[^>]*>✓<\/span>The sweep/); // sweep checked once on the spin
-    expect(onSpin).toMatch(/data-state="active"[^>]*>.*The spin/);
-  });
-
-  it('rewords the typed fork so it stops inviting the read-my-sens misconception, with a starting-point note (P4-3)', () => {
+  it('start-guided asks for the game pair first, as an offer whose skip costs only the table', () => {
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();
-    const manual = host.querySelector('[data-action="start-manual"]')!;
-    expect(manual.textContent!.toLowerCase()).toContain("i'll type my numbers");
-    // a starting-point note must clarify the typed numbers seed the search, not read out as the answer
-    expect(host.textContent!.toLowerCase()).toContain('starting point');
+    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    expect(host.querySelector('h1')!.textContent).toBe('Name your game, if you like');
+    expect(host.querySelector('[data-action="offer-accept"]')).toBeTruthy();
+    expect(host.querySelector('[data-action="offer-skip"]')).toBeTruthy();
+    expect(host.textContent).toContain('Skipping costs the per-game table, not the result.');
   });
 
-  it('keeps the manual fast path reachable from the intro (reduced-motion / lock-denial escape hatch)', () => {
+  it('starts on no answer at all, so an ignored offer cannot be read as one', () => {
+    // The anchoring defect that killed the spin dial, in a new costume. The spin prefilled a dial
+    // and then measured the constant it had prefilled; an offer prefilled from defaultDraft()
+    // ('cs2', 1) would let a player who clicks straight past it pin k off a pair nobody typed, and
+    // k would then be wrong by the ratio of two yaws with nothing on the screen to show it. Empty
+    // is the only value that means "no answer": storage cannot say whether a remembered
+    // currentSens was typed or defaulted, so it never prefills this either.
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();
-    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    expect(host.querySelector('[data-field="sens"]')).toBeTruthy(); // the typed form is still reachable
+    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    expect((host.querySelector('[data-field="game"]') as HTMLSelectElement).value).toBe('');
+    expect((host.querySelector('[data-field="sens"]') as HTMLInputElement).value).toBe('');
   });
 
-  it('the typed fast path writes sens/game + seeded bounds and navigates to session', () => {
-    const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx).mount();
-    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    (host.querySelector('[data-field="sens"]') as HTMLInputElement).value = '0.5';
-    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
-    expect(ctx.draft.currentSens).toBe(0.5);
-    const seed = countsForSens(0.5, yawFor(ctx.draft.currentGame));
-    expect(ctx.draft.bounds).toEqual(boundsFromSeed(seed));
-    expect(ctx.nav).toContain('session');
+  it('a half-filled offer refuses and names the missing half', () => {
+    // Half an offer is the one state that must not reach the turn: a sensitivity with no game is
+    // not a pair, and silently dropping a number the player took the trouble to type is worse than
+    // refusing it by name.
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host, { game: '', sens: '2' });
+    expect(cap.mounts()).toBe(0); // the turn never started
+    const err = host.querySelector('[data-error]')!;
+    expect(err.getAttribute('role')).toBe('alert');
+    expect(err.textContent!.toLowerCase()).toContain('game');
+    expect(ctx.draft.currentSens).toBe(1); // and nothing reached the draft
   });
 
-  it('the intro offers a way back out of the flow', () => {
-    const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx).mount();
-    const back = host.querySelector('[data-action="to-hero"]') as HTMLButtonElement;
-    expect(back).toBeTruthy();
-    back.click();
-    expect(ctx.nav).toEqual(['hero']);
+  it('skipping the offer mounts the blind turn without touching the draft', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    expect(cap.turn()).toBeTruthy();
+    expect(ctx.draft.currentSens).toBe(1); // a skip records nothing
   });
 
-  it('speaks in the first person singular, with no institutional "we"', () => {
-    const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx).mount();
-    expect(host.textContent!).not.toMatch(/\bwe\b|\bwe'll\b|\bus\b/i);
+  it('accepting the offer records the pair on the draft, then mounts the turn', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host, { game: 'cs2', sens: '2' });
+    expect(ctx.draft.currentSens).toBe(2);
+    expect(cap.mounts()).toBe(1);
   });
 
-  // The canon voice: sentence case, capital "I", one <h1> naming the screen, and no revived "+"
-  // motif (it was retired because screen readers announced "plus" before every heading).
-  it.each(['intro', 'manual'] as const)('the %s step renders exactly one h1, sentence case, no "+" prefix', (step) => {
-    const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx).mount();
-    if (step === 'manual') (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    const h1s = host.querySelectorAll('h1');
-    expect(h1s.length).toBe(1);
-    expect(host.querySelector('h2')).toBeNull(); // the screen name is the h1 now, no orphan h2
-    const title = h1s[0]!.textContent!;
-    expect(title.startsWith('+')).toBe(false);
-    expect(title).toMatch(/^[A-Z]/);
+  it('an unusable offered sensitivity refuses with a named alert and does not advance', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host, { game: 'cs2', sens: '0' });
+    expect(cap.mounts()).toBe(0); // still on the offer
+    const err = host.querySelector('[data-error]')!;
+    expect(err.getAttribute('role')).toBe('alert');
+    expect(err.textContent!.toLowerCase()).toContain('sensitivity');
+    expect(host.querySelector('[data-field="sens"]')!.getAttribute('aria-invalid')).toBe('true');
   });
 
-  it('never writes the first-person pronoun as a lowercase "i"', () => {
-    const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx).mount();
-    expect(host.textContent!).not.toMatch(/\bi\b/); // case-sensitive: a standalone lowercase i is the violation
-    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    expect(host.textContent!).not.toMatch(/\bi\b/);
+  it('a completed turn reports its own spread before anything commits', () => {
+    // Spec: "Afterwards it reports the spread honestly." This screen is the agreed case: the
+    // player is told how close their three turns landed, which is the moment the blind
+    // instrument earns its blindness. Tabular figures per canon.
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    cap.turn().onTurn(EST, null);
+    const spread = host.querySelector('[data-done="spread"]')!;
+    expect(spread.textContent).toBe('2.1');
+    expect(spread.className).toContain('mono');
+    expect(ctx.nav).toEqual([]); // reported BEFORE committing, not after
+    expect(ctx.draft.turn).toBeUndefined();
+  });
+
+  it('continue commits the estimate, seeds counts bounds, remembers, and heads to the hunt', () => {
+    const cap = captureTurn(); const ctx = rememberingCtx(null); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    cap.turn().onTurn(EST, null);
+    (host.querySelector('[data-action="turn-continue"]') as HTMLButtonElement).click();
+    expect(ctx.draft.turn).toEqual(EST); // phase 4's reconciliation reads the turn's own spread
+    expect(ctx.draft.bounds).toEqual(boundsFromSeed(EST.counts));
+    expect(ctx.draft.profile.speedAccuracy).toBe(0.5);
+    // Skipped offer plus a closed lattice gate: k is honestly unpinned, and the reason says the
+    // estimator never ran (which the result screen turns into "type your sensitivity instead").
+    expect(ctx.draft.kPin).toEqual({ pinned: false, reason: 'gate-closed' });
+    expect(ctx.savedPrefs()).not.toBeNull();
+    expect(ctx.nav).toEqual(['session']);
+  });
+
+  it('an accepted offer pins k by the typed route, inheriting the turn pass spread whole', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host, { game: 'cs2', sens: '2' });
+    cap.turn().onTurn(EST, null);
+    (host.querySelector('[data-action="turn-continue"]') as HTMLButtonElement).click();
+    const pin = ctx.draft.kPin!;
+    expect(pin.pinned).toBe(true);
+    if (pin.pinned) {
+      expect(pin.source).toBe('typed-sens');
+      expect(pin.logSd).toBe(EST.logSd); // the reproduction error lands whole on k
+      expect(pin.k).toBeCloseTo(8000 / countsForSens(2, yawFor('cs2')), 10);
+    }
+  });
+
+  it('a scaled lattice pins k even when the offer was skipped', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    cap.turn().onTurn(EST, SCALED);
+    (host.querySelector('[data-action="turn-continue"]') as HTMLButtonElement).click();
+    expect(ctx.draft.kPin).toEqual({ pinned: true, k: 2, source: 'lattice', logSd: 0 });
+    expect(ctx.draft.convention).toEqual(SCALED);
+  });
+
+  it('the typed pair outranks the lattice when both exist', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host, { game: 'cs2', sens: '2' });
+    cap.turn().onTurn(EST, SCALED);
+    (host.querySelector('[data-action="turn-continue"]') as HTMLButtonElement).click();
+    const pin = ctx.draft.kPin!;
+    expect(pin.pinned && pin.source).toBe('typed-sens');
+  });
+
+  it('redo discards the pending estimate and remounts the turn, committing nothing', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    cap.turn().onTurn(EST, SCALED);
+    (host.querySelector('[data-action="redo-turn"]') as HTMLButtonElement).click();
+    expect(cap.mounts()).toBe(2);
+    expect(ctx.draft.turn).toBeUndefined();
+    expect(ctx.nav).toEqual([]);
+  });
+
+  it('an accel refusal shows the acceleration screen, and retry remounts the turn', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    cap.turn().onBlocked('accel', null);
+    expect(host.querySelectorAll('h1').length).toBe(1);
+    expect(host.querySelector('h1')!.textContent).toBe('Mouse acceleration is on');
+    (host.querySelector('[data-action="retry"]') as HTMLButtonElement).click();
+    expect(cap.mounts()).toBe(2);
+  });
+
+  it('a spread refusal names the measured spread and the fourth pass', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    cap.turn().onBlocked('spread', 27.4);
+    expect(host.querySelector('h1')!.textContent).toBe('Those turns never settled');
+    expect(host.textContent!.toLowerCase()).toContain('fourth pass');
+    const spread = host.querySelector('[data-blocked="spread"]')!;
+    expect(spread.textContent).toBe('27.4'); // the honest number, not "too far apart"
+    expect(spread.className).toContain('mono');
+  });
+
+  it('the turn can go back to the intro and hand off to the typed fallback, committing nothing', () => {
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host);
+    cap.turn().onBack();
+    expect(host.querySelector('[data-action="start-guided"]')).toBeTruthy();
+    startTurn(host);
+    cap.turn().onManual();
+    expect(host.querySelector('[data-action="manual-begin"]')).toBeTruthy();
+    expect(ctx.nav).toEqual([]);
   });
 });
 
-// ── The typed step validates at the boundary ──
-// A dpi of 0 used to reach CameraRig, divide by zero and blank the page - and rememberPrefs had
-// already persisted it, so the blank page came back on every later visit.
-
-describe('setup: the typed step refuses numbers the arena cannot use', () => {
+describe('setup: the typed fallback', () => {
   function manualStep(ctx: ReturnType<typeof fakeCtx>): HTMLElement {
     const host = document.createElement('div');
     setup(host, ctx).mount();
@@ -123,14 +271,44 @@ describe('setup: the typed step refuses numbers the arena cannot use', () => {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
-  it('a zero or missing sensitivity is refused too, and names the sensitivity field', () => {
-    const ctx = fakeCtx(); const host = manualStep(ctx);
-    type(host, 'sens', '0');
-    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
-    expect(ctx.nav).toEqual([]);
-    expect(host.querySelector('[data-error]')!.textContent!.toLowerCase()).toContain('sensitivity');
-    expect(host.querySelector('[data-field="sens"]')!.getAttribute('aria-invalid')).toBe('true');
+  it('has no DPI field: game and in-game sensitivity are the whole ask', () => {
+    const host = manualStep(fakeCtx());
+    expect(host.querySelector('[data-field="dpi"]')).toBeNull();
+    expect(host.querySelector('[data-field="game"]')).toBeTruthy();
+    expect(host.querySelector('[data-field="sens"]')).toBeTruthy();
   });
+
+  it('writes sens/game plus counts-seeded bounds, clears stale turn state, leaves k unpinned, and navigates', () => {
+    const ctx = fakeCtx();
+    // A guided run the player is now replacing by typing: every trace of it must go.
+    ctx.draft.turn = EST;
+    ctx.draft.convention = SCALED;
+    ctx.draft.kPin = { pinned: true, k: 2, source: 'lattice', logSd: 0 };
+    const host = manualStep(ctx);
+    type(host, 'sens', '0.5');
+    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
+    expect(ctx.draft.currentSens).toBe(0.5);
+    expect(ctx.draft.bounds).toEqual(boundsFromSeed(countsForSens(0.5, yawFor('cs2'))));
+    expect(ctx.draft.turn).toBeUndefined();       // phase 4 must never reconcile against a replaced run
+    expect(ctx.draft.convention).toBeUndefined();
+    // Typing alone cannot pin k: without a turn there is no arena count to compare against, so
+    // the typed numbers seed the search window only and the pin is honestly refused.
+    expect(ctx.draft.kPin).toEqual({ pinned: false, reason: 'gate-closed' });
+    expect(ctx.nav).toEqual(['session']);
+  });
+
+  it.each([['', 'empty'], ['0', 'zero'], ['-2', 'negative']])(
+    'a %s sensitivity (%s) neither navigates nor reaches the draft, and says why', (bad) => {
+      const ctx = fakeCtx(); const host = manualStep(ctx);
+      type(host, 'sens', bad);
+      (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
+      expect(ctx.nav).toEqual([]);
+      expect(ctx.draft.currentSens).toBe(1); // the draft is untouched
+      const err = host.querySelector('[data-error]')!;
+      expect(err.getAttribute('role')).toBe('alert');
+      expect(err.textContent!.toLowerCase()).toContain('sensitivity');
+      expect(host.querySelector('[data-field="sens"]')!.getAttribute('aria-invalid')).toBe('true');
+    });
 
   it('clears the message as soon as the number is corrected, then commits', () => {
     const ctx = fakeCtx(); const host = manualStep(ctx);
@@ -142,157 +320,73 @@ describe('setup: the typed step refuses numbers the arena cannot use', () => {
     expect(host.querySelector('[data-error]')!.textContent).toBe('');
     expect(begin.getAttribute('aria-disabled')).toBe('false');
     begin.click();
-    expect(ctx.draft.currentSens).toBe(0.5);
     expect(ctx.nav).toEqual(['session']);
   });
 });
 
-// ── Phase C: remember-my-calibration on the intro step ──
-
-import type { PersistedPrefs } from '../../src/types';
-
-const PREFS: PersistedPrefs = {
-  currentGame: 'valorant', currentSens: 0.4,
-  speedAccuracy: 0.7, bounds: countsBounds(5670, 15750),
-};
-
-function rememberingCtx(prefs: PersistedPrefs | null): ReturnType<typeof fakeCtx> & { savedPrefs: () => PersistedPrefs | null } {
-  const ctx = fakeCtx();
-  let saved = prefs;
-  ctx.storage.loadPrefs = () => saved;
-  ctx.storage.savePrefs = (p) => { saved = p; };
-  return Object.assign(ctx, { savedPrefs: () => saved });
-}
-
-describe('setup: remembered calibration (Phase C)', () => {
-  it('offers the saved-calibration fast path as PRIMARY when prefs exist, demoting recalibration', () => {
+describe('setup: remembered calibration', () => {
+  it('offers the saved fast path as PRIMARY when the stored bounds are usable', () => {
     const ctx = rememberingCtx(PREFS); const host = document.createElement('div');
     setup(host, ctx).mount();
     const useSaved = host.querySelector('[data-action="use-saved"]') as HTMLButtonElement;
     expect(useSaved).toBeTruthy();
     expect(useSaved.className).toContain('action--primary');
-    expect(host.querySelector('[data-remembered]')!.textContent).toContain('5670');
-    const recal = host.querySelector('[data-action="start-guided"]')!;
-    expect(recal.className).toContain('action--ghost');
-    expect(recal.textContent!.toLowerCase()).toContain('recalibrate');
+    expect(host.querySelector('[data-remembered]')!.textContent).toContain('5,000');
+    expect(host.querySelector('[data-action="start-guided"]')!.className).toContain('action--ghost');
   });
 
-  it('shows NO fast path on a first visit (or a prefs-less Storage)', () => {
+  it('shows NO fast path on a first visit', () => {
     const ctx = fakeCtx(); const host = document.createElement('div');
     setup(host, ctx).mount();
     expect(host.querySelector('[data-action="use-saved"]')).toBeNull();
     expect(host.querySelector('[data-action="start-guided"]')!.className).toContain('action--primary');
   });
 
-  it('use-saved re-applies the remembered prefs to the draft and goes straight to the hunt', () => {
+  it('hides the fast path when the stored bounds are malformed', () => {
+    // A poisoned pref must not hand the optimizer an empty or inverted window on every visit.
+    const ctx = rememberingCtx({ ...PREFS, bounds: [counts360(0), counts360(0)] });
+    const host = document.createElement('div');
+    setup(host, ctx).mount();
+    expect(host.querySelector('[data-action="use-saved"]')).toBeNull();
+  });
+
+  it('use-saved re-applies the remembered prefs, resets the pin, and goes straight to the hunt', () => {
     const ctx = rememberingCtx(PREFS); const host = document.createElement('div');
+    ctx.draft.currentSens = 9; // a drifted draft must not leak into the session
+    ctx.draft.kPin = { pinned: true, k: 2, source: 'lattice', logSd: 0 }; // a stale pin must not either
     setup(host, ctx).mount();
     (host.querySelector('[data-action="use-saved"]') as HTMLButtonElement).click();
     expect(ctx.draft.currentGame).toBe('valorant');
-    expect(ctx.draft.bounds).toEqual([5670, 15750]);
+    expect(ctx.draft.currentSens).toBe(0.4);
+    expect(ctx.draft.bounds).toEqual([5000, 14000]);
     expect(ctx.draft.profile.speedAccuracy).toBe(0.7);
+    // The pin is measured against one turn on one browser and is never persisted, so the fast
+    // path cannot carry one: it resets to the honest refusal.
+    expect(ctx.draft.kPin).toEqual({ pinned: false, reason: 'gate-closed' });
+    expect(ctx.draft.turn).toBeUndefined();
     expect(ctx.nav).toEqual(['session']);
   });
-
-  it('the typed commit REMEMBERS the calibration for the next visit', () => {
-    const ctx = rememberingCtx(null); const host = document.createElement('div');
-    setup(host, ctx).mount();
-    (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
-    (host.querySelector('[data-field="sens"]') as HTMLInputElement).value = '0.4';
-    (host.querySelector('[data-action="manual-begin"]') as HTMLButtonElement).click();
-    expect(ctx.savedPrefs()).toMatchObject({ currentSens: 0.4 });
-  });
-
-  it('the GUIDED (sweep -> spin) commit also remembers the calibration and heads to the hunt', () => {
-    // The primary path per the intro copy. Injected fake views drive the sweep-done -> onSeed chain
-    // without a GL context, so a dropped rememberPrefs in commitGuided would fail here.
-    const ctx = rememberingCtx(null);
-    let sweepOpts: Parameters<typeof import('../../src/ui/calibrate/sweep-view').createSweepView>[1] | null = null;
-    let spinOpts: Parameters<typeof import('../../src/ui/calibrate/spin-view').createSpinView>[1] | null = null;
-    const deps = {
-      createSweepView: ((_host: HTMLElement, opts: never) => { sweepOpts = opts; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/sweep-view').createSweepView,
-      createSpinView: ((_host: HTMLElement, opts: never) => { spinOpts = opts; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/spin-view').createSpinView,
-    };
-    const host = document.createElement('div');
-    setup(host, ctx, deps).mount();
-
-    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
-    expect(sweepOpts, 'sweep view mounted on start-guided').toBeTruthy();
-    sweepOpts!.onResult({ dpi: 1600, accelerated: false }); // sweep measured a dpi -> advance to spin
-    expect(spinOpts, 'spin view mounted after a valid sweep').toBeTruthy();
-    spinOpts!.onSeed(counts360(9450)); // the spin supplies the seed -> commitGuided
-
-    expect(ctx.draft.bounds).toEqual(boundsFromSeed(counts360(9450)));
-    expect(ctx.nav).toEqual(['session']);
-  });
-
 });
 
-// ── The guided steps are not a corridor ──
-
-describe('setup: the sweep and the spin can be left', () => {
-  function captureOpts(): { deps: Parameters<typeof setup>[2]; sweep: () => SweepOpts; spin: () => SpinOpts } {
-    let sweepOpts: SweepOpts | null = null;
-    let spinOpts: SpinOpts | null = null;
-    const deps = {
-      createSweepView: ((_h: HTMLElement, o: SweepOpts) => { sweepOpts = o; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/sweep-view').createSweepView,
-      createSpinView: ((_h: HTMLElement, o: SpinOpts) => { spinOpts = o; return { dispose() {} }; }) as typeof import('../../src/ui/calibrate/spin-view').createSpinView,
-    };
-    return { deps, sweep: () => sweepOpts!, spin: () => spinOpts! };
-  }
-
-  it('the sweep can go back to the intro and can hand off to the typed step', () => {
-    const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx, cap.deps).mount();
-    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
-    cap.sweep().onBack();
-    expect(host.querySelector('[data-action="start-guided"]'), 'back returns to the intro').toBeTruthy();
-
-    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
-    cap.sweep().onManual();
-    expect(host.querySelector('[data-field="sens"]'), 'manual reaches the typed step').toBeTruthy();
+describe('setup: voice', () => {
+  it.each(['intro', 'offer', 'manual'] as const)('the %s step: one h1, sentence case, no "+", no we, no lowercase i', (step) => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    if (step === 'offer') (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
+    if (step === 'manual') (host.querySelector('[data-action="start-manual"]') as HTMLButtonElement).click();
+    const h1s = host.querySelectorAll('h1');
+    expect(h1s.length).toBe(1);
+    expect(host.querySelector('h2')).toBeNull();
+    expect(h1s[0]!.textContent!.startsWith('+')).toBe(false);
+    expect(h1s[0]!.textContent!).toMatch(/^[A-Z]/);
+    expect(host.textContent!).not.toMatch(/\bwe\b|\bwe'll\b|\bus\b/i);
+    expect(host.textContent!).not.toMatch(/\bi\b/); // case-sensitive
   });
 
-  it('the spin can go back to the intro and can hand off to the typed step', () => {
-    const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx, cap.deps).mount();
-    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
-    cap.sweep().onResult({ dpi: 1600, accelerated: false });
-    cap.spin().onBack();
-    expect(host.querySelector('[data-action="start-guided"]')).toBeTruthy();
-    expect(ctx.nav).toEqual([]); // leaving the spin commits nothing
-  });
-
-  it('gives the blocked step an h1 for each block reason (accel and invalid)', () => {
-    // The blocked screen used to render leads with no heading at all, leaving the document
-    // outline empty exactly where a visitor most needs orientation.
-    const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
-    setup(host, ctx, cap.deps).mount();
-    (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
-    cap.sweep().onInvalid();
-    expect(host.querySelectorAll('h1').length).toBe(1);
-    expect(host.querySelector('h1')!.textContent).toBe("That sweep didn't take");
-
-    (host.querySelector('[data-action="retry"]') as HTMLButtonElement).click();
-    cap.sweep().onResult({ dpi: 1600, accelerated: true });
-    expect(host.querySelectorAll('h1').length).toBe(1);
-    expect(host.querySelector('h1')!.textContent).toBe('Mouse acceleration is on');
-  });
-
-  it.each([true, false])('passes prefers-reduced-motion (%s) into both guided views', (reduce) => {
-    // The views draw their cues on canvas, which the CSS reduced-motion block cannot reach, so the
-    // preference has to travel as a flag or it is simply ignored.
-    const prev = (window as { matchMedia?: unknown }).matchMedia;
-    (window as unknown as { matchMedia: unknown }).matchMedia = (q: string) => ({ matches: reduce && q.includes('reduced-motion') });
-    try {
-      const cap = captureOpts(); const ctx = fakeCtx(); const host = document.createElement('div');
-      setup(host, ctx, cap.deps).mount();
-      (host.querySelector('[data-action="start-guided"]') as HTMLButtonElement).click();
-      expect(cap.sweep().reducedMotion).toBe(reduce);
-      cap.sweep().onResult({ dpi: 1600, accelerated: false });
-      expect(cap.spin().reducedMotion).toBe(reduce);
-    } finally {
-      (window as unknown as { matchMedia: unknown }).matchMedia = prev;
-    }
+  it('the intro offers a way back out of the flow', () => {
+    const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx).mount();
+    (host.querySelector('[data-action="to-hero"]') as HTMLButtonElement).click();
+    expect(ctx.nav).toEqual(['hero']);
   });
 });

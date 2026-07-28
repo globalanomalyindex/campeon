@@ -1,5 +1,8 @@
 import type { Counts360, GameId, PersistedPrefs, Profile, Result, Session, Storage } from '../types';
 import { countsBounds } from '../types';
+import type { TurnEstimate } from '../anchor/reference-turn';
+import type { Convention } from '../input/lattice';
+import type { KPin } from '../input/count-convention';
 
 export type Route = 'hero' | 'setup' | 'session' | 'result' | 'case-study' | 'options' | 'range';
 
@@ -14,6 +17,21 @@ export interface SessionDraft {
   currentSens: number;
   profile: Profile;
   bounds: [Counts360, Counts360];
+  /** The blind reference turn behind the current bounds, when the guided path ran. Phase 4's
+   *  reconciliation reads its self-measured spread as the turn's weight; the typed fallback and
+   *  the saved-prefs fast path clear it so a replaced run never haunts the reconcile (pinned in
+   *  tests/ui/setup.test.ts). */
+  turn?: TurnEstimate;
+  /** What the delta stream said about the count convention during the turn; null when the
+   *  acceleration gate kept the estimator from running at all. Kept beside the pin so the result
+   *  screen can say WHY k is unpinned in the ran-and-refused case. */
+  convention?: Convention | null;
+  /** The count convention pin for THIS run, computed at the guided commit
+   *  (src/ui/setup.ts commitGuided). Never persisted: rememberPrefs writes only game, sens, goal
+   *  and bounds, because a pin is measured against one turn on one browser, and reusing last
+   *  week's pin on a new browser is exactly the silent unit error the pin exists to prevent.
+   *  Absent (a deep-linked draft that never passed setup) reads as unpinned. */
+  kPin?: KPin;
 }
 
 export interface AppContext {

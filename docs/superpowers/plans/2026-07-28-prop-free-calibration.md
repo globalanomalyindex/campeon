@@ -5895,6 +5895,29 @@ git add src/ui/calibrate/turn-view.ts tests/ui/turn-view.test.ts
 git commit -m "feat(calibrate): the turn view, blind, with the lattice tap and the spread in the copy" -m "No canvas, no rAF, no degree glyph: the tests pin the absences. The raw delta stream feeds conventionFromGated behind the acceleration gate, and the fourth-pass offer names the measured spread instead of gesturing at it. The hold-to-reposition affordance survives from the spin verbatim, because running out of mousepad is real."
 ```
 
+> **AMENDED DURING EXECUTION, 2026-07-28. Applies to tasks 18, 19 and 20.**
+>
+> **The commit that deletes a component also deletes its stylesheet rules.** A component and its
+> styles are one unit.
+>
+> `tests/styles.test.ts` carries a repo-wide invariant that no rule may exist for a class nothing
+> applies. Deleting `calibrationProgress` in task 18 orphans `.cal-progress`, `.cal-progress__seg`,
+> `.cal-progress__num` and `.cal-progress__arrow`; task 19 then orphans `.cal-pace`,
+> `.cal-pace__fill`, `.cal-pace__label` and `.calibrate__readouts`. This plan assigns
+> `src/styles/calibrate.css` to phase 1b and says to prune it "when you next touch the stylesheet",
+> and never reconciles that deferral with the invariant, so as written tasks 18, 19 and 20 all end
+> red until a phase several steps away lands.
+>
+> Prune the orphans here, in the same commit that creates them. The ownership partition was an
+> authoring device to stop two plan authors colliding in one file; at execution time the phases run
+> sequentially with one executor each, so that risk is gone, and the alternative is carrying dead CSS
+> across a dozen commits with the test that exists to catch it either red or switched off. Relaxing
+> the invariant to get a green commit is not an option: it is there because this exact thing happens.
+>
+> Phase 1b keeps its own stylesheet work. It re-adds the per-game table, so it must restore the
+> `.result__games` rules AND the `--color-primary-wash` token, both removed as dead during task 4.
+> That is a different file and a different direction, and it is recorded on the phase 1b task.
+
 ### Task 18: the flow reworked onto the offer and the turn, and the pin site
 
 **Files:**

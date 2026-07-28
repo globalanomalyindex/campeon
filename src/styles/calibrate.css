@@ -57,28 +57,8 @@
 
 /* ── Guided cues: one step at a time ──────────────────────────────────────── */
 
-/* The two-segment journey tracker, held top centre across the sweep and the spin. */
-.cal-progress {
-  position: fixed; top: var(--space-4); left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: var(--space-3); z-index: 30;
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  padding: var(--space-2) var(--space-4);
-  font: var(--type-label); font-family: var(--font-text);
-  letter-spacing: var(--tracking-label); text-transform: uppercase;
-}
-.cal-progress__seg { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-muted); }
-.cal-progress__seg[data-state='active'] { color: var(--instrument-calibrate); }
-.cal-progress__seg[data-state='done'] { color: var(--color-success); }
-/* A numbered step is a frame, so it is a square cell on the ramp, not a pill. */
-.cal-progress__num {
-  display: inline-grid; place-items: center;
-  width: var(--space-4); height: var(--space-4);
-  border: 1px solid currentColor;
-  border-radius: var(--radius-none);
-  font-size: var(--text-caption); letter-spacing: 0;
-}
-.cal-progress__arrow { color: var(--text-muted); }
+/* The two-segment journey tracker left with the sweep and the spin: the guided path now has one
+   measured step, and a tracker over a single step is furniture. */
 
 /* The step marker reads as a catalogue tag. */
 .cal-step {

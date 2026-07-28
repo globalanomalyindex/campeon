@@ -1,43 +1,36 @@
 // Guided calibration orchestrator. Pure step machine (calibrate-flow) under a thin shell that
-// mounts the sweep + spin views and writes the session draft. The game pick is deferred to the
-// result; the speed/accuracy goal defaults to balanced. Retires the typed setup + the gate.
+// mounts the blind turn view and writes the session draft. The guided path is the offer (name
+// your game and sensitivity, or skip), then the turn, then the spread report, then the commit,
+// which is the single place k is pinned: the typed pair needs the arena's own count for the SAME
+// turn, so the offer rides alongside the turn and never replaces it. Nothing here carries a
+// physical unit: the card, the DPI field and the cm vocabulary left with the sweep (spec
+// 2026-07-25, "deleting the measurement, not replacing the card").
 import { rememberPrefs, type AppContext, type Screen } from './shell';
-import { counts360 } from '../types';
 import type { GameId } from '../types';
 import { GAME_YAW, yawFor } from '../convert/yaw-table';
 import { countsForSens } from '../convert/counts';
 import { boundsFromSeed } from './options/settings';
-import { CARD_WIDTH_CM } from '../input/dpi-sweep';
+import { pinConvention, type TypedSensRoute } from '../input/count-convention';
+import type { Convention } from '../input/lattice';
 import { calibrateReducer, initialCalState, type CalState } from './calibrate-flow';
-import { createSweepView, type SweepView } from './calibrate/sweep-view';
-import { createSpinView, type SpinView } from './calibrate/spin-view';
+import { createTurnView, type TurnView } from './calibrate/turn-view';
+import type { TurnEstimate } from '../anchor/reference-turn';
 
 /** Thin-shell injection seam (mirrors sessionView's SessionViewDeps): production mounts the real
- *  WebGL sweep + spin views, but a jsdom test can swap in fakes to drive the guided commit path -
- *  the sweep->spin->onSeed->commitGuided chain - without a GL context. */
-export interface SetupDeps {
-  createSweepView: typeof createSweepView;
-  createSpinView: typeof createSpinView;
-}
-const DEFAULT_SETUP_DEPS: SetupDeps = { createSweepView, createSpinView };
-
-/** The persistent 2-segment journey tracker overlaid across the sweep + spin steps. Pure markup so
- *  it is unit-testable: the active step is highlighted, an earlier finished step gets a checkmark. */
-export function calibrationProgress(step: 'sweep' | 'spin'): string {
-  const seg = (n: string, label: string, st: 'done' | 'active' | 'todo'): string =>
-    `<span class="cal-progress__seg" data-state="${st}"><span class="cal-progress__num">${st === 'done' ? '✓' : n}</span>${label}</span>`;
-  return `<div class="cal-progress" data-cal-progress>${
-    seg('1', 'The sweep', step === 'sweep' ? 'active' : 'done')
-  }<span class="cal-progress__arrow" aria-hidden="true">→</span>${
-    seg('2', 'The spin', step === 'spin' ? 'active' : 'todo')
-  }</div>`;
-}
+ *  pointer-locked turn view, but a jsdom test can swap in a fake to drive the onTurn to
+ *  commitGuided chain without a pointer lock. */
+export interface SetupDeps { createTurnView: typeof createTurnView; }
+const DEFAULT_SETUP_DEPS: SetupDeps = { createTurnView };
 
 export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFAULT_SETUP_DEPS): Screen {
-  const { createSweepView, createSpinView } = deps;
+  const { createTurnView } = deps;
   let state: CalState = initialCalState();
-  let view: SweepView | SpinView | null = null;
-  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let view: TurnView | null = null;
+  /** The turn awaiting the player's continue on the spread report. Outside the reducer on
+   *  purpose: the reducer carries no measurement state. */
+  let pending: { estimate: TurnEstimate; convention: Convention | null } | null = null;
+  /** The measured spread behind a 'spread' block, for the blocked screen to name. */
+  let blockedSpread: number | null = null;
 
   function dispatch(a: Parameters<typeof calibrateReducer>[1]): void {
     state = calibrateReducer(state, a);
@@ -50,29 +43,63 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     return GAME_YAW.map((g) => `<option value="${g.id}"${g.id === sel ? ' selected' : ''}>${g.label}</option>`).join('');
   }
 
-  function commitGuided(seedCounts: number): void {
+  /** The OFFER's picker, which starts on no answer at all, unlike the typed fallback's, which
+   *  defaults to the draft. The difference is the whole point. The spin dial was deleted because it
+   *  prefilled a number and then measured the number it had prefilled; a prefilled game beside a
+   *  prefilled sensitivity is the same defect in new clothes, because k is pinned from that pair
+   *  and a player who clicks past the offer would pin it against whatever `defaultDraft()` happened
+   *  to hold ('cs2' and 1), wrong by the ratio of two yaws with nothing on the screen to show it.
+   *  Empty is the only value that can mean "no answer", which is why a remembered `currentSens`
+   *  never prefills this either: storage cannot say whether that number was typed or defaulted.
+   *  Pinned by 'starts on no answer at all, so an ignored offer cannot be read as one'. */
+  function offerGameOptions(): string {
+    const opts = GAME_YAW.map((g) => `<option value="${g.id}">${g.label}</option>`).join('');
+    return `<option value="" selected>Pick your game</option>${opts}`;
+  }
+
+  /** The guided commit, and the ONLY place k is pinned. The typed route needs both halves: the
+   *  exact counts the player's own setting implies (the offer pair) and the arena's count for the
+   *  same turn (the estimate). That is why the offer is collected alongside the turn rather than
+   *  instead of it: skipping it costs the absolute numbers and never the ratio. */
+  function commitGuided(estimate: TurnEstimate, convention: Convention | null): void {
+    ctx.draft.turn = estimate; // phase 4's reconciliation reads the turn's own spread as its weight
+    ctx.draft.convention = convention;
+    const offered = state.offerAccepted && Number.isFinite(ctx.draft.currentSens) && ctx.draft.currentSens > 0;
+    const typed: TypedSensRoute | null = offered
+      ? { game: ctx.draft.currentGame, sens: ctx.draft.currentSens, arenaCounts: estimate.counts, anchorLogSd: estimate.logSd }
+      : null;
+    ctx.draft.kPin = pinConvention(convention, typed);
     ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: 0.5 }; // balanced default; tune later on options
-    ctx.draft.bounds = boundsFromSeed(counts360(seedCounts)); // the spin always supplies a seed
-    rememberPrefs(ctx); // a returning visitor never redoes a calibration they already earned
+    ctx.draft.bounds = boundsFromSeed(estimate.counts);
+    // rememberPrefs persists game, sens, goal and bounds only. The pin, the turn and the
+    // convention stay off disk on purpose: each is measured against one turn on one browser, and
+    // reusing last week's pin on a new browser is the silent unit error the pin exists to prevent.
+    rememberPrefs(ctx);
     ctx.navigate('session');
   }
 
-  /** True when this sensitivity can safely reach the arena. Zero or negative divides by zero in
-   *  `countsForSens`, and the tool no longer asks for a DPI, so this is the whole gate now. */
-  function usableNumbers(sens: number): boolean {
-    return Number.isFinite(sens) && sens > 0;
+  /** True when a stored bounds pair can seed the search. Guards the remembered fast path: a
+   *  malformed pair would hand the optimizer an empty or inverted window on every later visit. */
+  function usableBounds(b: readonly [number, number]): boolean {
+    return Number.isFinite(b[0]) && Number.isFinite(b[1]) && b[0] > 0 && b[1] > b[0];
   }
 
-  /** Commit the typed route. `countsForSens` is exact rather than estimated: given the game and the
-   *  sensitivity the player is currently using, 360 / (yaw * sens) IS their counts per 360. Returns
-   *  false without committing on an unusable number, so a bad value cannot poison the draft (and,
-   *  through rememberPrefs, every later visit). */
+  // The typed fallback: a genuine fallback, not a second pin route. Without a turn there is no
+  // arena count to compare the pair against, so k stays honestly unpinned here (gate-closed: the
+  // estimator never ran) and the typed numbers seed the search window only. Do not reintroduce a
+  // DPI field here: the unit chain is deleted, not dormant.
   function commitManual(sens: number, game: GameId, goal: number): boolean {
-    if (!usableNumbers(sens)) return false;
+    if (!(Number.isFinite(sens) && sens > 0)) return false;
     ctx.draft.currentSens = sens;
     ctx.draft.currentGame = game;
     ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: goal };
     ctx.draft.bounds = boundsFromSeed(countsForSens(sens, yawFor(game)));
+    // A typed commit replaces any earlier guided run wholesale: the stale turn, its convention
+    // and its pin are all cleared, because phase 4 must never weigh a turn the player chose to
+    // type over (pinned in tests/ui/setup.test.ts).
+    delete ctx.draft.turn;
+    delete ctx.draft.convention;
+    ctx.draft.kPin = pinConvention(null, null);
     rememberPrefs(ctx);
     ctx.navigate('session');
     return true;
@@ -82,21 +109,19 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     teardownView();
     host.replaceChildren();
 
-    if (state.step === 'sweep') {
-      view = createSweepView(host, { referenceWidthCm: CARD_WIDTH_CM, reducedMotion: reduced,
-        onResult: (r) => dispatch({ type: 'sweep-done', dpi: r.dpi, accelerated: r.accelerated }),
-        onInvalid: () => dispatch({ type: 'sweep-invalid' }),
-        onLockFailed: () => dispatch({ type: 'start-manual' }),
+    if (state.step === 'turn') {
+      view = createTurnView(host, {
+        onTurn: (estimate, convention) => {
+          pending = { estimate, convention };
+          dispatch({ type: 'turn-complete' }); // the spread report comes BEFORE the commit
+        },
+        onBlocked: (reason, spreadPct) => {
+          blockedSpread = spreadPct;
+          dispatch({ type: 'turn-blocked', reason });
+        },
         onManual: () => dispatch({ type: 'start-manual' }),
-        onBack: () => dispatch({ type: 'back-to-intro' }) });
-      host.insertAdjacentHTML('beforeend', calibrationProgress('sweep')); // fixed-position overlay tracker
-      return;
-    }
-    if (state.step === 'spin' && state.dpi !== null) {
-      view = createSpinView(host, { reducedMotion: reduced, onSeed: (cm) => commitGuided(cm),
-        onManual: () => dispatch({ type: 'start-manual' }),
-        onBack: () => dispatch({ type: 'back-to-intro' }) });
-      host.insertAdjacentHTML('beforeend', calibrationProgress('spin'));
+        onBack: () => dispatch({ type: 'back-to-intro' }),
+      });
       return;
     }
 
@@ -109,16 +134,15 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
 
   function stepHtml(): string {
     if (state.step === 'intro') {
-      // A returning visitor's fast path: their calibration was hardware-measured once and remembered
-      // (campeon.prefs.v1) - offer to reuse it as the search seed rather than redo the sweep+spin.
-      // Recalibrating stays one click away (a new mouse or pad invalidates the old measurement).
-      // A stored dpi the arena cannot use is not offered as a fast path: it would route straight to a
-      // divide by zero. Recalibrating is the only honest option in that case.
+      // A returning visitor's fast path: their calibration was measured once and remembered
+      // (campeon.prefs.v1). Recalibrating stays one click away (a new mouse or pad invalidates the
+      // old turn). Malformed stored bounds are not offered: recalibrating is the only honest
+      // option then.
       const stored = ctx.storage.loadPrefs?.() ?? null;
-      const remembered = stored;
+      const remembered = stored !== null && usableBounds(stored.bounds) ? stored : null;
       const rememberedBlock = remembered
         ? `<div class="setup__remembered" data-remembered>
-            <p class="setup__lead">You've calibrated before. Searching ${remembered.bounds[0]} to ${remembered.bounds[1]} counts per 360.</p>
+            <p class="setup__lead">You've calibrated before. Searching <span class="mono">${Math.round(remembered.bounds[0]).toLocaleString('en-US')}</span> to <span class="mono">${Math.round(remembered.bounds[1]).toLocaleString('en-US')}</span> counts per 360.</p>
             <button class="action action--primary" data-action="use-saved">Start from your saved calibration</button>
           </div>`
         : '';
@@ -126,17 +150,39 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       <div class="wrap stack setup__inner">
         <h1 class="display setup__title">Calibrate</h1>
         ${rememberedBlock}
-        <p class="setup__lead">Two quick steps, no numbers to look up. The sweep and the spin read how your hand actually moves.</p>
+        <p class="setup__lead">Nothing to measure or look up. Name your game if you like, then three blind turns read the turn distance your hands already know.</p>
         <ol class="cal-preview">
-          <li><span class="cal-preview__n">1</span><span>The sweep. Drag a card's width, which measures your mouse.</span></li>
-          <li><span class="cal-preview__n">2</span><span>The spin. Turn all the way around once.</span></li>
+          <li><span class="cal-preview__n">1</span><span>The turn. Turn all the way around by feel, three times: right, left, right.</span></li>
         </ol>
-        <p class="setup__lead">First, grab any card from your wallet: bank card, gym card, hotel key. They're all exactly the same size.</p>
-        ${reduced ? `<p class="setup__lead mono">Reduced motion is on, so the guided steps draw their cues as still marks.</p>` : ''}
-        <button class="action ${remembered ? 'action--ghost' : 'action--primary'}" data-action="start-guided">${remembered ? "Recalibrate, I've got a card" : "I've got a card, start"}</button>
+        <button class="action ${remembered ? 'action--ghost' : 'action--primary'}" data-action="start-guided">${remembered ? 'Recalibrate' : 'Start the turn'}</button>
         <button class="action action--ghost" data-action="start-manual">I'll type my numbers instead</button>
         <p class="setup__lead setup__manual-note mono">Typed numbers are the starting point the search works out from.</p>
         <button class="action action--ghost" data-action="to-hero">Back</button>
+      </div>`;
+    }
+    if (state.step === 'offer') return `
+      <div class="wrap stack setup__inner">
+        <h1 class="display setup__title">Name your game, if you like</h1>
+        <p class="setup__lead">Your game and the sensitivity you have in it right now pin the absolute numbers, because that pair says exactly how far your hand travels for one turn. Both halves or neither: half a pair measures nothing. Skip it and you still get the change to make, just not the numbers to type.</p>
+        <label class="field">Current game<select data-field="game">${offerGameOptions()}</select></label>
+        <label class="field">In-game sensitivity<input class="mono" type="number" min="0.01" step="0.01" data-field="sens" value="" aria-describedby="setup-error"></label>
+        <p class="field__error" id="setup-error" data-error role="alert"></p>
+        <button class="action action--primary" data-action="offer-accept">Use these</button>
+        <button class="action action--ghost" data-action="offer-skip">Skip, I don't know it</button>
+        <p class="setup__lead setup__manual-note mono">Skipping costs the per-game table, not the result.</p>
+        <button class="action action--ghost" data-action="back">Back</button>
+      </div>`;
+    if (state.step === 'turn-done' && pending !== null) {
+      // 'done' always rests on exactly three kept passes: an agreeing trio keeps all three, a
+      // rescued fourth drops the outlier back to three, and everything else blocks. So "your
+      // three turns" is always the truth. The spread is the payoff of the blindness: no meter
+      // told the hands where to stop, and they still landed this close.
+      return `
+      <div class="wrap stack setup__inner">
+        <h1 class="display setup__title">Your turns agree</h1>
+        <p class="gate__lead">Your three turns landed within <span class="mono" data-done="spread">${pending.estimate.spreadPct.toFixed(1)}</span> percent of each other. That agreement is the whole measurement: no meter told your hands where to stop.</p>
+        <button class="action action--primary" data-action="turn-continue">Keep going</button>
+        <button class="action action--ghost" data-action="redo-turn">Redo the turn</button>
       </div>`;
     }
     if (state.step === 'blocked') {
@@ -147,9 +193,11 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
           ? `<h1 class="display setup__title">Mouse acceleration is on</h1>
              <p class="gate__lead">Your mouse speeds up the faster you move, which makes one true turn distance impossible to pin down.</p>
              <p>Turn off "enhance pointer precision" (Windows) or your mouse driver's acceleration, then try again.</p>`
-          : `<h1 class="display setup__title">That sweep didn't take</h1>
-             <p class="gate__lead">Probably a little too short or uneven, which happens.</p>
-             <p>Line the card up, rest your mouse at its left edge, and slide smoothly all the way to the right edge.</p>`}
+          : `<h1 class="display setup__title">Those turns never settled</h1>
+             <p class="gate__lead">${blockedSpread !== null
+               ? `Even with a fourth pass, your turns landed <span class="mono" data-blocked="spread">${blockedSpread.toFixed(1)}</span> percent apart, too far for one honest number.`
+               : 'Even with a fourth pass, your turns landed too far apart for one honest number.'}</p>
+             <p>A steadier ritual helps: same start posture, a full circle each time, the same finishing click. Or type your numbers below.</p>`}
         <button class="action action--primary" data-action="retry">Try again</button>
         <button class="action action--ghost" data-action="manual">I'll type my numbers instead</button>
         <p class="setup__lead setup__manual-note mono">Typed numbers are the starting point the search works out from.</p>
@@ -166,7 +214,9 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
         <button class="action action--primary" data-action="manual-begin">Begin</button>
         <button class="action action--ghost" data-action="back">Back</button>
       </div>`;
-    return ''; // 'spin' returns early in render(); no other steps reach here
+    // 'turn' returns early in render(). 'turn-done' with no pending estimate is unreachable:
+    // only onTurn dispatches turn-complete, and it sets pending first.
+    return '';
   }
 
   function wire(root: HTMLElement): void {
@@ -177,52 +227,97 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       // Re-apply the remembered prefs to the draft (the shell already merged them at boot, but a
       // mid-session edit may have drifted the draft) and go straight to the hunt.
       const p = ctx.storage.loadPrefs?.();
-      if (!p || !usableNumbers(p.currentSens)) return; // a poisoned pref never reaches the arena
+      if (!p || !usableBounds(p.bounds)) return; // a poisoned pref never reaches the arena
       ctx.draft.currentGame = p.currentGame;
       ctx.draft.currentSens = p.currentSens;
       ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: p.speedAccuracy };
       ctx.draft.bounds = p.bounds;
+      // The stored prefs carry no turn record and never a pin (see SessionDraft.kPin): stale
+      // measurement state from an earlier run on this visit must not ride along either.
+      delete ctx.draft.turn;
+      delete ctx.draft.convention;
+      ctx.draft.kPin = pinConvention(null, null);
       ctx.navigate('session');
     });
     click('start-manual', () => dispatch({ type: 'start-manual' }));
-    click('retry', () => dispatch({ type: 'retry' }));
+    click('offer-skip', () => dispatch({ type: 'offer-skipped' }));
+    click('turn-continue', () => { if (pending !== null) commitGuided(pending.estimate, pending.convention); });
+    click('redo-turn', () => { pending = null; dispatch({ type: 'retry' }); });
+    click('retry', () => { blockedSpread = null; dispatch({ type: 'retry' }); });
     click('manual', () => dispatch({ type: 'start-manual' }));
     click('back', () => dispatch({ type: 'back-to-intro' }));
     click('to-hero', () => ctx.navigate('hero'));
+    wireOfferValidation(root, val);
     wireManualValidation(root, val);
   }
 
-  /** The typed step validates at the boundary. The begin button stays focusable and stays clickable
-   *  when the numbers are wrong (a disabled control explains nothing): pressing it names the problem
-   *  in a role="alert" and refuses to navigate. Once a first attempt has failed, typing corrects the
-   *  message live, so the fix is confirmed as it is made. */
+  /** The offer validates at the boundary, exactly as the typed fallback does: the accept button
+   *  stays focusable and clickable when the answer is wrong (a disabled control explains
+   *  nothing). Pressing it names the problem in a role="alert" and refuses to advance.
+   *
+   *  Both halves are required, and refusing half an offer is the load-bearing part. k is
+   *  arenaCounts / countsForSens(sens, yawFor(game)), so a sensitivity without its game is not a
+   *  measurement of anything: pairing it with a defaulted game would pin k wrong by the ratio of
+   *  two yaws, and pairing a game with a defaulted sensitivity would pin it wrong by the ratio of
+   *  two sensitivities. Skipping is always available and costs only the per-game table, so there
+   *  is no honest reason to accept half a pair. */
+  function wireOfferValidation(root: HTMLElement, val: (sel: string) => string): void {
+    const accept = root.querySelector('[data-action="offer-accept"]') as HTMLButtonElement | null;
+    const errEl = root.querySelector('[data-error]') as HTMLElement | null;
+    if (!accept || !errEl) return;
+    let attempted = false;
+
+    const problem = (): string | null => {
+      const game = val('game');
+      const raw = val('sens').trim();
+      if (game === '') return 'Pick the game that sensitivity is from, or skip this step.';
+      if (raw === '') return 'Type the sensitivity you have in that game, or skip this step.';
+      const sens = Number(raw);
+      return Number.isFinite(sens) && sens > 0 ? null : 'In-game sensitivity needs to be a number above zero.';
+    };
+    const show = (msg: string | null): void => {
+      errEl.textContent = msg ?? '';
+      accept.setAttribute('aria-disabled', msg ? 'true' : 'false');
+      root.querySelector('[data-field="sens"]')?.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    };
+    root.querySelector('[data-field="sens"]')?.addEventListener('input', () => { if (attempted) show(problem()); });
+    root.querySelector('[data-field="game"]')?.addEventListener('change', () => { if (attempted) show(problem()); });
+    accept.addEventListener('click', () => {
+      attempted = true;
+      const msg = problem();
+      show(msg);
+      if (msg !== null) { (root.querySelector('[data-field="sens"]') as HTMLElement | null)?.focus(); return; }
+      // The offer only records the pair. k is measured against the arena's own count, which does
+      // not exist until the turn passes are in, so the pin happens at the commit and not here.
+      ctx.draft.currentGame = val('game') as GameId;
+      ctx.draft.currentSens = Number(val('sens'));
+      dispatch({ type: 'offer-accepted' });
+    });
+  }
+
+  /** The typed fallback validates at the boundary, same contract as the offer above. Once a first
+   *  attempt has failed, typing corrects the message live, so the fix is confirmed as it is made. */
   function wireManualValidation(root: HTMLElement, val: (sel: string) => string): void {
     const begin = root.querySelector('[data-action="manual-begin"]') as HTMLButtonElement | null;
     const errEl = root.querySelector('[data-error]') as HTMLElement | null;
     if (!begin || !errEl) return;
-    const fields = ['sens'] as const;
     let attempted = false;
 
-    const problem = (): { field: 'sens'; msg: string } | null => {
+    const problem = (): string | null => {
       const sens = Number(val('sens'));
-      if (!Number.isFinite(sens) || sens <= 0) return { field: 'sens', msg: 'In-game sensitivity needs to be a number above zero.' };
-      return null;
+      return Number.isFinite(sens) && sens > 0 ? null : 'In-game sensitivity needs to be a number above zero.';
     };
-    const show = (p: ReturnType<typeof problem>): void => {
-      errEl.textContent = p?.msg ?? '';
-      begin.setAttribute('aria-disabled', p ? 'true' : 'false');
-      for (const f of fields) {
-        root.querySelector(`[data-field="${f}"]`)?.setAttribute('aria-invalid', f === p?.field ? 'true' : 'false');
-      }
+    const show = (msg: string | null): void => {
+      errEl.textContent = msg ?? '';
+      begin.setAttribute('aria-disabled', msg ? 'true' : 'false');
+      root.querySelector('[data-field="sens"]')?.setAttribute('aria-invalid', msg ? 'true' : 'false');
     };
-    for (const f of fields) {
-      root.querySelector(`[data-field="${f}"]`)?.addEventListener('input', () => { if (attempted) show(problem()); });
-    }
+    root.querySelector('[data-field="sens"]')?.addEventListener('input', () => { if (attempted) show(problem()); });
     begin.addEventListener('click', () => {
       attempted = true;
-      const p = problem();
-      show(p);
-      if (p !== null) { (root.querySelector(`[data-field="${p.field}"]`) as HTMLElement | null)?.focus(); return; }
+      const msg = problem();
+      show(msg);
+      if (msg !== null) { (root.querySelector('[data-field="sens"]') as HTMLElement | null)?.focus(); return; }
       commitManual(Number(val('sens')), val('game') as GameId, Number(val('goal')));
     });
   }
