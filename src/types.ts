@@ -30,6 +30,16 @@ export interface ArenaScene {
   spawnTarget(spec: TargetSpec): TargetHandle;
   onAim(cb: (sample: AimSample, viewYawPitch: [Degrees, Degrees]) => void): () => void;
   clearTargets(): void;
+  /** The target being presented right now, or null between presentations.
+   *
+   *  Target lifetime belongs to the instruments: each one spawns a target, clears it, and spawns the
+   *  next, holding the handle in a local nobody else sees. So nothing outside an instrument could
+   *  answer this question, which is why the anchor's observational channel
+   *  (src/anchor/reach-observer.ts) asks the scene rather than the session config: it is the only
+   *  place the answer exists. Newest wins when several are up, which is the free-play range's case
+   *  and never the scored one. Read-only, and safe to call on every frame.
+   *  Regression: tests/engine/arena-active-target.test.ts. */
+  activeTarget(): TargetHandle | null;
   // Phase 3 - the instrument-driving surface (the contract anticipated this):
   /** Per-frame tick: dt since the previous frame and the arena clock, both in ms. */
   onFrame(cb: (dtMs: Ms, nowMs: Ms) => void): () => void;

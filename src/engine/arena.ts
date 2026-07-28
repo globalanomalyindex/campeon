@@ -132,6 +132,10 @@ export class Arena implements ArenaScene {
   private readonly frameCbs = new Set<FrameCallback>();
   private readonly fireCbs = new Set<FireCallback>();
   private readonly moving = new Set<MovingTarget>();
+  /** The most recently spawned target that has not been cleared or removed. Tracked rather than
+   *  derived from `targets`, because a Map preserves insertion order and "newest" would then mean
+   *  "last inserted", which stops being true the moment a middle target is removed and re-added. */
+  private live: TargetHandle | null = null;
   private readonly unsubInput: () => void;
   private readonly unsubFire: () => void;
   private nextId = 0;
@@ -338,6 +342,7 @@ export class Arena implements ArenaScene {
       target.mesh.visible = false;
       this.enemies.spawn(id, target.mesh, target.radiusDeg(), this.nowMs);
     }
+    this.live = target;
     return target;
   }
 
@@ -349,6 +354,11 @@ export class Arena implements ArenaScene {
     }
     this.targets.clear();
     this.moving.clear();
+    this.live = null;
+  }
+
+  activeTarget(): TargetHandle | null {
+    return this.live;
   }
 
   /** Remove a single target by id (range free-play retires killed targets one at a time). Safe no-op
@@ -362,6 +372,7 @@ export class Arena implements ArenaScene {
     if (target instanceof MovingTarget) this.moving.delete(target);
     target.dispose();
     this.targets.delete(id);
+    if (this.live?.id === id) this.live = null;
     this.enemies?.remove?.(id);
   }
 

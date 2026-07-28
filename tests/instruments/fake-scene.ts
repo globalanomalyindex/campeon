@@ -32,6 +32,11 @@ export class FakeScene implements ArenaScene {
     this.cleared += 1;
     this.targets = [];
   }
+  /** Newest spawned, cleared by clearTargets: the same rule Arena implements, so a test double and
+   *  the real arena cannot disagree about when a reach ended. */
+  activeTarget(): TargetHandle | null {
+    return this.targets[this.targets.length - 1] ?? null;
+  }
   onAim(_cb: (s: AimSample, v: [Degrees, Degrees]) => void): () => void {
     return () => {};
   }
