@@ -67,7 +67,7 @@ export function createArenaStage(
 
   // The in-scene 3D revolver attaches through the arena's viewmodel seam (mirrors attachEnemies):
   // the arena drives its look/fire/tick from the rig camera + fire events, so its recoil/sway springs
-  // run inside arena.tick - no separate rAF tick, no DOM overlay. Cosmetic: it never touches cm/360.
+  // run inside arena.tick - no separate rAF tick, no DOM overlay. Cosmetic: it never touches the measurement.
   const ready = Promise.all([
     Promise.resolve(createViewmodel3D({ reducedMotion })).then((vm) => {
       if (!alive) { vm.dispose(); return; }

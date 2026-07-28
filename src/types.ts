@@ -87,7 +87,7 @@ export interface TrialContext {
 export interface TrialResult {
   instrument: InstrumentId;
   counts: Counts360;
-  score: number;                 // within-trial, higher = better (Phase 4 normalizes across the cm/360 sweep)
+  score: number;                 // within-trial, higher = better (Phase 4 normalizes across the counts sweep)
   raw: Record<string, number>;   // instrument-specific metrics
   at: Ms;
   /** Optional MEASURED standard error of `score` on its own native scale (Phase 1 heteroscedastic
