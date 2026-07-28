@@ -540,6 +540,50 @@
 .result__game-pick { max-width: 22rem; margin-bottom: var(--space-4); }
 .result__saved { font: var(--type-body-sm); color: var(--text-muted); margin-top: var(--space-3); }
 
+/* Tier one opens the page, so it drops the top margin the shared .result__tier rule uses to
+   separate the evidence blocks from what precedes them. Without this the hero starts a spacing
+   step below the wrap padding and the number no longer sits where the page begins. */
+.result__tier--one { margin-top: 0; }
+
+/* Tier two's per-game table, restored alongside the table itself: it exists only behind a pinned
+   count convention, and the rules go where the markup goes. Square, hairline-ruled, tabular
+   figures on every sensitivity. The current game is marked by a wash rather than a weight,
+   because hierarchy in this system never comes from font-weight (canon 3). */
+.result__games { width: 100%; border-collapse: collapse; margin-top: var(--space-5); font: var(--type-body-sm); }
+.result__games th, .result__games td { padding: var(--space-2) var(--space-3); text-align: left; border-bottom: 1px solid var(--border-hairline); }
+.result__games th {
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-muted);
+}
+.result__games td { font-variant-numeric: tabular-nums slashed-zero; }
+.result__games [data-current='true'] { background: var(--color-primary-wash); color: var(--text-strong); }
+
+/* The three assumption tiers (No. 1 assumes nothing, No. 2 one measured factor, No. 3 arithmetic
+   on your input). The ordering is DOM structure pinned by result-canon.test.ts; these rules only
+   dress it: museum-tag heads, prose-measure notes, tabular figures on every measured number
+   (canon 5). Zero radius everywhere is inherited; nothing here rounds a corner. */
+.result__ratio-note,
+.result__tier-note,
+.result__k-note {
+  font: var(--type-body-sm);
+  color: var(--text-muted);
+  max-width: var(--measure-prose);
+  margin-top: var(--space-3);
+}
+.result__counts-line { max-width: var(--measure-prose); }
+.result__counts-line .mono,
+.result__number,
+.result__converted {
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+/* Tier two's k-spread band (A5): measured widening, quieter than the point value it widens. */
+.result__games [data-sens-band] {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+.result__dpi-field { max-width: 22rem; margin-top: var(--space-4); }
+.result__converted { color: var(--text-muted); margin-top: var(--space-3); }
+
 /* ── The plot legend ──────────────────────────────────────────────────────────
    The swatches are empty inline spans carrying an instrument colour, so without a
    box they painted nothing at all. A dot, matching the .dot primitive. */

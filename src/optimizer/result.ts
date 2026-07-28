@@ -161,6 +161,12 @@ export interface BuildResultOpts {
   /** Search bounds, persisted with the verbatim curve so the plot survives a reload. */
   bounds?: [Counts360, Counts360];
   profile?: Profile;
+  /** The reconciled C0 reading (phase 2's turn, phase 4's reconciliation). null or omitted means
+   *  no anchor this session; the ratio fields are then omitted, never padded. */
+  anchor?: AnchorReading | null;
+  /** Phase 3's pin, straight off the draft (SessionDraft.kPin). Absent or unpinned costs tier
+   *  two, never tier one. */
+  k?: KPin;
 }
 
 /**
@@ -182,10 +188,15 @@ export function buildResult(
   opts: BuildResultOpts = {},
 ): Result {
   const { bounds, profile } = opts;
+  const prescription = buildPrescription(report, opts.anchor ?? null, opts.k, opts.games);
   return {
     optimalCounts: report.optimalCounts,
     ci90: report.ci90,
     breakdown: computeBreakdown(trials, report.optimalCounts, profile),
+    // The payoff tiers. null when nothing was earned (no anchor AND no pinned k) or the vertex
+    // clamped: the screen then leads with the located counts and says why the factor is
+    // withheld, never a padded ratio.
+    ...(prescription ? { prescription } : {}),
     ...(bounds ? { curve: report.curve, bounds } : {}),
     // The strike lean is the user's REAL taste knob (profile.speedAccuracy), not the hardcoded
     // instrumentWeights.strike (=1). Carry it so the result screen can label the strike rows. Omit

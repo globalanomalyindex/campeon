@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildResult, ciConcord } from '../../src/optimizer/result';
 import { counts360, type Counts360, type Profile, type Report, type TrialResult } from '../../src/types';
+import type { KPin } from '../../src/input/count-convention';
 
 const c = counts360;
 const ci = (lo: number, hi: number): [Counts360, Counts360] => [c(lo), c(hi)];
@@ -117,5 +118,36 @@ describe('ciConcord', () => {
     expect(ciConcord(c(8000), [c(NaN), c(9200)])).toBeUndefined();
     expect(ciConcord(c(8000), [c(0), c(9200)])).toBeUndefined();
     expect(ciConcord(c(8000), [c(9200), c(8000)])).toBeUndefined(); // hi <= lo
+  });
+});
+
+describe('buildResult prescription attachment', () => {
+  const anchor = { counts: c(7040), ci90: ci(6800, 7300) };
+  const latticePin: KPin = { pinned: true, k: 2, source: 'lattice', logSd: 0 };
+
+  it('attaches the prescription when an anchor is supplied (tier one rides the Result)', () => {
+    const r = buildResult(report, trials, { anchor });
+    expect(r.prescription).toBeDefined();
+    expect(r.prescription!.ratio).toBe(7040 / 8000);
+  });
+
+  it('omits it with neither an anchor nor a pinned k: absent, never a padded ratio', () => {
+    const r = buildResult(report, trials);
+    expect('prescription' in r).toBe(false);
+    const s = buildResult(report, trials, { k: { pinned: false, reason: 'gate-closed' } });
+    expect('prescription' in s).toBe(false);
+  });
+
+  it('attaches a k-only prescription when the anchor refused but k is pinned (A5)', () => {
+    const r = buildResult(report, trials, { k: latticePin });
+    expect(r.prescription).toBeDefined();
+    expect('ratio' in r.prescription!).toBe(false);
+    expect(r.prescription!.kSource).toBe('lattice');
+  });
+
+  it('omits it when the vertex clamped (a factor against a bound refuses)', () => {
+    const r = buildResult({ ...report, peakAtBound: 'high' }, trials, { anchor, k: latticePin });
+    expect('prescription' in r).toBe(false);
+    expect(r.peakAtBound).toBe('high'); // the bound disclosure itself still rides
   });
 });
