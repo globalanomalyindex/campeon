@@ -1,6 +1,8 @@
 import { makeEvolution } from '../optimizer/evolution';
 import { runSession as runSessionImpl, type SessionConfig, type SessionOutcome } from '../optimizer/session-controller';
 import { buildResult, ciConcord } from '../optimizer/result';
+import { anchorFromReaches, type FirstReach } from '../anchor/flick-anchor';
+import { reconcile } from '../anchor/reconcile';
 import { INSTRUMENTS } from '../instruments/registry';
 import { mulberry32 } from '../stats/rng';
 import { CONCORD_COPY } from './concord';
@@ -188,6 +190,13 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
       const engine = makeEvolution({ gp: { signalVar: 1, lengthScale: 0.6, noiseVar: 0.1 }, sigma0: 0.3, maxTrials: MAX_TRIALS });
 
       let allTrials: TrialResult[] = [];
+      // Every reach the anchor read, across every segment of this visit. Accumulated rather than
+      // replaced: "keep refining" runs a second runSession with its own ReachObserver, so its
+      // outcome carries only its own trials' reaches, and overwriting would hand the estimator a
+      // fraction of the session. It would then REFUSE rather than error, which is a silent loss
+      // wearing an honest refusal (pinned by 'accumulates reaches across segments').
+      let allReaches: FirstReach[] = [];
+      let leadInDiscarded = 0;
       let lastReport: Report | null = null;
       let lockedIn = false;
       let running = false;
@@ -244,7 +253,7 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         // leaves the flag stuck true forever: the abort scrim's gate stays armed, "keep refining"
         // is dead behind its own guard, and the session freezes with nothing on screen to say so.
         try {
-          const { report, trials } = await runSession({
+          const outcome = await runSession({
             profile: ctx.draft.profile, bounds: ctx.draft.bounds,
             engine, instruments: INSTRUMENTS, scene: stage.arena, schedule: SCHEDULE,
             maxTrials, coldStart: COLD_START, rng: mulberry32(2026), minTrials: MIN_TRIALS,
@@ -272,7 +281,12 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
             },
             onTrial: (_t, trials2, interim) => { lastReport = interim; drawPlot(interim, trials2); },
           });
-          allTrials = trials; lastReport = report;
+          allTrials = outcome.trials;
+          lastReport = outcome.report;
+          // Concatenated, never assigned. See the declaration of allReaches above: a second segment
+          // ran a second observer over its own trials only.
+          allReaches = [...allReaches, ...outcome.reaches];
+          leadInDiscarded += outcome.leadInDiscarded;
         } finally {
           running = false;
         }
@@ -286,7 +300,24 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
         // createdAt: 0 left every record unsortable and unprunable.
         const now = Date.now();
         const sessionId = `s-${now}-${allTrials.length}`;
-        const result = buildResult(report, allTrials, { bounds: ctx.draft.bounds, profile: ctx.draft.profile });
+        // The two anchor routes meet here and nowhere else, because this is the only place both
+        // exist: the blind turn was written to the draft at setup, and the reaches came out of the
+        // segments above. reconcile returns null when neither route spoke, and null is passed
+        // through as ABSENCE rather than widened into a guess: buildPrescription then withholds the
+        // factor and the screen says so. Order is load bearing only in that each argument is the
+        // previous result; nothing here refits anything.
+        const anchor = reconcile(ctx.draft.turn ?? null, anchorFromReaches(allReaches));
+        const result = buildResult(report, allTrials, {
+          bounds: ctx.draft.bounds,
+          profile: ctx.draft.profile,
+          // Spread conditionally, not passed as undefined: exactOptionalPropertyTypes draws a
+          // distinction between an absent option and one present with the value undefined, and the
+          // absent one is what "no anchor this session" means.
+          ...(anchor !== null ? { anchor } : {}),
+          // Phase 3's pin, straight off the draft. Absent or unpinned costs tier two and never the
+          // factor, because the factor is a ratio of two counts in the same browser units.
+          ...(ctx.draft.kPin !== undefined ? { k: ctx.draft.kPin } : {}),
+        });
         ctx.storage.saveSession({ id: sessionId, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: now });
         ctx.storage.saveResult(sessionId, result);
         ctx.lastResult = { sessionId, result };

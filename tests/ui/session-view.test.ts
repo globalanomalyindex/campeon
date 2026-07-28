@@ -6,8 +6,10 @@ import {
   CURTAIN_LINE, ENV_BEATS, dialedBudget, segmentShape, type SessionViewDeps,
 } from '../../src/ui/session-view';
 import type { AppContext } from '../../src/ui/shell';
-import type { InstrumentId, Report, TrialResult } from '../../src/types';
+import type { Counts360, InstrumentId, Report, TrialResult } from '../../src/types';
 import type { SessionOutcome } from '../../src/optimizer/session-controller';
+import type { FirstReach } from '../../src/anchor/flick-anchor';
+import { turnFromPasses } from '../../src/anchor/reference-turn';
 import type { ArenaStage } from '../../src/ui/arena-stage';
 
 describe('session-view helpers', () => {
@@ -534,5 +536,122 @@ describe('session-view: dialed-in decision support (Phase C)', () => {
     expect(savedPrefs.length).toBe(1);
     expect((savedPrefs[0] as { lastSessionId?: string }).lastSessionId).toMatch(/^s-/);
     screen.unmount();
+  });
+});
+
+describe('session-view: finalize reconciles the anchor and prescribes', () => {
+  const c = counts360;
+  const ci = (lo: number, hi: number): [Counts360, Counts360] => [c(lo), c(hi)];
+  const REPORT: Report = {
+    optimalCounts: c(6000),
+    ci90: ci(5600, 6500),
+    curve: [{ x: Math.log(5000), mean: 0.1 }, { x: Math.log(6000), mean: 0.4 }],
+  } as Report;
+  const TRIALS: TrialResult[] = [
+    { instrument: 'flick', counts: c(5200), score: 0.4, raw: {}, at: 0 },
+    { instrument: 'track', counts: c(6800), score: 0.5, raw: {}, at: 0 },
+  ];
+  /** A believed gain the reaches agree on, well away from the located optimum, so a factor of 1
+   *  cannot pass by accident. */
+  const B0 = 9000;
+  const LEVELS = [4200, 4800, 5400, 6000, 6600, 7200, 7800, 8400];
+
+  /** Reaches from an adapting player who believes B0, in the shape anchorFromReaches consumes. */
+  const reaches = (trials: number, perTrial: number, from = 0): FirstReach[] => {
+    const out: FirstReach[] = [];
+    for (let t = from; t < from + trials; t++) {
+      const rendered = LEVELS[t % LEVELS.length]!;
+      const e0 = Math.log(B0) - Math.log(rendered);
+      for (let j = 0; j < perTrial; j++) {
+        out.push({
+          rendered: c(rendered),
+          landedFraction: Math.exp(e0 * Math.pow(0.6, j) + Math.log(0.94)),
+          index: j,
+        });
+      }
+    }
+    return out;
+  };
+
+  const lockIn = async (
+    outcome: SessionOutcome,
+    prepare?: (ctx: AppContext) => void,
+  ): Promise<AppContext> => {
+    const h = mountWithRunningSegment();
+    prepare?.(h.ctx);
+    (h.root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    h.getResolve()!(outcome);
+    await flush();
+    await flush();
+    (h.root.querySelector('[data-dialed="lock"]') as HTMLButtonElement).click();
+    h.screen.unmount();
+    return h.ctx;
+  };
+
+  it('turns the reaches and the turn into a rendered factor, which is the whole change', async () => {
+    const ctx = await lockIn(
+      { report: REPORT, trials: TRIALS, reaches: reaches(6, 8), leadInDiscarded: 12 },
+      (c2) => { c2.draft.turn = turnFromPasses([8900, 9050, 9000])!; },
+    );
+    const p = ctx.lastResult!.result.prescription;
+    expect(p).toBeDefined();
+    // The factor is the anchor over the located optimum, both counted in browser deltas. Around
+    // 9000 / 6000, and the assertion is that it is a real quotient of two measured numbers rather
+    // than 1.00, which is what an unwired seam would have produced by never rendering at all.
+    expect(p!.ratio).toBeGreaterThan(1.3);
+    expect(p!.ratio).toBeLessThan(1.7);
+    expect(p!.ratioCi90![0]).toBeLessThan(p!.ratio!);
+    expect(p!.ratioCi90![1]).toBeGreaterThan(p!.ratio!);
+    expect(p!.counts).toBe(REPORT.optimalCounts);
+  });
+
+  it('the turn alone still anchors when the reaches refuse: the flick is a route, not a gate', async () => {
+    const ctx = await lockIn(
+      { report: REPORT, trials: TRIALS, reaches: [], leadInDiscarded: 0 },
+      (c2) => { c2.draft.turn = turnFromPasses([8900, 9050, 9000])!; },
+    );
+    expect(ctx.lastResult!.result.prescription!.ratio).toBeGreaterThan(1.3);
+  });
+
+  it('neither route means no factor at all, never a padded one', async () => {
+    // The honest degradation. reconcile returns null, buildPrescription is handed null, and with no
+    // pinned k either there is nothing to prescribe: the screen leads with the located counts and
+    // says the factor is withheld.
+    const ctx = await lockIn({ report: REPORT, trials: TRIALS, reaches: [], leadInDiscarded: 0 });
+    expect('prescription' in ctx.lastResult!.result).toBe(false);
+    expect(ctx.lastResult!.result.optimalCounts).toBe(REPORT.optimalCounts);
+  });
+
+  it('accumulates reaches across segments, because refining runs a second observer', async () => {
+    // "Keep refining" calls runSession again, with its own ReachObserver, so its outcome carries
+    // only the reaches of the trials it ran. Overwriting would hand the estimator a fraction of the
+    // session's data, and the estimator would answer that with a REFUSAL rather than an error: the
+    // loss would be silent and would look like a player who simply did not produce a clean read.
+    // The two halves below are each below FLICK_MIN_REACHES and together are above it.
+    // No turn on this draft: fakeContext() writes none, and exactOptionalPropertyTypes would reject
+    // an explicit `= undefined` anyway, so absence is expressed by not writing the field.
+    const h = mountWithRunningSegment();
+    (h.root.querySelector('[data-prelock="begin"]') as HTMLButtonElement).click();
+    await flush();
+    h.getResolve()!({ report: REPORT, trials: TRIALS, reaches: reaches(4, 6), leadInDiscarded: 8 });
+    await flush();
+    await flush();
+    (h.root.querySelector('[data-dialed="refine"]') as HTMLButtonElement).click();
+    await flush();
+    h.getResolve()!({ report: REPORT, trials: TRIALS, reaches: reaches(4, 6, 4), leadInDiscarded: 8 });
+    await flush();
+    await flush();
+    (h.root.querySelector('[data-dialed="lock"]') as HTMLButtonElement).click();
+    expect(h.ctx.lastResult!.result.prescription!.ratio).toBeGreaterThan(1.3);
+    h.screen.unmount();
+  });
+
+  it('a single segment of the same size cannot anchor, so the test above is measuring the join', async () => {
+    // The control for the accumulation test: 24 reaches is under FLICK_MIN_REACHES, so one half
+    // alone refuses. Without this, the test above would pass on an implementation that simply kept
+    // the LAST segment's reaches, and the whole assertion would be vacuous.
+    const ctx = await lockIn({ report: REPORT, trials: TRIALS, reaches: reaches(4, 6), leadInDiscarded: 8 });
+    expect('prescription' in ctx.lastResult!.result).toBe(false);
   });
 });
