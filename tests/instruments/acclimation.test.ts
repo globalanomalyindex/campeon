@@ -5,6 +5,7 @@ import { calibrate } from '../../src/instruments/calibrate';
 import { strike } from '../../src/instruments/strike';
 import {
   acclimationScale,
+  leadInReaches,
   planAcclimation,
   LEAD_MS_MAX,
   LEAD_MS_MIN,
@@ -273,5 +274,25 @@ describe('the lead-in budget adapts to the size of the gain change, and is discl
     expect(farTrack.raw.leadInMs).toBe(LEAD_MS_MAX);
     const nearTrack = (await driveTrack(CM, TAU_MS, CM)).result;
     expect(nearTrack.raw.leadInMs).toBe(LEAD_MS_MIN);
+  });
+});
+
+describe('the lead-in budget is a pure query, because the observational channel needs it', () => {
+  it('leadInReaches agrees with the plan for every arrival', () => {
+    for (const prev of [CM, CM * 2, CM * Math.SQRT2, CM / 4, FAR, undefined]) {
+      const c = ctx(1, prev);
+      expect(leadInReaches(c), `arrival ${String(prev)}`).toBe(planAcclimation(c, 'flick').reaches);
+    }
+    expect(leadInReaches(ctx(1, CM))).toBe(LEAD_REACHES_MIN);
+    expect(leadInReaches(ctx(1))).toBe(LEAD_REACHES_MAX);
+  });
+
+  it('it does not depend on the instrument, because the reversal it serves does not', () => {
+    // The observational channel labels reach ORDINALS, and the ordinal of the first reach at a new
+    // gain is 0 whichever instrument is presenting it. A signature that took an InstrumentId would
+    // invite a per-instrument budget that the adaptation literature does not support.
+    const c = ctx(1, FAR);
+    expect(leadInReaches(c)).toBe(planAcclimation(c, 'strike').reaches);
+    expect(leadInReaches(c)).toBe(planAcclimation(c, 'calibrate').reaches);
   });
 });

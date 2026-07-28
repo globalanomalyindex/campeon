@@ -33,6 +33,19 @@ import { mulberry32 } from '../stats/rng';
  * arrival gain unknown (`ctx.prevCounts` absent) the full budget is spent - an unknown is
  * treated as a far jump, never a near one.
  *
+ * The reversal, recorded because this file was built on the opposite premise. The lead-in exists
+ * because the adaptation transient is contamination. The flick anchor (src/anchor/flick-anchor.ts)
+ * exists because that same transient is the only place the player's own believed gain is legible: a
+ * reach launched before vision has corrected it is launched from the internal model, and belief is
+ * precisely what the discarded reaches carry. So the transient is now measured and then discarded
+ * from scoring, in that order, and the anchor's within-trial reach ordinal counts from the FIRST
+ * lead-in reach rather than the first scored one - reading it from the scored reaches instead would
+ * start the ordinal at `reaches`, and the adaptation term is geometric in the ordinal, so the
+ * intercept the anchor is built on would already have decayed away before the first observation.
+ * Nothing about scoring changes. The channel reads and never writes the scored Recording, pinned by
+ * tests/anchor/reach-observer.test.ts ('the scored recording is byte-identical with the anchor
+ * recorder attached').
+ *
  * Determinism: lead-in target geometry draws from a PRIVATE rng seeded from the trial's own
  * identity (counts per 360, instrument), never from the shared `ctx.rng` session stream. Drawing
  * from the shared stream would shift every scored draw after it, changing target geometry the
@@ -87,10 +100,24 @@ function leadSeed(ctx: TrialContext, id: InstrumentId): number {
   return h >>> 0;
 }
 
+/**
+ * The reach count the scorer will discard for this trial, as a pure integer query.
+ *
+ * Exposed separately from `planAcclimation` because the observational channel needs the number and
+ * must NOT construct a plan to get it: a plan carries the private lead-in rng, and handing a second
+ * generator seeded from the trial identity to the read-only side would make the observer look like a
+ * source of target geometry, which is exactly the confusion the private-rng rule exists to prevent.
+ * No InstrumentId parameter, because the budget has never depended on one and the shared literature
+ * (fast-process reaches, not per-drill tuning) gives no basis for it to start.
+ */
+export function leadInReaches(ctx: TrialContext): number {
+  return Math.round(LEAD_REACHES_MIN + (LEAD_REACHES_MAX - LEAD_REACHES_MIN) * acclimationScale(ctx));
+}
+
 export function planAcclimation(ctx: TrialContext, id: InstrumentId): AcclimationPlan {
   const s = acclimationScale(ctx);
   return {
-    reaches: Math.round(LEAD_REACHES_MIN + (LEAD_REACHES_MAX - LEAD_REACHES_MIN) * s),
+    reaches: leadInReaches(ctx),
     ms: Math.round(LEAD_MS_MIN + (LEAD_MS_MAX - LEAD_MS_MIN) * s),
     rng: mulberry32(leadSeed(ctx, id)),
   };
