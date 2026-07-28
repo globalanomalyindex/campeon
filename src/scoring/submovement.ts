@@ -38,7 +38,15 @@ export interface SubmovementSeg {
    *  frame it names by EXACT clock equality: recomputing it as `onsetTime + tO` is a float addition
    *  and is not guaranteed to reproduce the sample's own `t`, so a frame lookup keyed on that sum
    *  can miss and silently fall back to the wrong aim. Read by src/anchor/reach-observer.ts, and
-   *  pinned against a fractional clock origin by tests/anchor/clock-stamp.test.ts. */
+   *  pinned by tests/anchor/clock-stamp.test.ts.
+   *
+   *  Where it misses is the opposite of the obvious guess, and worth stating so nobody
+   *  "simplifies" the test fixture. The readdition is `a + (b - a)`, which Sterbenz makes EXACT
+   *  whenever the two stamps sit within a factor of two of each other. A large clock origin pushes
+   *  every onset and trough closer in ratio, so it is the safe case, not the dangerous one. The
+   *  miss happens near a clock origin of zero, where an early reach can have onset 47 ms against
+   *  trough 126 ms, a ratio of 2.68, outside the factor of two. A uniform 16 ms tick is doubly safe,
+   *  being both regular and dyadic, which is why the fixture ticks an irregular seeded clock. */
   troughTime: Ms;
 }
 

@@ -150,7 +150,9 @@ export class ReachObserver {
     // EXACT clock equality on purpose: SubmovementSeg.troughTime is the sample's own stamp, and
     // recomputing it as onsetTime + tO is a float addition that can miss the stamp by one ulp and
     // then silently read the wrong aim. Pinned by tests/anchor/clock-stamp.test.ts, which runs this
-    // on a fractional clock origin.
+    // on a seeded IRREGULAR clock. Not a fractional origin: the readdition is a + (b - a), which
+    // Sterbenz makes exact whenever the stamps are within a factor of two, so a large origin is the
+    // safe case. See the troughTime doc in src/scoring/submovement.ts for where it actually misses.
     const landed = frames.find((f) => f.t === troughTime);
     if (landed === undefined) return;
 
