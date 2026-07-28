@@ -21,9 +21,36 @@ repeatability is not one.
 
 Neither of the cross-session measurements below exists until these two land.
 
-**Reserve a fixed fraction of the trial budget for pinned band-edge points** in `bayesopt.ts` and
-`evolution.ts`. This moves the per-session measurement noise from 0.124 to about 0.079. Everything in
-this document is priced against that improvement, and several claims are only feasible after it.
+**Band-edge reservation is withdrawn. It does not work, and I measured it against the real allocator
+rather than a model of one.**
+
+The claim was that reserving a fixed fraction of the trial budget for pinned band-edge points moves
+the per-session noise from 0.124 to about 0.079, and everything downstream was priced against it. It
+does not reproduce. Driving the shipped `makeEvolution` engine with the exact configuration
+`src/ui/session-view.ts:188` uses, over 400 simulated sessions per cell:
+
+| reserved | fails to locate, peak centred | fails to locate, peak offset 0.25 | robust spread, offset |
+|---|---|---|---|
+| none | 1.0% | 6.5% | 0.1069 |
+| 20% | 1.0% | 10.8% | 0.1157 |
+| 30% | 1.0% | 14.5% | 0.1389 |
+
+Two corrections fall out. The shipped per-session noise is already about 0.10, not 0.124, so the tool
+starts closer to the target than the claim assumed. And reservation makes things **worse** whenever the
+truth sits off the band centre, which is the normal case, because the band is centred on the player's
+habit rather than on their optimum. Pinning trials at the edges spends budget away from the peak, and
+the rate of sessions that end at a bound instead of a located optimum more than doubles.
+
+The reason the original claim looked plausible is that a naive optimum-seeking allocator really does
+suffer here, at roughly a 23% failure-to-locate rate in simulation. The shipped allocator is not naive:
+the local c-optimality vertex screen already spreads the design deliberately, and it has already
+collected this win. `tests/optimizer/allocator-locates.test.ts` now pins that property so it cannot
+regress silently.
+
+**What this costs the rest of the document.** Every refusal threshold below was derived against a
+future noise of 0.079. At the real 0.10 they are all somewhat pessimistic and none of them becomes
+easier than stated, so nothing here overclaims. But the numbers are now conservative rather than
+calibrated, and they should be re-derived at 0.10 before any of them is printed on screen.
 
 **Persist raw per-instrument scores on their native absolute scale**, alongside the z-scored
 observation. `trialsToObservations` currently z-scores within a session, which destroys the level and
