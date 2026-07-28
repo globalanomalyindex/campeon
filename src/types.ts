@@ -1,4 +1,15 @@
 // ── units & identifiers ────────────────────────────────────────────────
+/** Mouse counts of travel for one full 360 turn. The optimisation variable and the tool's own unit.
+ *  Branded deliberately: a bare number alias gives the compiler no way to catch a unit swap, and
+ *  this migration is exactly a unit swap, so the brand is what makes tsc enumerate every call site.
+ *  Pinned by tests/types.test.ts "refuses a bare number where a count total is required". */
+export type Counts360 = number & { readonly __unit: 'counts360' };
+export const counts360 = (n: number): Counts360 => n as Counts360;
+/** A search window in counts. Exists because arithmetic on a branded number widens back to `number`,
+ *  so every clamp, exp and geometric midpoint has to re-brand, and a pair of them is the shape that
+ *  recurs (bounds, CIs, adopted ranges). */
+export const countsBounds = (lo: number, hi: number): [Counts360, Counts360] =>
+  [counts360(lo), counts360(hi)];
 export type Cm360 = number;          // physical cm of mouse travel per 360° turn (the optimization variable)
 export type Dpi = number;            // mouse counts per inch (user-supplied; not browser-readable)
 export type Degrees = number;
