@@ -1803,11 +1803,31 @@ gate can reach it. A value the player tuned by feel now carries no interval anyw
 
 ---
 
-### Task 5: Delete `convert/cm360.ts`, `convert/turn-rate.ts` and `input/dpi.ts`
+### Task 5: Delete `convert/cm360.ts` and `convert/turn-rate.ts`
+
+> **AMENDED DURING EXECUTION, 2026-07-28.** `src/input/dpi.ts` is NOT deleted here. Its deletion moves
+> to task 19, which is where its last consumer dies.
+>
+> The plan's step-1 grep used `input/dpi'\|input/dpi"`, which only catches path-qualified imports and
+> misses the sibling-relative `import { isValidDpi } from './dpi';` at `src/input/dpi-sweep.ts:5`.
+> `dpi-sweep.ts` is still live at this point (imported by `setup.ts`, `sweep-view.ts` and
+> `spin-view.ts`) and this plan already defers its own deletion to task 19. Deleting `dpi.ts` here
+> therefore fails with `TS2307: Cannot find module './dpi'`, confirmed empirically by performing the
+> deletion and running tsc.
+>
+> Of the three ways out, quarantining a local copy of `isValidDpi` duplicates a function that is about
+> to be deleted, and pulling task 19 forward reorders phase 2 ahead of phase 3, which phase 2 depends
+> on. Deferring is the only one that costs nothing: `dpi.ts` simply survives a few tasks longer, and
+> nothing in the new chain imports it.
+>
+> Two smaller corrections from the same run. Step 4's token gate cannot pass as written: a grep for
+> `[Cc][Mm]360` still prints five lines afterwards, all of them prose in surviving files that tasks 3
+> and 4 were explicitly told to write that way. Check that the remaining hits are comments, not code.
+> And the expected suite counts chain off a stale baseline, so compare the delta rather than the total.
 
 **Files:**
-- Delete: `src/convert/cm360.ts`, `src/convert/turn-rate.ts`, `src/input/dpi.ts`
-- Delete: `tests/convert/cm360.test.ts`, `tests/convert/turn-rate.test.ts`, `tests/input/dpi.test.ts`
+- Delete: `src/convert/cm360.ts`, `src/convert/turn-rate.ts`
+- Delete: `tests/convert/cm360.test.ts`, `tests/convert/turn-rate.test.ts`
 - Modify: `tests/convert/yaw-table.test.ts`
 
 - [ ] **Step 1: Confirm nothing imports them any more**
@@ -6848,6 +6868,13 @@ git commit -m "feat(setup): the offer rides alongside the turn, and the commit i
 ```
 
 ### Task 19: delete the sweep and the spin
+
+> **AMENDED DURING EXECUTION, 2026-07-28.** This task now ALSO deletes `src/input/dpi.ts` and
+> `tests/input/dpi.test.ts`, which task 5 could not, because `src/input/dpi-sweep.ts` imports
+> `isValidDpi` from it and `dpi-sweep.ts` dies here. Deleting `dpi-sweep.ts` without also deleting
+> `dpi.ts` leaves an orphan module that nothing imports and whose whole subject, mouse DPI, the tool
+> no longer measures. Confirm with `grep -rn "input/dpi'\|input/dpi\"\|from './dpi'" src tests` that
+> the two files are each other's only remaining consumers before removing them.
 
 **Files:**
 - Delete: `src/ui/calibrate/sweep-view.ts`
