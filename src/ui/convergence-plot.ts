@@ -1,4 +1,3 @@
-import { counts360 } from '../types';
 import type { Counts360, FacetPeak, InstrumentId } from '../types';
 
 export interface PlotSize { width: number; height: number; }
@@ -6,7 +5,9 @@ export interface PlotMark { counts: Counts360; score: number; instrument: Instru
 export interface PlotInput {
   bounds: [Counts360, Counts360];
   marks: readonly PlotMark[];
-  curve?: readonly { x: number; mean: number }[]; // x = ln(cm/360)
+  /** Fitted curve; each x is the natural log OF the counts-per-360 value (ln(counts), the same
+   *  scale the optimizer fits on - "counts/360" names the unit, never a division). */
+  curve?: readonly { x: number; mean: number }[];
   ci90?: [Counts360, Counts360];
   peak?: Counts360;
   /**
@@ -31,8 +32,8 @@ export interface FacetPeakPx {
 export interface PlotGeometry {
   size: PlotSize;
   pad: number;
-  xToPx(counts: Counts360): number;
-  xTicks: { counts: Counts360; px: number }[];
+  xToPx(counts: number): number;
+  xTicks: { counts: number; px: number }[];
   marks: PlotMarkPx[];
   curvePath: string | null;
   ciRectPx: { x: number; width: number } | null;
@@ -41,7 +42,39 @@ export interface PlotGeometry {
   yRange: [number, number];
 }
 
-const NICE_TICKS = [10, 15, 20, 25, 30, 35, 40, 50, 60, 80];
+/**
+ * Log-decade tick ladder for a counts axis. The old hand-enumerated cm ticks (10..80) covered one
+ * decade of a physical unit; counts bounds move with hardware and with k, spanning anywhere from a
+ * few hundred to tens of thousands, so the ladder is generated per decade instead of enumerated.
+ * The 1/1.5/2/3/5/7 mantissas keep near-even spacing in ln space (steps of 1.33x to 1.5x). When
+ * bounds span enough decades that the full ladder would shingle 10px labels into each other, the
+ * ladder thins to 1/2/5 and then to decades: thinning keeps ln spacing even, where dropping every
+ * other tick would alternate 1.5x and 2x gaps.
+ */
+const TICK_MANTISSAS = [1, 1.5, 2, 3, 5, 7] as const;
+export function countTicks(lo: number, hi: number): number[] {
+  const build = (mants: readonly number[]): number[] => {
+    const out: number[] = [];
+    for (let dec = Math.floor(Math.log10(lo)); dec <= Math.ceil(Math.log10(hi)); dec++) {
+      for (const m of mants) {
+        const v = m * 10 ** dec;
+        if (v >= lo && v <= hi) out.push(v);
+      }
+    }
+    return out;
+  };
+  for (const mants of [TICK_MANTISSAS, [1, 2, 5], [1]] as const) {
+    const t = build(mants);
+    if (t.length <= 9) return t;
+  }
+  return build([1]);
+}
+
+/** Tick label: 8000 reads "8k", 1500 reads "1.5k". Tabular mono at 10px cannot afford five
+ *  digits per tick without the labels colliding at the 360px result-plot width. */
+export function tickLabel(v: number): string {
+  return v >= 1000 ? `${v / 1000}k` : String(v);
+}
 
 export function plotGeometry(input: PlotInput): PlotGeometry {
   const { bounds, marks, curve, ci90, peak, size } = input;
@@ -63,7 +96,7 @@ export function plotGeometry(input: PlotInput): PlotGeometry {
   const yToPx = (score: number): number =>
     y0 + ((score - yMin) / (yMax - yMin)) * (y1 - y0);
 
-  const xTicks = NICE_TICKS.filter((t) => t >= lo && t <= hi).map((t) => ({ counts: counts360(t), px: xToPx(t) }));
+  const xTicks = countTicks(lo, hi).map((t) => ({ counts: t, px: xToPx(t) }));
   const marksPx: PlotMarkPx[] = marks.map((m) => ({ ...m, px: xToPx(m.counts), py: yToPx(m.score) }));
 
   let curvePath: string | null = null;
@@ -82,7 +115,7 @@ export function plotGeometry(input: PlotInput): PlotGeometry {
 
   const clampX = (px: number): number => Math.max(x0, Math.min(x1, px));
   const facetPeaks: FacetPeakPx[] = (input.facetPeaks ?? [])
-    .filter((f): f is FacetPeak & { peakCounts: number } => f.peakCounts !== undefined && Number.isFinite(f.peakCounts))
+    .filter((f): f is FacetPeak & { peakCounts: Counts360 } => f.peakCounts !== undefined && Number.isFinite(f.peakCounts))
     .map((f) => ({
       instrument: f.instrument,
       px: clampX(xToPx(f.peakCounts)),
@@ -124,7 +157,9 @@ export function plotLegendHtml(ids: readonly InstrumentId[] = ['track', 'flick',
   return `<span class="plot-legend mono" aria-hidden="true">${items}</span>`;
 }
 
-/** Thin renderer: clears `svg` and draws the geometry (CI band → curve → marks → peak → ticks). */
+/** Thin renderer: clears `svg` and draws the geometry (CI band, curve, marks, peak, ticks).
+ *  Same curve as before the unit change, honest label: the axis is the log of counts per 360 now,
+ *  and the ticks say so in counts. */
 export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?: string): void {
   svg.setAttribute('viewBox', `0 0 ${g.size.width} ${g.size.height}`);
   svg.replaceChildren();
@@ -157,7 +192,7 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
     }));
   }
   // A5 facet-peak markers: each probe's OWN best, as a diamond on a top rail with its spread
-  // whisker - the eye compares them against the gold peak line (the thesis, tested visibly).
+  // whisker - the eye compares them against the answer line (the thesis, tested visibly).
   // strike (taste-conditioned, excluded from the tier) renders hollow + dashed.
   const railY = g.pad + 7;
   for (const f of g.facetPeaks) {
@@ -182,7 +217,7 @@ export function renderConvergencePlot(svg: SVGElement, g: PlotGeometry, yLabel?:
       x: t.px.toFixed(2), y: String(g.size.height - 8), 'text-anchor': 'middle',
       fill: 'var(--text-muted)', 'font-size': '10', 'font-family': 'var(--font-mono)',
     });
-    label.textContent = String(t.counts);
+    label.textContent = tickLabel(t.counts);
     svg.appendChild(label);
   }
 
