@@ -40,6 +40,24 @@ export const FLICK_MIN_REACHES = 40;
 export const FLICK_MIN_LEVELS = 6;
 export const ADAPT_RATE_MIN = 0.05;
 export const ADAPT_RATE_MAX = 0.95;
+/**
+ * Guard two's identifiability floor: the profiled SSE at the argmin must sit at least this far,
+ * relatively, below the profile SSE at EACH end of the searched rate grid before the rate counts
+ * as determined by the data at all.
+ *
+ * Measured, never chosen. Across 200 calibration seeds per player on the suite's own session shape
+ * (24 trials of 12 reaches over the 2x band): the no-stable-belief player's largest relative drop
+ * was 0.0389 at every noise level from 0.05 to 0.12, and the no-adaptation player's was exactly 0,
+ * while the stable player at rate 0.6 never dropped below 0.185 at the suite's own noise of 0.08,
+ * and never below 0.070 even at noise 0.12. 0.05 sits in that gap. On 200 fresh validation seeds
+ * per player it refuses 200 of 200 no-stable-belief sessions and answers 200 of 200 stable ones,
+ * and tests/anchor/flick-anchor-refusals.test.ts pins 40 of 40 of each on seeds disjoint from the
+ * calibration set. The cost it buys, disclosed: a very fast adapter, rate 0.4 at noise 0.08,
+ * brushes the floor (smallest drop 0.044 across 200 seeds), so a few such sessions refuse. That is
+ * the cheap direction. A refusal costs a widened interval, which the reconciliation absorbs; the
+ * false answer this floor exists to stop was measured at 12.7 percent, stated confidently.
+ */
+export const RATE_SSE_DROP_MIN = 0.05;
 /** Grid resolution for the profiled rate: rate = k / RATE_GRID for k in 0..RATE_GRID-1. */
 export const RATE_GRID = 200;
 /** One-sided critical value for the covariance precondition: the 99th percentile of the normal. */
@@ -186,11 +204,17 @@ export function anchorFromReaches(reaches: readonly FirstReach[]): FlickAnchor |
   }
 
   // Profile the rate. rate = 1 is not searched: the design is exactly singular there, and the
-  // refusal bound at ADAPT_RATE_MAX is what catches a player heading toward it.
+  // refusal bound at ADAPT_RATE_MAX is what catches a player heading toward it. The profile's
+  // value at both ends of the grid is kept, because guard two below is a statement about the
+  // SHAPE of this profile and not only about where its minimum lands.
   let best: Fit | null = null;
+  let sseAtZero: number | null = null;
+  let sseAtTop: number | null = null;
   for (let k = 0; k < RATE_GRID; k++) {
     const fit = fitAt(k / RATE_GRID, lnF, lnR, idx);
     if (fit === null || !Number.isFinite(fit.sse)) continue;
+    if (k === 0) sseAtZero = fit.sse;
+    sseAtTop = fit.sse; // overwritten each solvable k, so it ends at the largest solvable rate
     if (best === null || fit.sse < best.sse) best = fit;
   }
   if (best === null) {
@@ -200,16 +224,39 @@ export function anchorFromReaches(reaches: readonly FirstReach[]): FlickAnchor |
     return { identifiable: false, reason: 'too-few-reaches' };
   }
 
-  // Guard two: the fitted adaptation rate pinning at a boundary.
+  // Guard two: the adaptation rate must be IDENTIFIED, not merely interior.
   //
-  // At the lower bound the player re-anchors on whatever gain was just rendered, so only the opening
-  // reach of each trial carries belief and every later one is pure bias. Simulation put that player
-  // at 12.7 percent while the estimator still answered, and the pin is its signature. At the upper
-  // bound the player does not adapt within the trial at all, and then the intercept and the
+  // The players this refuses. At the lower end the player re-anchors on whatever gain was just
+  // rendered, so only the opening reach of each trial carries belief and every later one is pure
+  // bias; simulation put that player at 12.7 percent while the estimator still answered. At the
+  // upper end the player does not adapt within the trial at all, and then the intercept and the
   // asymptote are the same column, so the belief mismatch cannot be separated from the motor bias
   // however good the residuals look. Both are one refusal, because both mean the same thing: three
   // parameters were fitted and only two were identified.
+  //
+  // The first design read the argmin's POSITION, refusing when it pinned at ADAPT_RATE_MIN.
+  // Measured, that signature does not fire: on the re-anchoring player the profile is nearly flat
+  // (SSE 0.749588 at an argmin of 0.075 against 0.756545 at rate zero, a 0.9 percent drop the
+  // noise swamps), so the argmin lands wherever the noise puts it and the position check refused
+  // on only 33 of 40 seeds. Where the profile is flat, the argmin is not a reading.
+  //
+  // So the signature is the flatness itself. The fit at the argmin must beat the fit at BOTH ends
+  // of the grid by a relative margin the data can resolve, the same discipline as fitDrift in
+  // src/stats/peak-fit.ts refusing a collinear drift covariate and conventionFrom in
+  // src/input/lattice.ts refusing an ambiguous lattice spacing. An undetermined rate is not a
+  // nuisance here, because the rate trades off against the belief term: a session that cannot
+  // tell its argmin from a boundary cannot tell belief from bias either, and then the anchor is
+  // not a measurement. The position check stays for the boundaries themselves, where the refusal
+  // needs no comparison: at or below ADAPT_RATE_MIN the belief is gone by the second reach even
+  // when the fit is sharp, and at or above ADAPT_RATE_MAX the design is heading into the exact
+  // singularity at rate 1. A missing boundary fit refuses too: an improvement that cannot be
+  // evaluated is an improvement that cannot be claimed.
   if (best.rate <= ADAPT_RATE_MIN || best.rate >= ADAPT_RATE_MAX) {
+    return { identifiable: false, reason: 'adapt-rate-at-bound' };
+  }
+  const dropAtZero = sseAtZero !== null && sseAtZero > 0 ? (sseAtZero - best.sse) / sseAtZero : 0;
+  const dropAtTop = sseAtTop !== null && sseAtTop > 0 ? (sseAtTop - best.sse) / sseAtTop : 0;
+  if (dropAtZero < RATE_SSE_DROP_MIN || dropAtTop < RATE_SSE_DROP_MIN) {
     return { identifiable: false, reason: 'adapt-rate-at-bound' };
   }
 
