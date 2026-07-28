@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { counts360, type Counts360 } from '../../src/types';
 import { countsForSens } from '../../src/convert/counts';
-import { yawFor } from '../../src/convert/yaw-table';
+import { GAME_YAW, yawFor } from '../../src/convert/yaw-table';
 import type { Convention } from '../../src/input/lattice';
 import {
   kFromTypedSens,
   pinConvention,
+  tierTwoFrom,
   type TypedSensRoute,
 } from '../../src/input/count-convention';
 
@@ -125,5 +126,64 @@ describe('pinConvention', () => {
     expect(pinConvention(spacingOne, typed({ sens: 0 }))).toEqual({
       pinned: false, reason: 'typed-sens-implausible',
     });
+  });
+});
+
+describe('tierTwoFrom', () => {
+  const latticePin = { pinned: true, k: 1.5, source: 'lattice', logSd: 0 } as const;
+
+  it('withholds the table entirely when k is unpinned', () => {
+    // Not an empty table, not a table of dashes: absent. A per-game sensitivity with an unpinned k
+    // is a number that would be wrong by exactly the factor we failed to measure.
+    expect(tierTwoFrom(counts360(6000), { pinned: false, reason: 'gate-closed' })).toBeNull();
+    expect(tierTwoFrom(counts360(6000), { pinned: false, reason: 'lattice-indeterminate' })).toBeNull();
+    expect(tierTwoFrom(counts360(6000), { pinned: false, reason: 'typed-sens-implausible' })).toBeNull();
+  });
+
+  it('withholds the table when the optimum or the pinned k is not a usable number', () => {
+    // The k guard is not unreachable defensiveness: KPin is a plain structural type, so any caller
+    // assembling one by hand (phase 1b's fixtures do) can hand this a zero and would otherwise get
+    // an Infinity table back.
+    expect(tierTwoFrom(counts360(0), latticePin)).toBeNull();
+    expect(tierTwoFrom(counts360(NaN), latticePin)).toBeNull();
+    expect(tierTwoFrom(counts360(6000), { pinned: true, k: 0, source: 'lattice', logSd: 0 })).toBeNull();
+    expect(tierTwoFrom(counts360(6000), { pinned: true, k: NaN, source: 'lattice', logSd: 0 })).toBeNull();
+  });
+
+  it('emits the native sensitivity for every game at the pinned convention', () => {
+    const t = tierTwoFrom(counts360(6000), latticePin);
+    expect(t).not.toBeNull();
+    // C* = 6000 browser deltas at k = 1.5 is 4000 real counts per 360.
+    // cs2 yaw 0.022: 360 / (0.022 * 4000) = 4.0909...
+    expect(t!.perGameSens.cs2).toBeCloseTo(4.090909, 6);
+    // valorant effective yaw 0.07: 360 / (0.07 * 4000) = 1.2857...
+    expect(t!.perGameSens.valorant).toBeCloseTo(1.285714, 6);
+    expect(Object.keys(t!.perGameSens).sort()).toEqual(GAME_YAW.map((g) => g.id).sort());
+  });
+
+  it('scales every emitted sensitivity exactly with k, and nothing else', () => {
+    // This is the whole reach of k: it multiplies the absolute numbers in tier two and touches
+    // nothing else. The arena is self-consistent in browser counts, so the ratio in tier one is
+    // unaffected by k, which is why an unpinned k costs a tier rather than the answer.
+    const a = tierTwoFrom(counts360(6000), { pinned: true, k: 1.5, source: 'lattice', logSd: 0 })!;
+    const b = tierTwoFrom(counts360(6000), { pinned: true, k: 3, source: 'lattice', logSd: 0 })!;
+    for (const g of GAME_YAW) {
+      expect(b.perGameSens[g.id]!).toBeCloseTo(a.perGameSens[g.id]! * 2, 9);
+    }
+  });
+
+  it('restricts the table to the requested games', () => {
+    const t = tierTwoFrom(counts360(6000), latticePin, ['cs2', 'apex'])!;
+    expect(Object.keys(t.perGameSens).sort()).toEqual(['apex', 'cs2']);
+  });
+
+  it('carries the pinned k, its source and its log sd, and nothing that could be mistaken for a ratio', () => {
+    const typedPinned = { pinned: true, k: 1.5, source: 'typed-sens', logSd: 0.12 } as const;
+    const t = tierTwoFrom(counts360(6000), typedPinned)!;
+    expect(t.kSource).toBe('typed-sens');
+    expect(t.kLogSd).toBe(0.12);
+    expect(t.k).toBe(1.5); // tier three renders hardware counts as C* / k and must not re-derive it
+    expect(Object.keys(t).sort()).toEqual(['k', 'kLogSd', 'kSource', 'perGameSens']);
+    expect(tierTwoFrom(counts360(6000), latticePin)!.kSource).toBe('lattice');
   });
 });

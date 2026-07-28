@@ -8,9 +8,9 @@
 // Anything else leaves k unpinned, and an unpinned k costs the absolute numbers but never the ratio:
 // the arena is self-consistent in browser counts, so the rendered gain, the searched range and the
 // tier-one ratio are all untouched by k. That is why refusing here costs a tier and not the answer.
-import type { Counts360, GameId } from '../types';
-import { countsForSens } from '../convert/counts';
-import { yawFor } from '../convert/yaw-table';
+import { counts360, type Counts360, type GameId } from '../types';
+import { countsForSens, sensFor } from '../convert/counts';
+import { GAME_YAW, yawFor } from '../convert/yaw-table';
 import { CONVENTION_K_MAX, CONVENTION_K_MIN, type Convention } from './lattice';
 
 /** The player's offer: the game they just closed and the sensitivity they had in it, plus the arena's
@@ -102,4 +102,51 @@ export function pinConvention(lattice: Convention | null, typed: TypedSensRoute 
   // shut it, or no delta stream existed to read (the typed-only path never runs the turn).
   if (lattice === null) return { pinned: false, reason: 'gate-closed' };
   return { pinned: false, reason: 'lattice-indeterminate' };
+}
+
+/** The k-gated fields of the `Prescription`. Deliberately carries no ratio and no CI of its own:
+ *  tier one is measured in browser counts and k cannot touch it. */
+export interface TierTwo {
+  perGameSens: Partial<Record<GameId, number>>;
+  kSource: 'lattice' | 'typed-sens';
+  /** The pinned convention itself, echoed so the caller never re-derives it. Tier three renders
+   *  hardware counts as C* / k, and a `Result` reloaded from storage has no draft left to ask. */
+  k: number;
+  /**
+   * k's relative uncertainty in ln space, from the pin. The per-game interval must widen by it,
+   * never narrow: on the typed route this is the anchor's reproduction error landing whole on k, so
+   * it is not small. One number covers every game, because k is a single multiplicative factor
+   * common to all of them, so the RELATIVE band it implies is identical per game and a per-game
+   * band would be the same number written eight times (hand-off H3 carries the arithmetic the
+   * result screen renders it with).
+   */
+  kLogSd: number;
+}
+
+/**
+ * The per-game table at the located optimum, or null when it may not be shown.
+ *
+ * `counts` is C*, the located optimum in BROWSER deltas, which is the unit the whole arena and the
+ * whole search run in. Dividing by k converts it to real mouse counts, which is the only place in
+ * the tool where k appears at all. Callers pass C* undivided: dividing before the call would apply k
+ * twice.
+ *
+ * Returns null whenever k is unpinned. Not an empty table and not a table of dashes: absent. A
+ * per-game sensitivity computed with an unpinned k is wrong by exactly the factor we failed to
+ * measure, and it is the number a player types into their game (pinned by 'withholds the table
+ * entirely when k is unpinned').
+ */
+export function tierTwoFrom(
+  counts: Counts360,
+  pin: KPin,
+  games?: readonly GameId[],
+): TierTwo | null {
+  if (!pin.pinned) return null;
+  if (!Number.isFinite(counts) || !(counts > 0)) return null;
+  if (!Number.isFinite(pin.k) || !(pin.k > 0)) return null;
+  const trueCounts = counts360(counts / pin.k);
+  const ids = games ?? GAME_YAW.map((g) => g.id);
+  const perGameSens: Partial<Record<GameId, number>> = {};
+  for (const id of ids) perGameSens[id] = sensFor(trueCounts, yawFor(id));
+  return { perGameSens, kSource: pin.source, k: pin.k, kLogSd: pin.logSd };
 }
