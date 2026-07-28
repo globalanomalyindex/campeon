@@ -129,7 +129,9 @@ both: the intercept is the belief mismatch, the asymptote is the bias, the curva
 rate. The bias is estimated from the player's own late-session reaches, never borrowed.
 
 Two prerequisites, both already on the open-questions list, which makes fixing them load-bearing
-rather than optional. The submovement segmenter must run in count space with a threshold in counts per
+rather than optional. The submovement segmenter, which is `segment()` in `src/scoring/submovement.ts`
+and not in `fitts.ts` as an earlier draft of this spec said (`fitts.ts` holds only the ISO 9241-9
+throughput), must run in count space with a threshold in counts per
 second, because a threshold expressed in deg/s moves with the variable under test. And
 `flattenCoalesced` must stop dividing by `devicePixelRatio`.
 
@@ -143,6 +145,14 @@ stream that was scaled and then re-rounded to integers reads as `k = 1` with tot
 refuses. Measured over 200 simulated sweeps per case: k = 0.5 then rounded reads 1.01 in 100% of runs,
 k = 1.5 then rounded reads 1.0, k = 2 through acceleration then rounded reads 1.0. Four of five cases
 emit a confident wrong k, and k lands on the number the player types.
+
+One refinement the plan-writing caught, and it is good news rather than bad. The collapse is specific
+to scaling that is fractional or nonlinear. Pure integer scaling survives rounding untouched, because
+multiplying integers by 2 leaves integers and the rounding is a no-op, so a browser that multiplies raw
+counts by a `devicePixelRatio` of 2 is detected correctly as `scaled(2)`. The dangerous cases are
+division, a fractional ratio, and acceleration. So the estimator is more useful in practice than the
+one-sided contract alone suggests, and the contract still has to be one-sided, because the cases where
+it fails are exactly the cases it cannot see.
 
 The collapse is also undetectable. A genuine k = 1 stream and a k = 0.5-then-rounded stream give mean
 delta 6.15 versus 6.28, odd fraction 0.515 versus 0.546, ones fraction 0.053 versus 0.059. No statistic
@@ -228,7 +238,16 @@ Every one ends in a refusal rather than a number.
 ## Tests
 
 The one that carries the thesis: take a recorded session, multiply every count by an arbitrary factor,
-and assert the reported ratio is byte-identical. Verified at k of 1, 2, 1.5, 0.5 and 7.3.
+and assert the reported ratio survives. Verified at k of 1, 2, 1.5, 0.5 and 7.3.
+
+Correction found while writing the plan, by running it rather than reasoning about it: the ratio is
+**not** byte-identical, and claiming it was is a floating-point error on my part. Scaling both terms of
+a quotient does not commute with IEEE 754 rounding, so `(k*a)/(k*b)` differs from `a/b` in the last
+unit in the last place for about a third of pairs at k of 1.5 and 7.3, and the assembled pipeline
+deviates by around 1e-10. The test therefore asserts exact equality at k of 1 and agreement to 1e-9
+elsewhere, and it carries an injected control that fails at 2.006582377496116 so a version of the
+pipeline that genuinely loses the invariance still gets caught. The invariance is exact in the algebra
+and approximate in the arithmetic, and the honest test says which.
 
 Then: lattice property tests across k of 1, 2, 3, 0.5, 1.25, 1.5 and 1/3, plus the collapse cases
 pinned as tests in their own right, so a future reader who thinks returning `k = 1` looks tidier finds
