@@ -193,6 +193,19 @@ describe('result screen, tier two (one measured factor)', () => {
     expect(host.querySelector('[data-sens-band]')).toBeNull();
   });
 
+  it('dashes the rows a pin says nothing about, one placeholder per empty cell', () => {
+    // The realistic pin covers the games the player named, not all eight. Each unknown row keeps
+    // its place and gets a dash in BOTH cells: one dash spanning the pair would misrender the
+    // table, and a fabricated sensitivity would be worse than either.
+    const host = mount({ ...RESULT, prescription: { ...PRES, perGameSens: { cs2: 1.59, valorant: 0.5 } } });
+    expect(host.querySelectorAll('[data-game]').length).toBe(8);
+    expect(host.querySelector('tr[data-game="cs2"] [data-sens-band]')!.textContent).toBe('1.296 to 1.951');
+    const apex = host.querySelector('tr[data-game="apex"]')!;
+    expect([...apex.querySelectorAll('td.mono')].map((td) => td.textContent)).toEqual(['-', '-']);
+    expect(apex.querySelector('[data-sens-band]')).toBeNull();
+    expect(host.querySelectorAll('[data-sens-band]').length).toBe(2); // only the measured two
+  });
+
   it('withholds tier two in a sentence a player understands when k is unpinned', () => {
     const host = mount({ ...RESULT, prescription: unpinnedPres() });
     expect(host.querySelector('.result__games')).toBeNull();

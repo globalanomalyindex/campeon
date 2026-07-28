@@ -37,14 +37,14 @@ export const THESIS_INCONCLUSIVE =
  * number on screen is then a clamped edge of the searched window: the fit concluded the best
  * sensitivity sits beyond the range that was searched, so the copy must present the edge as a bound
  * on the answer and never as a located optimum. The direction word says which way the evidence
- * points (high = the slow end of the cm/360 scale, low = the fast end). The caller interpolates the
+ * points (high = the slow end of the counts-per-360 scale, low = the fast end). The caller interpolates the
  * SAME formatted value it prints as the big number, so the copy and the number can never disagree.
  */
 export const BOUNDED_COPY: Record<'low' | 'high', (v: string) => string> = {
   high: (v) =>
-    `The fitted curve peaks past the slow edge of the window I searched. Your number reads as at least ${v} cm/360, a bound this session cannot see past.`,
+    `The fitted curve peaks past the slow edge of the window I searched. Your number reads as at least ${v} counts per 360, a bound this session cannot see past.`,
   low: (v) =>
-    `The fitted curve peaks past the fast edge of the window I searched. Your number reads as at most ${v} cm/360, a bound this session cannot see past.`,
+    `The fitted curve peaks past the fast edge of the window I searched. Your number reads as at most ${v} counts per 360, a bound this session cannot see past.`,
 };
 
 /** The lead line above a bounded number: the edge is where the maths stopped, and the lead says so
