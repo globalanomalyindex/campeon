@@ -90,4 +90,27 @@ describe('remembered prefs (campeon.prefs.v1, Phase C)', () => {
     s.savePrefs!(noPointer);
     expect(s.loadPrefs!()).toEqual(noPointer);
   });
+
+  it('round-trips the card reading, and reads a blob that predates it as simply not having one', () => {
+    const s = createStorage(fakeKv());
+    s.savePrefs!({ ...prefs, dpi: 1600 });
+    expect(s.loadPrefs!()!.dpi).toBe(1600);
+    s.savePrefs!(prefs); // a visit whose card was skipped or refused
+    expect(s.loadPrefs!()!.dpi).toBeUndefined();
+  });
+
+  it('drops an unusable card reading WITHOUT taking the calibration down with it', () => {
+    // The asymmetry is deliberate. Every other field here is what the search runs on, so garbage in
+    // one means the whole blob is untrustworthy. The card reading seeds nothing, so binning a good
+    // search window over a hand-edited DPI would cost the visitor their calibration to punish a
+    // note. Dropped, it reads downstream as "the card never ran" - what a first visit looks like.
+    for (const dpi of [0, -800, 5, 90000, Number.NaN, 'lots']) {
+      const kv = fakeKv();
+      kv.setItem('campeon.prefs.v1', JSON.stringify({ ...prefs, dpi }));
+      const read = createStorage(kv).loadPrefs!();
+      expect(read, `dpi: ${String(dpi)}`).not.toBeNull();
+      expect(read!.dpi).toBeUndefined();
+      expect(read!.bounds).toEqual(prefs.bounds);
+    }
+  });
 });

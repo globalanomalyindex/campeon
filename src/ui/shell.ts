@@ -1,4 +1,4 @@
-import type { Counts360, GameId, PersistedPrefs, Profile, Result, Session, Storage } from '../types';
+import type { Counts360, Dpi, GameId, PersistedPrefs, Profile, Result, Session, Storage } from '../types';
 import { countsBounds } from '../types';
 import type { TurnEstimate } from '../anchor/reference-turn';
 import type { Convention } from '../input/lattice';
@@ -17,6 +17,16 @@ export interface SessionDraft {
   currentSens: number;
   profile: Profile;
   bounds: [Counts360, Counts360];
+  /** The card sweep's measured counts per inch, when the guided path ran one: a RECORD of what was
+   *  measured, and nothing the search reads. It seeds nothing and scales nothing; counts per 360
+   *  stays the only measured unit whether this is here or not.
+   *
+   *  It is deliberately NOT the input to the plausibility check either. That check divides a turn's
+   *  counts by a sweep's DPI, which is only sound when both were counted through the same browser
+   *  in the same run, so src/ui/setup.ts holds this run's reading in a local and passes THAT. A
+   *  value that arrived here from storage was measured on another visit, where the count convention
+   *  may have differed, and it would cancel nothing. */
+  dpi?: Dpi;
   /** The blind reference turn behind the current bounds, when the guided path ran. Phase 4's
    *  reconciliation reads its self-measured spread as the turn's weight; the typed fallback and
    *  the saved-prefs fast path clear it so a replaced run never haunts the reconcile (pinned in
@@ -90,6 +100,10 @@ function draftFromPrefs(prefs: PersistedPrefs | null): SessionDraft {
     currentSens: prefs.currentSens,
     profile: { ...d.profile, speedAccuracy: prefs.speedAccuracy },
     bounds: prefs.bounds,
+    // Spread only when the stored blob actually carries one, so an older visit's prefs leave the
+    // field absent rather than present-and-undefined: absent is what "the card never ran" means
+    // everywhere else in the draft.
+    ...(prefs.dpi !== undefined ? { dpi: prefs.dpi } : {}),
   };
 }
 
@@ -106,6 +120,10 @@ export function rememberPrefs(ctx: AppContext, lastSessionId?: string): void {
     currentSens: ctx.draft.currentSens,
     speedAccuracy: ctx.draft.profile.speedAccuracy,
     bounds: ctx.draft.bounds,
+    // Written only when the draft has one. A run with no card must clear the remembered reading
+    // rather than leave the previous visit's in place, which is what omitting the key does: the
+    // whole blob is replaced on every save, so an absent draft dpi persists as an absent stored one.
+    ...(ctx.draft.dpi !== undefined ? { dpi: ctx.draft.dpi } : {}),
     ...(pointer !== undefined ? { lastSessionId: pointer } : {}),
   });
 }

@@ -257,12 +257,21 @@ export interface Result {
 /**
  * The remembered calibration + presentation preferences (campeon.prefs.v1): what a returning
  * visitor should NOT have to redo. Everything here is either user-chosen (game, sens, taste) or
- * measured once (the seeded search window in counts) - never a scored outcome; results live in
- * their own store and `lastSessionId` is only a POINTER into it.
+ * measured once (the seeded search window in counts, the card's counts per inch) - never a scored
+ * outcome; results live in their own store and `lastSessionId` is only a POINTER into it.
  */
 export interface PersistedPrefs {
   currentGame: GameId;
   currentSens: number;
+  /** The last card sweep's measured counts per inch, as a RECORD of what was measured. Optional
+   *  twice over: an older stored blob predates the field, and a run that skipped or refused the
+   *  card has none, so a reader must feature-check rather than default it.
+   *
+   *  It must never be divided into a later run's counts. The plausibility check works because the
+   *  sweep and the turn shared one browser and therefore one count convention k, which cancels; a
+   *  reading restored from another visit, possibly on another browser, cancels nothing and would
+   *  produce a confident wrong distance. Same reason a count convention pin is never persisted. */
+  dpi?: Dpi;
   /** The speed/accuracy taste knob (profile.speedAccuracy). */
   speedAccuracy: number;
   bounds: [Counts360, Counts360];

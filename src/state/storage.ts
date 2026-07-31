@@ -1,6 +1,7 @@
 import type { GameId, PersistedPrefs, Result, Session, Storage } from '../types';
 import { countsBounds } from '../types';
 import { GAME_YAW } from '../convert/yaw-table';
+import { isValidDpi } from '../input/dpi';
 
 /** The known game ids, so a remembered currentGame is validated against the real table (not just
  *  "some non-empty string") - a stale/hand-edited id degrades the whole blob to a first visit. */
@@ -36,11 +37,19 @@ function validPrefs(p: unknown): PersistedPrefs | null {
   const [lo, hi] = c.bounds;
   if (!finite(lo) || !finite(hi) || !(lo > 0) || !(hi > lo)) return null;
   if (c.lastSessionId !== undefined && typeof c.lastSessionId !== 'string') return null;
+  // The card reading degrades ON ITS OWN rather than taking the blob with it, unlike every field
+  // above. Those are what the search runs on, so garbage there means the visit cannot be trusted at
+  // all; this one is a record that seeds nothing, and throwing away a good search window because a
+  // hand-edited DPI is nonsense would cost the visitor their calibration to punish a note. An
+  // unusable one is dropped, which reads downstream as "the card never ran" - the same absence a
+  // first visit has. Pinned by tests/state/storage.test.ts.
+  const dpi = isValidDpi(c.dpi as number) ? (c.dpi as number) : undefined;
   return {
     currentGame: c.currentGame as GameId,
     currentSens: c.currentSens,
     speedAccuracy: c.speedAccuracy,
     bounds: countsBounds(lo, hi),
+    ...(dpi !== undefined ? { dpi } : {}),
     ...(c.lastSessionId !== undefined ? { lastSessionId: c.lastSessionId } : {}),
   };
 }

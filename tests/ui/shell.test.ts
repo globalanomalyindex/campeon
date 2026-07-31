@@ -270,4 +270,30 @@ describe('shell: remembered prefs (Phase C)', () => {
     rememberPrefs(shell.context, 's-new'); // an explicit pointer replaces it
     expect(storage.loadPrefs!()!.lastSessionId).toBe('s-new');
   });
+
+  it('carries the card reading both ways, and lets an absent one erase the stored reading', () => {
+    // The card is a measurement of the mouse rather than of the run, so it is remembered like the
+    // search window. Absent is meaningful and must survive the round trip: savePrefs replaces the
+    // whole blob, so a draft with no reading has to leave the stored one gone rather than let the
+    // previous visit's number attach itself to a run that never swept a card.
+    const storage = prefsStorage({ ...PREFS, dpi: 1600 });
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, { storage, screens: { hero: recordingScreen([], 'hero') } as never });
+    shell.start();
+    expect(shell.context.draft.dpi).toBe(1600);
+
+    delete shell.context.draft.dpi;
+    rememberPrefs(shell.context);
+    expect(storage.loadPrefs!()!.dpi).toBeUndefined();
+  });
+
+  it('a stored blob with no card reading leaves the draft field absent, not undefined-in-place', () => {
+    const root = document.getElementById('app')!;
+    const shell = createShell(root, {
+      storage: prefsStorage(PREFS),
+      screens: { hero: recordingScreen([], 'hero') } as never,
+    });
+    shell.start();
+    expect('dpi' in shell.context.draft).toBe(false);
+  });
 });
