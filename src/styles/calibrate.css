@@ -3,9 +3,17 @@
    (turquoise) as its signal colour. The stage is a measuring surface, so it sits
    on ink while the surrounding chrome stays on paper. */
 
+/* The click target that acquires pointer lock, and the only thing on this screen a player is asked
+   to hit. Its height used to be carried by the `.calibrate__canvas` inside it; the blind turn removed
+   that canvas, since an instrument that draws its own progress measures its own meter, and the height
+   left with it. The stage then collapsed to the 2px its border occupied, so the copy said "click the
+   box" over a hairline. The height belongs here, on the element that takes the click, not on a child
+   that may or may not exist. Pinned by tests/styles.test.ts "gives every click target a real area". */
 .calibrate__stage {
   position: relative;
   width: 100%;
+  height: 360px;
+  cursor: crosshair;
   background: var(--surface-inverse);
   border: 1px solid var(--border-default);
   overflow: hidden;

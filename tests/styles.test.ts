@@ -99,6 +99,30 @@ describe('stylesheets and markup agree', () => {
     expect(dead.sort(), 'these rules are defined and never called').toEqual([]);
   });
 
+  it('gives every click target a real area', () => {
+    // The defect this exists for shipped. `.calibrate__stage` is the element that takes the click
+    // which acquires pointer lock, and the copy on that screen says "click the box to begin". Its
+    // height was never its own: it came from a `.calibrate__canvas` child, and when the blind turn
+    // removed that canvas (an instrument that draws its own progress measures its own meter) the
+    // height left with it. The stage collapsed to the 2px of its border, so the box the copy named
+    // was a hairline nobody could hit, and nothing caught it: the dead-rule check above passes,
+    // because every class still had a rule. A rule existing is not the same as an element having
+    // an area.
+    //
+    // WCAG 2.2 SC 2.5.8 puts the minimum target at 24 CSS px. These are primary targets on a screen
+    // whose whole job is to receive one click, so they are held far above that floor.
+    const TARGETS = ['calibrate__stage'];
+    for (const cls of TARGETS) {
+      const rule = new RegExp(`\\.${cls}\\s*\\{([^}]*)\\}`).exec(code);
+      expect(rule, `${cls} has no rule at all`).not.toBeNull();
+      const body = rule![1];
+      const h = /(?:^|;)\s*(?:min-)?height\s*:\s*(\d+(?:\.\d+)?)px/.exec(body);
+      expect(h, `${cls} takes a click and declares no height of its own, so it collapses to its border`)
+        .not.toBeNull();
+      expect(Number(h![1])).toBeGreaterThanOrEqual(24);
+    }
+  });
+
   it('animates on the motion tokens, never a hand-typed duration', () => {
     // 2.4s, 90ms and a 70ms stagger step all shipped as literals. A duration that is not a
     // token cannot be turned down by the reduced-motion block, which is the point of having
