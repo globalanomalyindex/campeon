@@ -18,18 +18,55 @@
   border: 1px solid var(--border-default);
   overflow: hidden;
 }
+/* The trace canvas: the clock scrolls, the pen draws instantaneous speed. Its x axis is time,
+   so the drawing can prove the instrument is reading without leaking how far around the player
+   is; that blindness is pinned by tests/ui/turn-trace.test.ts "identical clocks and speeds draw
+   identical traces". No display property of its own, so the hidden attribute still works. */
+.calibrate__trace {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* Which way this pass goes. Static on purpose: a cue that moved would pace the turn. The stage
+   carries data-surface="chamber", so the mineral resolves to its lifted, ink-legible cut. */
+.cal-dir {
+  position: absolute; top: var(--space-4); left: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-3);
+  color: var(--instrument-calibrate);
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  pointer-events: none;
+}
+.cal-dir__chevs { display: flex; gap: 2px; }
+.cal-dir__chevs i {
+  display: block; width: 7px; height: 7px;
+  border-top: 1px solid currentColor; border-right: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+.cal-dir--left .cal-dir__chevs { transform: scaleX(-1); }
+
+/* The recording mark, held at the foot of the stage so the trace keeps the field. */
+.calibrate__rec {
+  position: absolute; left: var(--space-4); bottom: var(--space-3);
+  margin: 0;
+  font: var(--type-label); font-family: var(--font-text);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* --text-body, so the chamber remap on the stage keeps this paper-on-ink rather than flipping
+   it to ink-on-ink (the old --text-inverse inverts twice inside data-surface="chamber"). */
 .calibrate__hint {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   text-align: center; pointer-events: none;
-  color: var(--text-inverse);
+  color: var(--text-body);
 }
-.calibrate__hint span {
-  background: color-mix(in oklab, var(--stone-900) 82%, transparent);
-  color: var(--stone-50);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid color-mix(in oklab, var(--stone-50) 20%, transparent);
-}
+/* The text-bubble rule that used to live here (`.calibrate__hint span`, a scrim, padding and a
+   stone border) outlived the text it dressed: the hint now holds only the pulse mark, and the
+   rule's higher specificity was repainting the pulse ring stone and the dot ink-on-ink, so the
+   "start here" mark the copy points at was invisible on the stage. The pulse styles itself. */
 
 /* The three live readouts left with the sweep: a blind instrument shows no number while it
    measures, and reports its spread once, afterwards. */

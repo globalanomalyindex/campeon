@@ -111,10 +111,13 @@ describe('turn machine: verdicts', () => {
 });
 
 describe('turn view: blind means blind', () => {
-  it('renders no canvas, no dial and no degree readout', () => {
+  it('draws a live trace, and no dial, degree readout or percentage', () => {
+    // The canvas is back, but it is not the spin's dial: it draws the clock and instantaneous
+    // speed, a geometry tests/ui/turn-trace.test.ts pins as unable to encode the path length.
     const { host, view } = mountTurn();
-    expect(host.querySelector('canvas')).toBeNull(); // the spin's dial was a canvas; its absence is the point
+    expect(host.querySelector('canvas.calibrate__trace')).toBeTruthy();
     expect(host.textContent).not.toContain('°');
+    expect(host.textContent).not.toContain('%');
     view.dispose();
   });
 
@@ -123,6 +126,25 @@ describe('turn view: blind means blind', () => {
     expect(host.querySelector('[data-turn="pass"]')!.textContent).toContain('Pass 1 of 3');
     expect(host.querySelector('[data-turn="rec"]')).toBeTruthy();
     view.dispose();
+  });
+
+  it('cues the direction of the pass, statically', () => {
+    // The report this answers: nothing on the stage said which way the pass goes. The cue is
+    // static chevrons plus a label; anything that moved would pace the turn it points at.
+    const { host, view } = mountTurn();
+    expect(host.querySelectorAll('.cal-dir__chevs i').length).toBe(3);
+    expect(host.querySelector('[data-turn="dirlabel"]')!.textContent).toBe('to the right');
+    view.dispose();
+  });
+
+  it('promises no facing anywhere in the copy: the screen cannot show one', async () => {
+    // "End facing the way you started" asked the player to check a heading against a screen
+    // with no way to draw one. The task is proprioceptive and the copy has to say so; checked
+    // at the source because most phase copy renders only behind a pointer lock.
+    const fs = await import('node:fs/promises');
+    const src = await fs.readFile('src/ui/calibrate/turn-view.ts', 'utf8');
+    const copyLines = src.split('\n').filter((l) => !l.trimStart().startsWith('//') && !l.trimStart().startsWith('*'));
+    expect(copyLines.join('\n')).not.toMatch(/facing/i);
   });
 
   it('says why it refuses to show progress: the blindness is the trust signal', () => {

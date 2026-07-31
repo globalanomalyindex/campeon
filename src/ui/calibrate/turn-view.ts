@@ -4,13 +4,17 @@
 // counts), filled, turned green and invited the finishing click at exactly the counts matching
 // that constant, whoever the player was, with overshoot hidden by Math.min(360, deg) - the
 // instrument measured its own constant. The machine below cannot: no state in it knows a target
-// count. What the screen may show is which pass is up and that recording is live; the copy says
-// why it refuses to show more. Nothing moves, so there is no reduced-motion variant to plumb.
+// count. What the screen may show is which pass is up, which way it goes, and that the
+// instrument is reading: a trace scrolled by the clock and drawn from instantaneous speed
+// (turn-trace.ts), whose geometry provably cannot encode how far around the player is. Under
+// prefers-reduced-motion the drum holds still and only the pen advances, same two axes.
 import { turnFromPasses, type TurnEstimate } from '../../anchor/reference-turn';
 import { accelVerdict } from '../../input/accel-check';
 import type { PointerLockMode } from '../../types';
 import { createPointerLock } from '../../input/pointer-lock';
 import { conventionFromGated, type Convention } from '../../input/lattice';
+import { createSpeedTrace, type TraceGeometry, type TraceMode } from './turn-trace';
+import { hex, rgba } from '../../palette';
 
 /** Why the turn refused: 'accel' = the fast pass accumulated materially more than the slow ones;
  *  'spread' = four passes never settled close enough to honestly average. */
@@ -133,9 +137,14 @@ export function createTurnView(
         <h1 class="display">The turn</h1>
         <p class="gate__lead" data-turn="lead" aria-live="polite" aria-atomic="true">${LEAD_START}</p>
         <p class="cal-sub" data-turn="sub"></p>
-        <div class="calibrate__stage">
+        <div class="calibrate__stage" data-surface="chamber">
+          <canvas class="calibrate__trace" data-turn="trace" hidden></canvas>
+          <div class="cal-dir" data-turn="dir">
+            <span class="cal-dir__chevs" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span data-turn="dirlabel">to the right</span>
+          </div>
           <div class="calibrate__hint" data-turn="hint"><span class="cal-pulse"><span class="cal-pulse__dot"></span></span></div>
-          <p class="cal-method mono" data-turn="rec" hidden>Recording</p>
+          <p class="calibrate__rec" data-turn="rec" hidden>Recording</p>
         </div>
         <div class="cal-helper"><span><b>Out of room?</b> Hold the button, slide your mouse back, then let go.</span></div>
         <p class="cal-method mono" data-turn="why">No dial and no readout here, on purpose. A meter that filled toward done would tell your hand when to stop, and then the measurement would be of my meter, not of your turn.</p>
@@ -170,18 +179,97 @@ export function createTurnView(
 
   const recordingNow = (): boolean => m.phase === 'recording' || m.phase === 'fast-recording';
 
+  // The live trace. Sweep mode under reduced motion: the ink holds still and only the pen
+  // advances, so liveness survives without a scrolling field. Its geometry is pure and lives in
+  // turn-trace.ts; the invariant that it cannot encode accumulated path is pinned there, in
+  // tests/ui/turn-trace.test.ts "identical clocks and speeds draw identical traces".
+  const traceMode: TraceMode =
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'sweep' : 'scroll';
+  const trace = createSpeedTrace();
+  const traceCanvas = $('trace') as HTMLCanvasElement;
+  // Asked for lazily, only when a pass is live: jsdom has no 2D context and mounting must not
+  // depend on one (the drawing shell is runtime-verified, per the pure-core seam).
+  let traceCtx2d: CanvasRenderingContext2D | null | undefined;
+  const traceCtx = (): CanvasRenderingContext2D | null => {
+    if (traceCtx2d === undefined) traceCtx2d = traceCanvas.getContext('2d');
+    return traceCtx2d;
+  };
+  let traceRaf: number | null = null;
+
+  function sizeTraceCanvas(ctx: CanvasRenderingContext2D): void {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.round(stage.clientWidth * dpr));
+    const h = Math.max(1, Math.round(stage.clientHeight * dpr));
+    if (traceCanvas.width !== w || traceCanvas.height !== h) {
+      traceCanvas.width = w; traceCanvas.height = h;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawTrace(ctx: CanvasRenderingContext2D, g: TraceGeometry): void {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = traceCanvas.width / dpr, h = traceCanvas.height / dpr;
+    ctx.clearRect(0, 0, w, h);
+    // No axis, no labels: the resting pen draws its own zero line, and any rule under it would
+    // start reading as a scale.
+    const baseline = h * 0.7, top = h * 0.14;
+    ctx.strokeStyle = hex.calibrate;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'miter';
+    for (const line of g.lines) {
+      ctx.beginPath();
+      for (let i = 0; i < line.length; i++) {
+        const px = line[i].x * w;
+        const py = baseline - line[i].amp * (baseline - top);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    // The pen: a short tick at the writing edge. In sweep mode this is the one thing that
+    // moves, and it is what proves the instrument is alive while the hand is still.
+    ctx.strokeStyle = rgba('paper', 0.55);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const penPx = Math.min(g.penX * w, w - 1);
+    ctx.moveTo(penPx, baseline - 7);
+    ctx.lineTo(penPx, baseline + 7);
+    ctx.stroke();
+  }
+
+  function traceFrame(): void {
+    traceRaf = null;
+    if (!(pointer.isLocked() && recordingNow())) return;
+    const ctx = traceCtx();
+    if (ctx) drawTrace(ctx, trace.geometry(performance.now(), traceMode));
+    traceRaf = requestAnimationFrame(traceFrame);
+  }
+
+  function syncTrace(): void {
+    const live = pointer.isLocked() && recordingNow();
+    traceCanvas.hidden = !live;
+    if (live && traceRaf === null && typeof requestAnimationFrame === 'function') {
+      const ctx = traceCtx();
+      if (ctx === null) return;
+      sizeTraceCanvas(ctx);
+      traceRaf = requestAnimationFrame(traceFrame);
+    }
+    if (!live && traceRaf !== null) { cancelAnimationFrame(traceRaf); traceRaf = null; }
+  }
+
   const off = pointer.onSample((s) => {
     if (!pointer.isLocked()) return;
     if (latticeTap.length < LATTICE_TAP_CAP) latticeTap.push(s.dx, s.dy);
     if (paused) { pressMoved += Math.abs(s.dx); return; } // press movement classifies tap vs hold; never counts
     // Path length, not the signed sum: unheld wobble cancels in a signed sum and under-counts the
     // turn, which biased the old spin's seed fast (same fix SpinSeedAccumulator carried).
-    if (recordingNow()) path += Math.abs(s.dx);
+    // The trace is fed the same quantity, so it draws counted motion and nothing else.
+    if (recordingNow()) { path += Math.abs(s.dx); trace.add(s.t, Math.abs(s.dx)); }
   });
 
   function flashTooSoon(): void {
     if (tooSoonTimer !== null) clearTimeout(tooSoonTimer);
-    $('lead').textContent = 'That click came too soon to be a full turn, so it did not count. Keep turning, and click when you are facing forward again.';
+    $('lead').textContent = 'That click came too soon to be a full turn, so it did not count. Keep turning until your hand says the circle is closed, then click.';
     tooSoonTimer = window.setTimeout(() => { tooSoonTimer = null; updateUi(); }, TOO_SOON_MS);
   }
 
@@ -190,7 +278,10 @@ export function createTurnView(
     if (next === m) { flashTooSoon(); return; } // the machine refused the tap: explain the no-op
     const wasRecording = recordingNow();
     m = next;
-    if (recordingNow() && !wasRecording) path = 0; // a fresh pass counts from zero
+    if (recordingNow() && !wasRecording) {
+      path = 0; // a fresh pass counts from zero
+      trace.reset(performance.now()); // and draws on a blank drum: no replayed motion
+    }
     if (m.phase === 'done' && m.estimate !== null) {
       // Read the mode and run the gate BEFORE exiting the lock: pointerlockchange nulls mode().
       // `accel: null` is correct in both worlds: on raw no fast pass ran so there is no verdict,
@@ -231,7 +322,16 @@ export function createTurnView(
     const locked = pointer.isLocked();
     $('hint').style.display = locked ? 'none' : 'flex';
     $('rec').hidden = !(locked && recordingNow() && !repositioning);
-    if (m.phase === 'fast-idle' || m.phase === 'fast-recording') {
+    syncTrace();
+    const fastPhase = m.phase === 'fast-idle' || m.phase === 'fast-recording';
+    const dir = turnDirection(m.passes.length);
+    // The direction cue is static on purpose: a cue that moved would pace the turn. It hides
+    // for the fast pass, whose direction is the player's to choose.
+    const leftward = dir === 'left'; // hoisted: a 'left' literal inside toggle() reads as a class to tests/styles.test.ts
+    $('dir').style.display = fastPhase ? 'none' : 'flex';
+    $('dirlabel').textContent = `to the ${dir}`;
+    $('dir').classList.toggle('cal-dir--left', leftward);
+    if (fastPhase) {
       $('pass').textContent = 'Last pass · quick';
     } else if (m.passes.length >= NATURAL_PASSES) {
       $('pass').textContent = 'Pass 4 · the tie-breaker · to the left';
@@ -244,19 +344,18 @@ export function createTurnView(
       $('sub').textContent = "Let go when you're set. Counting stays paused while you hold.";
       return;
     }
-    const dir = turnDirection(m.passes.length);
     switch (m.phase) {
       case 'idle':
         $('lead').textContent = m.passes.length === 0
           ? `Click once to start pass 1, then turn a full circle to the ${dir}, by feel, as if you were in your game.`
           : `Pass ${m.passes.length} is in. Click once to start pass ${m.passes.length + 1}, turning to the ${dir} this time.`;
         $('sub').textContent = m.passes.length === 0
-          ? 'End facing the way you started, then click again to finish the pass.'
+          ? 'Your hand knows how much mouse travel one full turn takes in your game. Give it that much, then click again to finish the pass.'
           : 'Alternating direction cancels a one-way drift instead of averaging it in.';
         break;
       case 'recording':
-        $('lead').textContent = `Turning to the ${dir}. One full circle, and click when you are facing forward again.`;
-        $('sub').textContent = '';
+        $('lead').textContent = `Turning to the ${dir}. Give it the travel one full circle takes in your game, then click to finish the pass.`;
+        $('sub').textContent = 'The line draws your speed against the clock. It carries no measure of how far around you are.';
         break;
       case 'fourth-offer':
         // The estimate exists in this phase by construction (set on entry). The spread is the
@@ -314,6 +413,7 @@ export function createTurnView(
 
   return { dispose() {
     off();
+    if (traceRaf !== null) cancelAnimationFrame(traceRaf);
     if (holdTimer !== null) clearTimeout(holdTimer);
     if (tooSoonTimer !== null) clearTimeout(tooSoonTimer);
     document.removeEventListener('pointerlockchange', onLock);
