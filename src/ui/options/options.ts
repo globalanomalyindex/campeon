@@ -132,8 +132,10 @@ export function options(host: HTMLElement, ctx: AppContext): Screen {
           status.textContent = `Saved. I search ${nlo} to ${nhi} counts per 360.`;
         } else {
           // "Applied for this visit" was not true for a visitor who has never calibrated. Their only
-          // way into a run is the sweep and the spin (or typed numbers), and both of those set the
-          // window from what they measure, so this one is replaced before it is ever searched. Only
+          // way into a run is the guided calibration or typed numbers, and the window comes from
+          // the blind turn either way, so this one is replaced before it is ever searched. The card
+          // sweep beside the turn does not touch it: it measures counts per inch, which seeds
+          // nothing and only checks the turn against a physical standard. Only
           // "start from your saved calibration" carries a stored window forward, and that path needs
           // a calibration to exist. So the message names the calibration as what happens next.
           status.textContent = `Set to ${nlo} to ${nhi} counts per 360. Calibration comes before your first run and it sets the window from what it measures, so it will replace this one. After you have calibrated, a window you set here is saved.`;

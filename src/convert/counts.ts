@@ -1,9 +1,13 @@
 // Counts per 360 is the tool's own unit, so nothing here takes a DPI, a centimetre, or the 2.54 that
 // used to sit in convert/cm360.ts. DPI cancels out of every number the tool reports: sens is
 // 914.4 / (dpi * yaw * cm360) and cm360 is counts * 2.54 / dpi, so sens is 360 / (yaw * counts) and
-// the DPI is gone. It survived only in a printed label, which is why the card was deleted rather
-// than replaced. Verified numerically as well as algebraically, in tests/convert/counts.test.ts
+// the DPI is gone. Verified numerically as well as algebraically, in tests/convert/counts.test.ts
 // "agrees with the retired cm form at the same physical setting".
+//
+// The card sweep exists again and this stays true, which is the only reason it was allowed back. It
+// measures a DPI and hands it to no one here: a count total that came from the arena is converted,
+// searched and reported without it, and its single consumer is src/anchor/plausibility.ts, where the
+// turn is checked against a physical standard rather than converted into one.
 import { counts360 } from '../types';
 import type { Counts360, Degrees } from '../types';
 
