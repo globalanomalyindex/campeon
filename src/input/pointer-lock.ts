@@ -10,12 +10,13 @@ interface MovementLike {
  * Flatten coalesced pointer events into AimSamples, carrying `movementX`/`movementY` through
  * UNCHANGED (pure).
  *
- * It used to divide both axes by `devicePixelRatio`, on the reasoning recorded in the deleted
- * input/dpi.ts: Chrome reports device pixels, Firefox reports CSS pixels, and dividing by DPR makes
- * them agree. Dividing two streams that differ by a factor by that same factor cannot reconcile
- * them, so what it actually did was make one browser correct and leave the other wrong by DPR. It
- * also halved every delta on a DPR 2 display, which destroys the integer lattice the count
- * convention probe reads. Pinned by tests/input/pointer-lock.test.ts "carries movementX and
+ * It used to divide both axes by `devicePixelRatio`, on the reasoning that Chrome reports device
+ * pixels, Firefox reports CSS pixels, and dividing by DPR makes them agree. Dividing two streams
+ * that differ by a factor by that same factor cannot reconcile them, so what it actually did was
+ * make one browser correct and leave the other wrong by DPR. It also halved every delta on a DPR 2
+ * display, which destroys the integer lattice the count convention probe reads. The card sweep and
+ * input/dpi.ts came back without it, deliberately and separately (tests/input/dpi.test.ts asserts on
+ * that module's whole namespace). Pinned by tests/input/pointer-lock.test.ts "carries movementX and
  * movementY through unchanged".
  */
 export function flattenCoalesced(
