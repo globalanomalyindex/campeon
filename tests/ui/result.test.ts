@@ -289,6 +289,47 @@ describe('result screen, tier three (arithmetic on your input)', () => {
     expect(out.textContent).toBe('');
   });
 
+  it('reports the measured length when the Result carries a same-run card reading', () => {
+    const host = mount({ ...RESULT, dpi: 800 });
+    // BROWSER counts over the measured reading: 8240 * 2.54 / 800 = 26.162. The prescription's k
+    // of 2 must NOT participate: the measured DPI carries the count convention already, so
+    // dividing hardwareCounts (4,120) instead would remove it twice and print 13.1.
+    expect(host.querySelector('[data-result="cm360"]')!.textContent).toBe('26.2');
+    const line = host.querySelector('[data-result="measured-cm"]')!.textContent!;
+    expect(line).toContain('About');
+    // The two honesty points that survive the card's return, stated rather than dropped.
+    expect(line).toContain('3 to 5 percent');
+    expect(line).toContain('does not depend on the card');
+  });
+
+  it('renames the tier for what it now assumes: the card, when the length is measured', () => {
+    const head = (res: Result): string =>
+      mount(res).querySelector('[data-tier="three"] .result__tier-head')!.textContent!;
+    expect(head({ ...RESULT, dpi: 800 })).toBe('No. 3 · one physical standard');
+    expect(head(RESULT)).toBe('No. 3 · arithmetic on your input'); // no reading, no rename
+  });
+
+  it('renders no measured length without a card reading on the Result', () => {
+    expect(mount().querySelector('[data-result="measured-cm"]')).toBeNull();
+  });
+
+  it('never converts an edge: a bounded result keeps counts even with a reading aboard', () => {
+    // A bound in centimetres would hand the player the search window's rim dressed as a desk
+    // length. The counts line keeps its bound prefix; the length stays off the page.
+    const host = mount({ ...RESULT, peakAtBound: 'high', dpi: 800 });
+    expect(host.querySelector('[data-result="measured-cm"]')).toBeNull();
+    expect(host.querySelector('[data-tier="three"]')!.textContent).toContain('At least');
+  });
+
+  it('refuses an implausible reading (hand-edited export) rather than printing a length', () => {
+    expect(mount({ ...RESULT, dpi: 5 }).querySelector('[data-result="measured-cm"]')).toBeNull();
+  });
+
+  it('a tuned pick keeps its length: the counts share the run and browser the card measured', () => {
+    const host = mount({ ...RESULT, tuned: true, dpi: 800 });
+    expect(host.querySelector('[data-result="cm360"]')!.textContent).toBe('26.2');
+  });
+
   it('typedCm is pure arithmetic that refuses instead of guessing', () => {
     expect(typedCm(8240, 800)).toBeCloseTo(26.162, 3);
     expect(typedCm(8240, 0)).toBeNull();

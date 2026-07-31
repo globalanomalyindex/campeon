@@ -8,6 +8,7 @@ import { marksFromTrials } from './session-view';
 import {
   ciConcord, ratioFraming, CONFIRMED_MAX_ABS_LN, type Prescription, type RatioFraming,
 } from '../optimizer/result';
+import { cm360From } from '../anchor/plausibility';
 
 const fmt = (v: number, digits = 1): string => (Number.isFinite(v) ? v.toFixed(digits) : '-');
 // Counts are whole units at four-plus digits: rounded and grouped, because 8240 misreads as a
@@ -57,17 +58,35 @@ const TIER_TWO_WITHHELD =
 const TIER_TWO_BOUNDED =
   'No per-game numbers for a bounded result. The number above is an edge of the window I searched, and converting an edge would hand you my search setting as if it were your best.';
 
-// ── Tier-three copy. The tool's own unit, plus arithmetic the player can opt into. The conversion
-// renders WITH its arithmetic visible so it can never read as a measurement; the canon test pins
-// that no cm/360 string appears anywhere on this screen. Two variants (A6): with k pinned the
-// number is HARDWARE counts (C*/k, the division done once in buildPrescription) and the DPI
-// conversion carries one caveat; without k the number is BROWSER counts and every centimetre
-// claim must name the second unmeasured factor, because this is the tier whose whole job is
-// refusing to overclaim.
+// ── Tier-three copy. The tool's own unit, the card's length when one was measured, and arithmetic
+// the player can opt into. This tier spent the cardless era refusing centimetres because
+// converting them needed a guessed DPI; the sweep measures one, so a Result that carries a
+// same-run reading reports the length (measuredCmHtml below) and the tier head names the card as
+// the one assumption. Two honesty limits survive the return and are stated, never dropped: the
+// card method lands within about 3 to 5 percent, so the length reads as approximate, and tier
+// one's factor remains the strictest claim on the page, a ratio of two counts in the same units
+// that does not depend on the card at all (pinned in tests/ui/result.test.ts). The typed-DPI
+// conversion stays, renders WITH its arithmetic visible so it can never read as a measurement,
+// and keeps its two variants (A6): with k pinned the number is HARDWARE counts (C*/k, the
+// division done once in buildPrescription) and the conversion carries one caveat; without k the
+// number is BROWSER counts and every typed-centimetre claim must name the second unmeasured
+// factor, because this is the tier whose whole job is refusing to overclaim.
 const TIER_THREE_EXPLAINER =
   'If you know your mouse’s DPI, that is counts divided by DPI, times 2.54, in centimetres.';
 const BROWSER_COUNTS_NOTE =
   'These are counts as the browser reports them; the scale between them and your mouse’s own counts went unmeasured this session.';
+
+/** The measured length, present exactly when the Result carries a same-run card reading and the
+ *  number is a location (an edge is never converted: reporting the search window's rim in
+ *  centimetres would hand the player my setting dressed as their desk). The centimetres come from
+ *  cm360From, whose division is the one that looks like a bug: the sweep's "DPI" is the hardware
+ *  DPI times the browser's unpinned count convention k, and it divides RAW browser counts, which
+ *  carry the same k, so k cancels and the length is right with the convention never measured
+ *  (src/anchor/plausibility.ts holds the algebra and its test). That is also why the division
+ *  never touches hardwareCounts, which already had k taken out: dividing them by the measured DPI
+ *  would remove k twice (pinned in tests/ui/result.test.ts). */
+const measuredCmHtml = (cm: number): string =>
+  `<p class="result__counts-line" data-result="measured-cm">About <span class="mono" data-result="cm360">${cm.toFixed(1)}</span> cm of mouse travel makes one full turn at this sensitivity. The length is measured: your sweep across the card put a physical width on the counts. The card method lands within about 3 to 5 percent, so the centimetres are approximate. The factor in No. 1 remains the strictest number on this page, a ratio of two counts in the same units, and it does not depend on the card at all.</p>`;
 
 /** Tier three's optional conversion: centimetres from the player's OWN typed DPI. Pure arithmetic
  *  on their input. It lives here in the shell, off every measured path, so nothing upstream can
@@ -278,8 +297,20 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       const tierThreeLine = hw !== undefined
         ? `<span class="mono" data-result="tier-three-counts" data-counts-kind="hardware">${fmtCounts(hw)}</span> hardware counts of mouse travel make one full turn at this sensitivity. The measured browser factor is already divided out of this number. ${TIER_THREE_EXPLAINER}`
         : `${boundedPrefix}<span class="mono" data-result="tier-three-counts" data-counts-kind="browser">${fmtCounts(r.optimalCounts)}</span> browser counts of mouse travel make one full turn at this sensitivity. ${TIER_THREE_EXPLAINER} ${BROWSER_COUNTS_NOTE}`;
+      // The card's length. Gated on !bounded (an edge is never converted) and computed from RAW
+      // browser counts, never hardwareCounts: cm360From's divisor carries the count convention k
+      // and so do the raw counts, which is what cancels; hardwareCounts already shed k. cm360From
+      // itself refuses a missing or implausible reading with NaN, so a hand-edited export cannot
+      // print a length. A tuned pick keeps its length: the counts were picked in the same run and
+      // browser the card measured, so the pairing that makes the division sound still holds
+      // (adoptResult says why it carries the reading).
+      const measuredCm = !bounded && r.dpi !== undefined ? cm360From(r.optimalCounts, r.dpi) : NaN;
+      const tierThreeHead = Number.isFinite(measuredCm)
+        ? 'No. 3 · one physical standard'
+        : 'No. 3 · arithmetic on your input';
       const tierThree = `<div class="result__tier reveal" data-tier="three" data-reveal style="--reveal-i:10">
-          <p class="result__tier-head t-label">No. 3 · arithmetic on your input</p>
+          <p class="result__tier-head t-label">${tierThreeHead}</p>
+          ${Number.isFinite(measuredCm) ? measuredCmHtml(measuredCm) : ''}
           <p class="result__counts-line">${tierThreeLine}</p>
           <label class="field result__dpi-field"><span>Mouse DPI, if you know it</span>
             <input type="number" min="1" step="1" inputmode="numeric" data-action="dpi-convert"></label>

@@ -63,6 +63,8 @@ const VARIANTS: Record<string, Result> = {
   unanchored: (() => { const { prescription: _p, ...rest } = RESULT; return rest; })(),
   bounded: { ...RESULT, peakAtBound: 'high' },
   tuned: { ...RESULT, tuned: true },
+  // The card's length aboard: the one variant that shows centimetres without a typed DPI.
+  measured: { ...RESULT, dpi: 800 },
 };
 
 describe('result screen canon', () => {
@@ -87,9 +89,12 @@ describe('result screen canon', () => {
     expect(head('one')).toBe('No. 1 · assumes nothing');
     expect(head('two')).toBe('No. 2 · one measured factor');
     expect(head('three')).toBe('No. 3 · arithmetic on your input');
+    // With the card's reading aboard, tier three assumes the card and its head says so.
+    expect(mount(VARIANTS.measured!).querySelector('[data-tier="three"] .result__tier-head')!.textContent)
+      .toBe('No. 3 · one physical standard');
   });
 
-  it('the only centimetre on the page is the typed-DPI arithmetic, and no cm/360 survives', () => {
+  it('without a card reading the only centimetre is the typed-DPI arithmetic, and no cm/360 survives', () => {
     const host = mount(RESULT);
     expect(host.textContent).not.toContain('cm/360');
     expect(host.textContent).not.toContain('cm per 360'); // absent until the player types a DPI
@@ -100,6 +105,12 @@ describe('result screen canon', () => {
     expect(out.textContent).toContain('cm per 360');
     expect(out.textContent).toContain('2.54');
     expect(host.textContent).not.toContain('cm/360'); // still nowhere, even after converting
+  });
+
+  it('the measured length speaks the unit in prose and never revives the slashed compact form', () => {
+    const host = mount(VARIANTS.measured!);
+    expect(host.querySelector('[data-result="measured-cm"]')).toBeTruthy();
+    expect(host.textContent).not.toContain('cm/360');
   });
 
   it('spells the unit counts per 360 everywhere, never a slashed compact form (F36)', () => {
