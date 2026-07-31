@@ -13,8 +13,8 @@ import { accelVerdict } from '../../input/accel-check';
 import type { PointerLockMode } from '../../types';
 import { createPointerLock } from '../../input/pointer-lock';
 import { conventionFromGated, type Convention } from '../../input/lattice';
-import { createSpeedTrace, type TraceGeometry, type TraceMode } from './turn-trace';
-import { hex, rgba } from '../../palette';
+import { createSpeedTrace, type TraceMode } from './turn-trace';
+import { createTracePainter } from './trace-canvas';
 
 /** Why the turn refused: 'accel' = the fast pass accumulated materially more than the slow ones;
  *  'spread' = four passes never settled close enough to honestly average. */
@@ -190,60 +190,15 @@ export function createTurnView(
       ? 'sweep' : 'scroll';
   const trace = createSpeedTrace();
   const traceCanvas = $('trace') as HTMLCanvasElement;
-  // Asked for lazily, only when a pass is live: jsdom has no 2D context and mounting must not
-  // depend on one (the drawing shell is runtime-verified, per the pure-core seam).
-  let traceCtx2d: CanvasRenderingContext2D | null | undefined;
-  const traceCtx = (): CanvasRenderingContext2D | null => {
-    if (traceCtx2d === undefined) traceCtx2d = traceCanvas.getContext('2d');
-    return traceCtx2d;
-  };
+  // One painter, shared with the card sweep (trace-canvas.ts), so the two instruments cannot drift
+  // into drawing the same claim two different ways.
+  const painter = createTracePainter(traceCanvas, stage);
   let traceRaf: number | null = null;
-
-  function sizeTraceCanvas(ctx: CanvasRenderingContext2D): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.round(stage.clientWidth * dpr));
-    const h = Math.max(1, Math.round(stage.clientHeight * dpr));
-    if (traceCanvas.width !== w || traceCanvas.height !== h) {
-      traceCanvas.width = w; traceCanvas.height = h;
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  function drawTrace(ctx: CanvasRenderingContext2D, g: TraceGeometry): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = traceCanvas.width / dpr, h = traceCanvas.height / dpr;
-    ctx.clearRect(0, 0, w, h);
-    // No axis, no labels: the resting pen draws its own zero line, and any rule under it would
-    // start reading as a scale.
-    const baseline = h * 0.7, top = h * 0.14;
-    ctx.strokeStyle = hex.calibrate;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'miter';
-    for (const line of g.lines) {
-      ctx.beginPath();
-      for (let i = 0; i < line.length; i++) {
-        const px = line[i].x * w;
-        const py = baseline - line[i].amp * (baseline - top);
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-    }
-    // The pen: a short tick at the writing edge. In sweep mode this is the one thing that
-    // moves, and it is what proves the instrument is alive while the hand is still.
-    ctx.strokeStyle = rgba('paper', 0.55);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    const penPx = Math.min(g.penX * w, w - 1);
-    ctx.moveTo(penPx, baseline - 7);
-    ctx.lineTo(penPx, baseline + 7);
-    ctx.stroke();
-  }
 
   function traceFrame(): void {
     traceRaf = null;
     if (!(pointer.isLocked() && recordingNow())) return;
-    const ctx = traceCtx();
-    if (ctx) drawTrace(ctx, trace.geometry(performance.now(), traceMode));
+    painter.paint(trace.geometry(performance.now(), traceMode));
     traceRaf = requestAnimationFrame(traceFrame);
   }
 
@@ -251,9 +206,7 @@ export function createTurnView(
     const live = pointer.isLocked() && recordingNow();
     traceCanvas.hidden = !live;
     if (live && traceRaf === null && typeof requestAnimationFrame === 'function') {
-      const ctx = traceCtx();
-      if (ctx === null) return;
-      sizeTraceCanvas(ctx);
+      if (!painter.ready()) return; // jsdom has no 2D context, and mounting must not depend on one
       traceRaf = requestAnimationFrame(traceFrame);
     }
     if (!live && traceRaf !== null) { cancelAnimationFrame(traceRaf); traceRaf = null; }
