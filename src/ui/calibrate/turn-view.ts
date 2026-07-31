@@ -88,8 +88,10 @@ export function turnTap(m: TurnMachine, pathCounts: number, mode: PointerLockMod
       if (pathCounts < MIN_PASS_COUNTS) return m;
       if (m.estimate === null) return { ...m, phase: 'blocked', blockReason: 'spread' }; // unreachable: fast phases exist only past an agreed estimate
       // accelVerdict's default 10 percent tolerance, tight rather than apologetic: a full turn is
-      // 3 to 6 times the 8.56 cm card that once forced the tolerance to widen, so edge slop is a
-      // proportionally small fraction of the pass (the widener is deleted, it has no caller left).
+      // 3 to 6 times the 8.56 cm card that forces the tolerance to widen, so edge slop is a
+      // proportionally small fraction of the pass. `accelTolForWidth` exists and is called by the
+      // card sweep, which needs it; passing it here would loosen a check that has no reason to be
+      // loose, and hide a real acceleration verdict behind the card's slop budget.
       return accelVerdict(m.estimate.counts, pathCounts).accelerated
         ? { ...m, phase: 'blocked', blockReason: 'accel' }
         : { ...m, phase: 'done' };

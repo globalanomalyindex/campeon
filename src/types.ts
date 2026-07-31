@@ -13,6 +13,14 @@ export const counts360 = (n: number): Counts360 => n as Counts360;
 export const countsBounds = (lo: number, hi: number): [Counts360, Counts360] =>
   [counts360(lo), counts360(hi)];
 export type Degrees = number;
+/** Counts per inch, as MEASURED by the card sweep (src/input/dpi-sweep.ts). Deliberately not
+ *  branded and deliberately not called the player's hardware DPI: the sweep runs on raw browser
+ *  counts, so what it measures is the hardware DPI times the browser's unpinned count convention k.
+ *  That factor cancels against the turn, which counts in the same units, so every number built on
+ *  this one is right without k ever being pinned (src/anchor/plausibility.ts holds the cancellation
+ *  and tests/anchor/plausibility.test.ts pins it). Anything that would claim this number as a
+ *  hardware setting is claiming more than was measured. */
+export type Dpi = number;
 export type Ms = number;
 export type GameId =
   | 'valorant' | 'cs2' | 'apex' | 'ow2' | 'cod' | 'fortnite' | 'r6' | 'pubg';
