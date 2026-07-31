@@ -26,11 +26,15 @@ const CONFINED_PCT = Math.round(Math.expm1(CONFIRMED_MAX_ABS_LN) * 100);
 // mean the same coverage.
 const Z90 = 1.6448536269514722;
 
-// ── Tier-one copy. The screen is ordered by how much each claim assumes and the ordering IS the
-// argument: the factor leads BECAUSE it assumes nothing (a ratio of two counts in the same units).
-// Each variant below is one branch of the spec's error-path list; none may claim what its data
-// cannot distinguish (canon invariant 2). Deliberately the least sophisticated sentences on the
-// page: tier one earns the lead by assumptions, never by rhetoric.
+// ── Tier-one copy. The tiers below the hero stay ordered by how much each claim assumes, but the
+// HERO leads with the strongest claim the player can act on without knowing anything in advance:
+// a per-game sensitivity to type whenever the count convention k is pinned (the one condition
+// under which an absolute number is honestly available; count-convention.ts owns the two routes),
+// the multiply factor when only the anchor was measured, and the located counts when neither was.
+// The factor is never weaker evidence for being demoted: it is a ratio of two counts in the same
+// units, the one claim that assumes nothing, and the copy that carries it says so wherever it
+// renders. Each variant below is one branch of the spec's error-path list; none may claim what
+// its data cannot distinguish (canon invariant 2).
 const RATIO_WIDTH_NOTE =
   'This interval is wider than the band in the plot below, because the factor carries two measurements: where you aim best, and where you started. A narrower number would answer an easier question.';
 // F33: only what the interval supports. No "the session had every chance to move you" (a claim
@@ -40,8 +44,27 @@ const ratioConfirmedNote = (pct: number): string =>
   `Every factor this interval allows is within ${pct}% of no change, and ${pct}% is the tightest this instrument resolves: there is no change here it can distinguish. The honest instruction is to change nothing.`;
 const RATIO_INDISTINCT_NOTE =
   'The factor against where you started came back with an interval that includes 1.00, so I will not prescribe a change I cannot tell apart from no change.';
+// The indistinct sentence for a sens-led hero, where "no prescription" would contradict the number
+// above it: the located number stands, and what the interval withholds is any claim that it moves
+// the player from where they began.
+const SENS_INDISTINCT_NOTE =
+  'The factor against where you started came back with an interval that includes 1.00: the number above and the one you came in with are closer than this instrument can tell apart.';
 const RATIO_UNAVAILABLE_NOTE =
-  'The headline factor needs a clean read of where your hands started, and this session did not produce one. I report the location and leave the factor blank.';
+  'A starting-point factor needs a clean read of where your hands started, and this session did not produce one. I report the location and leave the factor blank.';
+// What a k-unpinned hero says plainly it would need before it could hand over a number to type.
+// Rendered only when tier two is withheld, so it can never claim a missing pin above a table that
+// has one.
+const NEEDS_PIN_RATIO =
+  'This factor multiplies the sensitivity you have now, so it asks you to know that number. A number to type instead needs one measured factor this session did not pin, and No. 2 below says what pins it.';
+const NEEDS_PIN_COUNTS =
+  'A number to type into your game needs one measured factor this session did not pin, and No. 2 below says what pins it.';
+// The factor as the sens hero's secondary line. Demoted in layout, never in standing: the sentence
+// itself names it the strictest claim on the page, because a ratio of two counts in the same units
+// assumes nothing the leading number does not already rest on.
+const sensRatioLine = (ratio: string, ciText: string): string =>
+  `If you know the sensitivity you play at now, the same finding is a multiply by <span class="mono" data-result="ratio">${ratio}</span>, 90% interval <span class="mono" data-result="ratio-ci">${ciText}</span>. That factor is the strictest claim on this page: a ratio of two counts measured the same way, so your game, mouse DPI and driver settings all cancel out of it.`;
+const SENS_SWITCH_NOTE =
+  'Playing a different game? Pick it under No. 2 and this number follows.';
 
 // ── Tier-two copy. The one assumption, named, in words a player can act on. Two routes pin k and
 // no third exists (the discrete DPI prior is the false-precision shortcut the spec bans). The
@@ -54,7 +77,7 @@ const K_NOTE: Record<'lattice' | 'typed-sens', string> = {
     'One measured factor stands between my counts and your mouse. The in-game sensitivity you typed pinned it, to within the spread of the turn it was compared against, and each row below folds that spread into its 90% band.',
 };
 const TIER_TWO_WITHHELD =
-  'No per-game numbers this session. They need one measured factor, the scale between what your browser reports and what your mouse actually counts, and nothing this session pinned it down. Telling me your game and current in-game sensitivity at setup pins it.';
+  'No per-game numbers this session. They need one measured factor, the scale between what your browser reports and what your mouse actually counts, and nothing this session pinned it down. Two routes pin it: a browser that hands me raw mouse input, where the factor shows up in the movement stream on its own, or your game and current in-game sensitivity named at setup.';
 const TIER_TWO_BOUNDED =
   'No per-game numbers for a bounded result. The number above is an edge of the window I searched, and converting an edge would hand you my search setting as if it were your best.';
 
@@ -152,9 +175,19 @@ function srSummary(
   framing: RatioFraming | undefined,
   tuned: boolean,
   bounded: 'low' | 'high' | undefined,
+  sensLead?: { label: string; sens: number; band: string | null },
 ): string {
   if (tuned) return `Your sensitivity, tuned by feel: ${fmtCounts(r.optimalCounts)} counts per 360. It carries no measured interval.`;
   if (bounded) return `Your number reads as ${bounded === 'high' ? 'at least' : 'at most'} ${fmtCounts(r.optimalCounts)} counts per 360. The fitted curve peaks past the ${bounded === 'high' ? 'slow' : 'fast'} edge of the searched window, so the edge is a bound and no measured interval is reported.`;
+  if (sensLead) {
+    const band = sensLead.band ? `, 90% band ${sensLead.band}` : '';
+    const tail = ratioP && framing === 'directional'
+      ? `If you know the sensitivity you play at now, that is a multiply by ${fmtRatio(ratioP.ratio)}, 90% interval ${fmtRatio(ratioP.ci[0])} to ${fmtRatio(ratioP.ci[1])}.`
+      : ratioP
+        ? 'The factor against your starting point includes no change: this number and where you started are closer than the instrument tells apart.'
+        : 'No starting-point factor was measurable this session.';
+    return `Set ${sensLead.label} to ${sensLead.sens.toFixed(3)}${band}. ${tail}`;
+  }
   if (ratioP && framing === 'directional') return `Multiply your in-game sensitivity by ${fmtRatio(ratioP.ratio)}, 90% interval ${fmtRatio(ratioP.ci[0])} to ${fmtRatio(ratioP.ci[1])}. You aim best at ${fmtCounts(r.optimalCounts)} counts per 360.`;
   if (ratioP && framing === 'confirmed') return `The factor came back as ${fmtRatio(ratioP.ratio)}: every value its interval allows is within ${CONFINED_PCT}% of no change, the tightest this instrument resolves.`;
   const tail = ratioP
@@ -196,13 +229,43 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
           ? { ratio: p.ratio, ci: p.ratioCi90 }
           : undefined;
       const framing = ratioP ? ratioFraming(ratioP.ci) : undefined;
-      const heroMode: 'tuned' | 'bounded' | 'ratio' | 'confirmed' | 'counts' =
+      // The per-game band's half-width in ln space: the search's own precision and k's spread
+      // combined in quadrature (A5, D3; Math.hypot can only widen). Computed up here because the
+      // hero and the tier-two table must render the SAME band or the same number would carry two
+      // different uncertainty claims on one screen.
+      const kSpread = p?.kLogSd !== undefined && Number.isFinite(p.kLogSd) && p.kLogSd > 0 ? p.kLogSd : 0;
+      const searchHalfLn =
+        p !== undefined && p.countsCi90[0] > 0 && p.countsCi90[1] > p.countsCi90[0]
+          ? Math.log(p.countsCi90[1] / p.countsCi90[0]) / 2
+          : null;
+      const halfLn = searchHalfLn === null ? null : Math.hypot(searchHalfLn, Z90 * kSpread);
+      const gameLabelFor = (id: GameId): string => GAME_YAW.find((g) => g.id === id)?.label ?? id;
+      const sensAt = (id: GameId): number | undefined => {
+        const s = p?.perGameSens?.[id];
+        return s !== undefined && Number.isFinite(s) && s > 0 ? s : undefined;
+      };
+      const sensBandText = (s: number): string | null =>
+        halfLn !== null ? `${(s * Math.exp(-halfLn)).toFixed(3)} to ${(s * Math.exp(halfLn)).toFixed(3)}` : null;
+      const sensNow = sensAt(ctx.draft.currentGame);
+      // The hero leads with the strongest claim the player can act on with no prior knowledge.
+      // 'sens' exists only under a pinned k (perGameSens is present exactly then; count-convention
+      // owns the gate), so the absolute number is never fabricated: unpinned sessions keep the
+      // factor or the located counts and say plainly what a typeable number would need. A
+      // confirmed factor still leads, because "change nothing" is an instruction no number
+      // improves on.
+      const heroMode: 'tuned' | 'bounded' | 'sens' | 'ratio' | 'confirmed' | 'counts' =
         tuned ? 'tuned'
         : bounded ? 'bounded'
-        : framing === 'directional' ? 'ratio'
         : framing === 'confirmed' ? 'confirmed'
+        : sensNow !== undefined ? 'sens'
+        : framing === 'directional' ? 'ratio'
         : 'counts';
       const showRatioHero = heroMode === 'ratio' || heroMode === 'confirmed';
+      // Rendered only when tier two is withheld, so the "did not pin" claim can never sit above a
+      // pinned table.
+      const needsPin = (heroMode === 'ratio' || heroMode === 'counts') && !p?.perGameSens
+        ? `<p class="result__ratio-note reveal" data-result="needs-pin" data-reveal style="--reveal-i:3">${heroMode === 'ratio' ? NEEDS_PIN_RATIO : NEEDS_PIN_COUNTS}</p>`
+        : '';
       // D1: Result.ci90 is optional now (absent means tuned by feel; phase 1a task 4). A measured
       // Result always carries it; the truthiness guard keeps tsc honest under strict and renders
       // nothing from a malformed one rather than fabricating an interval.
@@ -213,34 +276,49 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       const lead =
         heroMode === 'tuned' ? 'Your number'
         : heroMode === 'bounded' ? BOUNDED_LEAD
+        : heroMode === 'sens' ? `Set <span data-result="sens-game">${gameLabelFor(ctx.draft.currentGame)}</span> to`
         : heroMode === 'ratio' ? 'Multiply your in-game sensitivity by'
         : heroMode === 'confirmed' ? 'The factor came back as'
         : 'Where you aim best';
-      const heroNumber = showRatioHero && ratioP
-        ? `<span data-result="ratio">${fmtRatio(ratioP.ratio)}</span><small>×</small>`
-        : `<span data-result="counts360">${fmtCounts(r.optimalCounts)}</span><small> counts per 360</small>`;
+      const heroNumber =
+        heroMode === 'sens' && sensNow !== undefined
+          ? `<span data-result="sens360">${sensNow.toFixed(3)}</span>`
+          : showRatioHero && ratioP
+            ? `<span data-result="ratio">${fmtRatio(ratioP.ratio)}</span><small>×</small>`
+            : `<span data-result="counts360">${fmtCounts(r.optimalCounts)}</span><small> counts per 360</small>`;
       const ciLine = tuned
         ? `<p class="result__ci result__ci--tuned reveal" data-reveal style="--reveal-i:2">You picked this one by feel, so it carries no measured interval.</p>`
         : bounded
           ? `<p class="result__ci result__ci--bounded reveal" data-result="bounded" data-bounded="${bounded}" data-reveal style="--reveal-i:2">${BOUNDED_COPY[bounded](fmtCounts(r.optimalCounts))}</p>`
-          : showRatioHero && ratioP
-            ? `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% interval <span data-result="ratio-ci">${fmtRatio(ratioP.ci[0])} to ${fmtRatio(ratioP.ci[1])}</span>. ${
-                heroMode === 'ratio'
-                  ? 'A ratio of two counts measured the same way, so your game, mouse DPI and driver settings all cancel out of it.'
-                  : `Everything this interval allows sits within ${CONFINED_PCT}% of no change.`
-              }</p>`
-            : r.ci90
-              ? `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% interval <span data-result="ci">${fmtCounts(r.ci90[0])} to ${fmtCounts(r.ci90[1])}</span> counts per 360</p>`
-              : '';
+          : heroMode === 'sens' && sensNow !== undefined
+            ? (sensBandText(sensNow) !== null
+                ? `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% band <span data-result="sens-band">${sensBandText(sensNow)}</span>. The band carries the search's own precision and the measured factor that turns my counts into your game's units.</p>`
+                : '')
+            : showRatioHero && ratioP
+              ? `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% interval <span data-result="ratio-ci">${fmtRatio(ratioP.ci[0])} to ${fmtRatio(ratioP.ci[1])}</span>. ${
+                  heroMode === 'ratio'
+                    ? 'A ratio of two counts measured the same way, so your game, mouse DPI and driver settings all cancel out of it.'
+                    : `Everything this interval allows sits within ${CONFINED_PCT}% of no change.`
+                }</p>`
+              : r.ci90
+                ? `<p class="result__ci reveal" data-reveal style="--reveal-i:2">90% interval <span data-result="ci">${fmtCounts(r.ci90[0])} to ${fmtCounts(r.ci90[1])}</span> counts per 360</p>`
+                : '';
       const heroNote = tuned || bounded
         ? ''
-        : heroMode === 'ratio'
-          ? `<p class="result__ratio-note reveal" data-result="ratio-note" data-reveal style="--reveal-i:3">${RATIO_WIDTH_NOTE}</p>`
-          : heroMode === 'confirmed'
-            ? `<p class="result__ratio-note reveal" data-result="ratio-confirmed" data-reveal style="--reveal-i:3">${ratioConfirmedNote(CONFINED_PCT)}</p>`
-            : ratioP
-              ? `<p class="result__ratio-note reveal" data-result="ratio-withheld" data-reveal style="--reveal-i:3">${RATIO_INDISTINCT_NOTE}</p>`
-              : `<p class="result__ratio-note reveal" data-result="ratio-unavailable" data-reveal style="--reveal-i:3">${RATIO_UNAVAILABLE_NOTE}</p>`;
+        : heroMode === 'sens'
+          ? `${ratioP && framing === 'directional'
+              ? `<p class="result__ratio-note reveal" data-result="ratio-note" data-reveal style="--reveal-i:3">${sensRatioLine(fmtRatio(ratioP.ratio), `${fmtRatio(ratioP.ci[0])} to ${fmtRatio(ratioP.ci[1])}`)}</p>`
+              : ratioP
+                ? `<p class="result__ratio-note reveal" data-result="ratio-withheld" data-reveal style="--reveal-i:3">${SENS_INDISTINCT_NOTE}</p>`
+                : `<p class="result__ratio-note reveal" data-result="ratio-unavailable" data-reveal style="--reveal-i:3">${RATIO_UNAVAILABLE_NOTE}</p>`}
+            <p class="result__ratio-note reveal" data-result="sens-switch" data-reveal style="--reveal-i:3">${SENS_SWITCH_NOTE}</p>`
+          : heroMode === 'ratio'
+            ? `<p class="result__ratio-note reveal" data-result="ratio-note" data-reveal style="--reveal-i:3">${RATIO_WIDTH_NOTE}</p>${needsPin}`
+            : heroMode === 'confirmed'
+              ? `<p class="result__ratio-note reveal" data-result="ratio-confirmed" data-reveal style="--reveal-i:3">${ratioConfirmedNote(CONFINED_PCT)}</p>`
+              : ratioP
+                ? `<p class="result__ratio-note reveal" data-result="ratio-withheld" data-reveal style="--reveal-i:3">${RATIO_INDISTINCT_NOTE}</p>${needsPin}`
+                : `<p class="result__ratio-note reveal" data-result="ratio-unavailable" data-reveal style="--reveal-i:3">${RATIO_UNAVAILABLE_NOTE}</p>${needsPin}`;
 
       // Tier two: the table exists only under a pinned k. A tuned value renders no tier two at
       // all (its k evidence was dropped with the measurement, and explaining k against a hand
@@ -253,12 +331,6 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       // present a number the player types into their game as if it were exact. A degenerate
       // countsCi90 renders no band at all rather than a fabricated one. The withheld sentence
       // must be one a player can act on.
-      const kSpread = p?.kLogSd !== undefined && Number.isFinite(p.kLogSd) && p.kLogSd > 0 ? p.kLogSd : 0;
-      const searchHalfLn =
-        p !== undefined && p.countsCi90[0] > 0 && p.countsCi90[1] > p.countsCi90[0]
-          ? Math.log(p.countsCi90[1] / p.countsCi90[0]) / 2
-          : null;
-      const halfLn = searchHalfLn === null ? null : Math.hypot(searchHalfLn, Z90 * kSpread);
       const rows = p?.perGameSens
         ? GAME_YAW.map((g) => {
             const sens = p.perGameSens![g.id];
@@ -325,10 +397,10 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
       root.innerHTML = `
         <div class="wrap stack result__inner">
           <div class="result__tier result__tier--one" data-tier="one" data-hero="${heroMode}">
-            <p class="result__tier-head t-label reveal" data-reveal style="--reveal-i:0">No. 1 · assumes nothing</p>
+            <p class="result__tier-head t-label reveal" data-reveal style="--reveal-i:0">${heroMode === 'sens' ? 'No. 1 · the number to type' : 'No. 1 · assumes nothing'}</p>
             <p class="result__lead reveal" data-reveal style="--reveal-i:0">${lead}</p>
             <h1 class="display result__number reveal" data-reveal style="--reveal-i:1">${heroNumber}</h1>
-            <p class="result__sr-summary sr-only">${srSummary(r, ratioP, framing, tuned, bounded)}</p>
+            <p class="result__sr-summary sr-only">${srSummary(r, ratioP, framing, tuned, bounded, heroMode === 'sens' && sensNow !== undefined ? { label: gameLabelFor(ctx.draft.currentGame), sens: sensNow, band: sensBandText(sensNow) } : undefined)}</p>
             ${ciLine}
             ${heroNote}
           </div>
@@ -399,6 +471,25 @@ export function result(host: HTMLElement, ctx: AppContext): Screen {
         // game without re-asking.
         ctx.draft.currentGame = sel.value as GameId;
         rememberPrefs(ctx);
+        // A sens-led hero follows the pick, so the number to type is always the number for the
+        // game on screen. A game the pin says nothing about renders dashes, never a fabrication
+        // (the same rule the table rows hold to). The sr summary is rewritten in place: it is not
+        // a live region and announces nothing, but a later read must speak the number shown.
+        if (heroMode === 'sens') {
+          const id = sel.value as GameId;
+          const label = gameLabelFor(id);
+          const s = sensAt(id);
+          const gameEl = root.querySelector('[data-result="sens-game"]');
+          if (gameEl) gameEl.textContent = label;
+          const numEl = root.querySelector('[data-result="sens360"]');
+          if (numEl) numEl.textContent = s !== undefined ? s.toFixed(3) : '-';
+          const bandEl = root.querySelector('[data-result="sens-band"]');
+          if (bandEl) bandEl.textContent = (s !== undefined ? sensBandText(s) : null) ?? '-';
+          const srEl = root.querySelector('.result__sr-summary');
+          if (srEl && s !== undefined) {
+            srEl.textContent = srSummary(r, ratioP, framing, tuned, bounded, { label, sens: s, band: sensBandText(s) });
+          }
+        }
       });
       // Tier three's converter: pure arithmetic on the typed value, rendered with the arithmetic
       // VISIBLE (counts, DPI, 2.54) so it can never read as a measurement. It divides convertBase,

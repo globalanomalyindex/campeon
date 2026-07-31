@@ -82,13 +82,16 @@ describe('result screen canon', () => {
     expect(two!.compareDocumentPosition(three!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('labels each tier with what it assumes', () => {
-    const host = mount(RESULT);
+  it('labels each tier with what it assumes, and the sens-led hero with what it is for', () => {
+    const host = mount(RESULT); // k pinned: the hero is the number to type
     const head = (tier: string): string =>
       host.querySelector(`[data-tier="${tier}"] .result__tier-head`)!.textContent!;
-    expect(head('one')).toBe('No. 1 · assumes nothing');
+    expect(head('one')).toBe('No. 1 · the number to type');
     expect(head('two')).toBe('No. 2 · one measured factor');
     expect(head('three')).toBe('No. 3 · arithmetic on your input');
+    // With k unpinned the factor leads again and keeps its assumes-nothing label.
+    expect(mount(VARIANTS.unanchored!).querySelector('[data-tier="one"] .result__tier-head')!.textContent)
+      .toBe('No. 1 · assumes nothing');
     // With the card's reading aboard, tier three assumes the card and its head says so.
     expect(mount(VARIANTS.measured!).querySelector('[data-tier="three"] .result__tier-head')!.textContent)
       .toBe('No. 3 · one physical standard');

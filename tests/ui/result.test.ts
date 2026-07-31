@@ -66,18 +66,43 @@ const unpinnedPres = (): Prescription => {
   return rest;
 };
 
-describe('result screen, tier one (assumes nothing)', () => {
-  it('leads with the multiply factor when the interval excludes no change', () => {
+describe('result screen, tier one (the hero)', () => {
+  it('leads with the per-game number when k is pinned: the number a player can type knowing nothing', () => {
+    // This test used to pin the multiplier as the lead, which assumed the player knows their
+    // current sensitivity. The measurement supports an absolute number whenever k is pinned, so
+    // the absolute number leads and the factor rides as the secondary line.
     const host = mount();
-    expect(host.querySelector('[data-result="ratio"]')).toBeTruthy();
-    expect(host.querySelector('[data-result="ratio"]')!.textContent).toBe('0.88');
-    expect(host.querySelector('[data-result="ratio-ci"]')!.textContent).toBe('0.79 to 0.97');
-    expect((host.querySelector('[data-tier="one"]') as HTMLElement).dataset.hero).toBe('ratio');
-    expect(host.textContent).toContain('Multiply your in-game sensitivity by');
+    expect((host.querySelector('[data-tier="one"]') as HTMLElement).dataset.hero).toBe('sens');
+    expect(host.querySelector('[data-result="sens-game"]')!.textContent).toBe('CS2 / CS:GO');
+    expect(host.querySelector('[data-result="sens360"]')!.textContent).toBe('1.590');
+    // The hero band is the SAME quadrature band the tier-two row carries (search CI + kLogSd).
+    expect(host.querySelector('[data-result="sens-band"]')!.textContent).toBe('1.296 to 1.951');
   });
 
-  it('prices the wider interval as completeness, in the width note', () => {
-    const note = mount().querySelector('[data-result="ratio-note"]')!.textContent!;
+  it('keeps the factor as the secondary line, named the strictest claim, never weaker evidence', () => {
+    const host = mount();
+    expect(host.querySelector('[data-result="ratio"]')!.textContent).toBe('0.88');
+    expect(host.querySelector('[data-result="ratio-ci"]')!.textContent).toBe('0.79 to 0.97');
+    const note = host.querySelector('[data-result="ratio-note"]')!.textContent!;
+    expect(note).toContain('strictest claim');
+    expect(note.toLowerCase()).toContain('cancel');
+    // And the hero says the number follows the game pick, so a defaulted game cannot mislead.
+    expect(host.querySelector('[data-result="sens-switch"]')!.textContent).toContain('Pick it under No. 2');
+  });
+
+  it('falls back to the multiply-factor lead when k is unpinned, and says what a typeable number needs', () => {
+    const host = mount({ ...RESULT, prescription: unpinnedPres() });
+    expect((host.querySelector('[data-tier="one"]') as HTMLElement).dataset.hero).toBe('ratio');
+    expect(host.querySelector('[data-result="ratio"]')!.textContent).toBe('0.88');
+    expect(host.textContent).toContain('Multiply your in-game sensitivity by');
+    const needs = host.querySelector('[data-result="needs-pin"]')!.textContent!;
+    expect(needs).toContain('one measured factor');
+    expect(needs).toContain('No. 2');
+  });
+
+  it('prices the wider interval as completeness, in the width note (k-unpinned ratio lead)', () => {
+    const note = mount({ ...RESULT, prescription: unpinnedPres() })
+      .querySelector('[data-result="ratio-note"]')!.textContent!;
     // Tier one is wider than the plot band because it carries the anchor too; the copy must say
     // so as a fact about the question answered, never as an apology.
     expect(note).toContain('wider');
@@ -98,7 +123,17 @@ describe('result screen, tier one (assumes nothing)', () => {
   });
 
   it('an interval that includes no change drops the multiply framing (spec error path)', () => {
+    // k pinned, so the per-game number still leads (a location, carried with its band); what the
+    // indistinct interval costs is any claim of a change from where the player started.
     const host = mount({ ...RESULT, prescription: { ...PRES, ratio: 0.93, ratioCi90: [0.85, 1.08] } });
+    expect(host.querySelector('[data-result="ratio"]')).toBeNull();
+    expect((host.querySelector('[data-tier="one"]') as HTMLElement).dataset.hero).toBe('sens');
+    expect(host.querySelector('[data-result="sens360"]')!.textContent).toBe('1.590');
+    expect(host.querySelector('[data-result="ratio-withheld"]')!.textContent).toContain('includes 1.00');
+  });
+
+  it('an indistinct interval with k unpinned keeps the counts lead and the no-prescription sentence', () => {
+    const host = mount({ ...RESULT, prescription: { ...unpinnedPres(), ratio: 0.93, ratioCi90: [0.85, 1.08] } });
     expect(host.querySelector('[data-result="ratio"]')).toBeNull();
     expect(host.querySelector('[data-result="counts360"]')!.textContent).toBe('8,240');
     expect(host.querySelector('[data-result="ci"]')!.textContent).toBe('7,800 to 8,700');
@@ -111,10 +146,11 @@ describe('result screen, tier one (assumes nothing)', () => {
     expect(host.querySelector('[data-result="ratio-unavailable"]')!.textContent).toContain('leave the factor blank');
   });
 
-  it('a k-only prescription (A5) leads with the located counts, factor blank, tier two intact', () => {
+  it('a k-only prescription (A5) still leads with the per-game number, factor blank, tier two intact', () => {
     const host = mount({ ...RESULT, prescription: kOnlyPres() });
     expect(host.querySelector('[data-result="ratio"]')).toBeNull();
-    expect(host.querySelector('[data-result="counts360"]')!.textContent).toBe('8,240');
+    expect((host.querySelector('[data-tier="one"]') as HTMLElement).dataset.hero).toBe('sens');
+    expect(host.querySelector('[data-result="sens360"]')!.textContent).toBe('1.590');
     expect(host.querySelector('[data-result="ratio-unavailable"]')!.textContent).toContain('leave the factor blank');
     expect(host.querySelectorAll('[data-game]').length).toBe(8); // the table earned its gate
   });
@@ -228,6 +264,22 @@ describe('result screen, tier two (one measured factor)', () => {
     expect(ctx.draft.currentGame).toBe('valorant');
     expect(saved.length).toBe(1);
     expect((saved[0] as { currentGame: string }).currentGame).toBe('valorant');
+    // The sens-led hero follows the pick: the number to type is always for the game on screen.
+    expect(host.querySelector('[data-result="sens-game"]')!.textContent).toBe('Valorant');
+    expect(host.querySelector('[data-result="sens360"]')!.textContent).toBe('0.500');
+    expect(host.querySelector('.result__sr-summary')!.textContent).toContain('Set Valorant to 0.500');
+  });
+
+  it('picking a game the pin says nothing about dashes the hero, never fabricates a number', () => {
+    const host = document.createElement('div');
+    const ctx = fakeCtx();
+    ctx.lastResult = { sessionId: 's1', result: { ...RESULT, prescription: { ...PRES, perGameSens: { cs2: 1.59 } } } };
+    resultScreen(host, ctx).mount();
+    const select = host.querySelector('[data-action="your-game"]') as HTMLSelectElement;
+    select.value = 'valorant';
+    select.dispatchEvent(new Event('change'));
+    expect(host.querySelector('[data-result="sens360"]')!.textContent).toBe('-');
+    expect(host.querySelector('[data-result="sens-band"]')!.textContent).toBe('-');
   });
 
   it('a tuned value renders no tier two at all (its k evidence was dropped with the measurement)', () => {
