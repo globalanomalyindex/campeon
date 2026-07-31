@@ -108,7 +108,7 @@ const TAP_MS = 220;       // press shorter than this (with little movement) = a 
 const TAP_MOVE_MAX = 40;  // counts of movement during a press still considered "still" (a tap)
 const TOO_SOON_MS = 1800; // how long the too-soon explanation holds the lead before reverting
 
-const LEAD_START = 'This step measures one full turn, three times over, by feel. Click the box to begin.';
+const LEAD_START = 'This step measures the full turn you show me, three times over. Click the box to begin.';
 
 /** The fourth-pass offer, with the measured spread in it. Exported pure so jsdom can pin the copy
  *  without a pointer lock. The number renders in tabular figures per canon: a player being told
@@ -302,14 +302,14 @@ export function createTurnView(
     switch (m.phase) {
       case 'idle':
         $('lead').textContent = m.passes.length === 0
-          ? `Click once to start pass 1, then turn a full circle to the ${dir}, by feel, as if you were in your game.`
+          ? `Click once to start pass 1, then show me a full circle to the ${dir}, at whatever travel feels right for your hand.`
           : `Pass ${m.passes.length} is in. Click once to start pass ${m.passes.length + 1}, turning to the ${dir} this time.`;
         $('sub').textContent = m.passes.length === 0
-          ? 'Your hand knows how much mouse travel one full turn takes in your game. Give it that much, then click again to finish the pass.'
+          ? 'A comfortable full circle is the answer I need, and if you already play, the turn you make in your game is that answer. Click again to finish the pass.'
           : 'Alternating direction cancels a one-way drift instead of averaging it in.';
         break;
       case 'recording':
-        $('lead').textContent = `Turning to the ${dir}. Give it the travel one full circle takes in your game, then click to finish the pass.`;
+        $('lead').textContent = `Turning to the ${dir}. Give it the travel a full circle takes for you, then click to finish the pass.`;
         $('sub').textContent = 'The line draws your speed against the clock. It carries no measure of how far around you are.';
         break;
       case 'fourth-offer':

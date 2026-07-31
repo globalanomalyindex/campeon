@@ -243,10 +243,10 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       <div class="wrap stack setup__inner">
         <h1 class="display setup__title">Calibrate</h1>
         ${rememberedBlock}
-        <p class="setup__lead">Nothing to look up. One card off your desk, then three blind turns read the turn distance your hands already know.</p>
+        <p class="setup__lead">Nothing to look up and nothing you need to know first. One card off your desk, then three blind turns where you show me the full turn that suits your hand and your desk.</p>
         <ol class="cal-preview">
           <li><span class="cal-preview__n">1</span><span>The card. Slide your mouse across a bank card, twice. Its width is fixed by standard, so it is a ruler.</span></li>
-          <li><span class="cal-preview__n">2</span><span>The turn. Turn all the way around by feel, three times: right, left, right.</span></li>
+          <li><span class="cal-preview__n">2</span><span>The turn. Show me a comfortable turn all the way around, three times: right, left, right.</span></li>
         </ol>
         <button class="action ${remembered ? 'action--ghost' : 'action--primary'}" data-action="start-guided">${remembered ? 'Recalibrate' : 'Start with the card'}</button>
         <button class="action action--ghost" data-action="start-manual">I'll type my numbers instead</button>
