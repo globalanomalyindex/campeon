@@ -68,8 +68,9 @@
    rule's higher specificity was repainting the pulse ring stone and the dot ink-on-ink, so the
    "start here" mark the copy points at was invisible on the stage. The pulse styles itself. */
 
-/* The three live readouts left with the sweep: a blind instrument shows no number while it
-   measures, and reports its spread once, afterwards. */
+/* The three live readouts did not come back with the card. A running count of what an instrument
+   is reading is a number the hand can aim at, and neither step here wants that: the turn is blind
+   by design, and the sweep's finish line is the card's edge. Both report once, afterwards. */
 
 /* What a step measured and how tightly, stated under the step itself. A note, so it sits
    below the instruction in size and colour and never competes with it. */
@@ -82,8 +83,10 @@
 
 /* ── Guided cues: one step at a time ──────────────────────────────────────── */
 
-/* The two-segment journey tracker left with the sweep and the spin: the guided path now has one
-   measured step, and a tracker over a single step is furniture. */
+/* The two-segment journey tracker does not come back with the card. It was built for the sweep and
+   the spin, a pair the flow no longer has: the card and the turn are not two of a kind, one being
+   a reading off a printed standard and the other the measurement the whole tool is for, and
+   numbering them 1 and 2 would say they are. Each step names itself in .cal-step instead. */
 
 /* The step marker reads as a catalogue tag. */
 .cal-step {
@@ -127,8 +130,30 @@
 }
 .cal-helper b { color: var(--text-strong); font-weight: var(--weight-regular); }
 
-/* The pace meter went with the sweep: it fed back a live reading of the very stroke it was
-   measuring, which is the coaching the blind turn exists to withhold. */
+/* The pace meter, which belongs to the card sweep and to nothing else. It reads SPEED, never
+   distance, which is what keeps it on the honest side of the line the blind turn draws: a meter
+   that grew with the pass would put a finish line on the screen and the hand would stop at it
+   instead of at the card's edge. The card sweep needs it because a slow pass that is not slow, or a
+   quick pass that is not quick, makes the acceleration cross-check meaningless. */
+.cal-pace {
+  height: 8px;
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-sunken);
+  overflow: hidden;
+  margin: var(--space-3) 0;
+}
+.cal-pace__fill {
+  height: 100%; width: 100%;
+  /* scaleX from the left rather than an animated width: transform and opacity are the only
+     properties this system animates, and a width transition is a layout animation on every frame
+     of a 1000 Hz input stream. The fill moves on the shortest step of the ramp, long enough to
+     smooth the jitter and short enough that the meter still reads as the hand. */
+  transform: scaleX(0); transform-origin: left center;
+  background: var(--color-warning);
+  transition: transform var(--dur-instant) linear, background-color var(--dur-fast) var(--ease-standard);
+}
+.cal-pace__fill[data-ok='true'] { background: var(--color-success); }
+.cal-pace__label { font: var(--type-body-sm); color: var(--text-muted); }
 
 /* The step preview on the intro. */
 .cal-preview { list-style: none; padding: 0; margin: var(--space-2) 0; display: grid; gap: var(--space-2); }
@@ -156,4 +181,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cal-pulse__dot { animation: none; }
+  .cal-pace__fill { transition: none; }
 }
