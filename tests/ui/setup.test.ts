@@ -7,6 +7,7 @@ import { boundsFromSeed } from '../../src/ui/options/settings';
 import { counts360, type PersistedPrefs } from '../../src/types';
 import type { TurnEstimate } from '../../src/anchor/reference-turn';
 import type { Convention } from '../../src/input/lattice';
+import { DPR_ONE_LOG_SD } from '../../src/input/count-convention';
 import type { AppContext, Route, SessionDraft } from '../../src/ui/shell';
 
 type TurnOpts = Parameters<typeof import('../../src/ui/calibrate/turn-view').createTurnView>[1];
@@ -31,6 +32,20 @@ function fakeCtx(): AppContext & { nav: Route[] } {
 
 const EST: TurnEstimate = { counts: counts360(8000), spreadPct: 2.1, logSd: 0.08, agreed: true, passes: 3 };
 const SCALED: Convention = { state: 'scaled', k: 2, purity: 1 };
+/** What an honest browser produces: a unit lattice, which the estimator reports as a REFUSAL. Only
+ *  the display density can turn it into a pin. */
+const SPACING_ONE: Convention = { state: 'indeterminate', reason: 'spacing-one', purity: 1 };
+
+/** Run `fn` with a matchMedia that exists and never fires. jsdom ships none, and the density watch
+ *  refuses to vouch for a density it has no change signal for, so the deduction route is
+ *  unreachable without this - which is itself pinned by the test below that omits it. */
+function withMatchMedia<T>(fn: () => T): T {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: () => ({ addEventListener: () => {}, removeEventListener: () => {} }),
+  });
+  try { return fn(); } finally { delete (window as { matchMedia?: unknown }).matchMedia; }
+}
 
 interface Captured {
   deps: SetupDeps;
@@ -256,6 +271,32 @@ describe('setup: the guided flow (the card, the offer, then the blind turn)', ()
     (host.querySelector('[data-action="turn-continue"]') as HTMLButtonElement).click();
     expect(ctx.draft.kPin).toEqual({ pinned: true, k: 2, source: 'lattice', logSd: 0 });
     expect(ctx.draft.convention).toEqual(SCALED);
+  });
+
+  it('pins k by deduction when the display sits at plain density and the stream is a unit lattice', () => {
+    // The shell's whole job on this route: read the density across the capture and hand it to the
+    // pure pin. jsdom reports devicePixelRatio 1 and has no matchMedia, so the change detector is
+    // stubbed in for this one test - the watch refuses to vouch for a density it cannot watch.
+    withMatchMedia(() => {
+      const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+      setup(host, ctx, cap.deps).mount();
+      startTurn(host, undefined, cap);
+      cap.turn().onTurn(EST, SPACING_ONE);
+      (host.querySelector('[data-action="turn-continue"]') as HTMLButtonElement).click();
+      expect(ctx.draft.kPin).toEqual({ pinned: true, k: 1, source: 'dpr-one', logSd: DPR_ONE_LOG_SD });
+    });
+  });
+
+  it('refuses the deduction when the browser cannot promise the density held for the capture', () => {
+    // Bare jsdom: devicePixelRatio reads 1, but with no matchMedia there is no way to know it held
+    // for the whole turn. The route fails closed on the unverifiable premise rather than on the
+    // number, which is the direction a wrong answer here would be unrecoverable in.
+    const cap = captureTurn(); const ctx = fakeCtx(); const host = document.createElement('div');
+    setup(host, ctx, cap.deps).mount();
+    startTurn(host, undefined, cap);
+    cap.turn().onTurn(EST, SPACING_ONE);
+    (host.querySelector('[data-action="turn-continue"]') as HTMLButtonElement).click();
+    expect(ctx.draft.kPin).toEqual({ pinned: false, reason: 'lattice-indeterminate' });
   });
 
   it('the typed pair outranks the lattice when both exist', () => {

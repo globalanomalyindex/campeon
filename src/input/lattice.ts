@@ -168,8 +168,13 @@ export const LATTICE_MIN_SAMPLES = 60;
 /** Half-width of the band around unity that reads as `spacing-one`. Within two percent of 1 a
  *  stream cannot be distinguished from an integer stream that was rescaled by a fraction and
  *  re-rounded (the simulated collapse read 1.00 to 1.01), and no real coordinate convention lives
- *  there. */
-const SPACING_ONE_TOL = 0.02;
+ *  there.
+ *
+ *  Exported because it is also the width a scaling could hide in: everything inside this band is
+ *  classified `spacing-one`, so `pinConvention`'s devicePixelRatio route, which pins k at 1 on the
+ *  strength of that classification, carries this as k's spread rather than claiming zero. One
+ *  constant, so widening the band widens the spread it implies in the same edit. */
+export const SPACING_ONE_TOL = 0.02;
 
 /**
  * The count convention read off a raw movement-delta stream. `rawDeltas` may interleave the x and y

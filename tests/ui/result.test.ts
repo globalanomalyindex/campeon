@@ -203,6 +203,19 @@ describe('result screen, tier two (one measured factor)', () => {
     expect(host.querySelector('.result__k-note')!.textContent).toContain('movement stream');
   });
 
+  it('tells the player the plain-density route was reasoned, not measured', () => {
+    // The third route deduces k from a display that has no scale to apply, and the note must not
+    // borrow the standing of the two that measured it: a reader deciding whether to trust a number
+    // they are about to type is owed the difference between a reading and an argument.
+    const host = mount({ ...RESULT, prescription: { ...PRES, kSource: 'dpr-one', kLogSd: 0.02 } });
+    const note = host.querySelector('.result__k-note')!.textContent!;
+    expect(note).toContain('plain density');
+    expect(note).toContain('reasoned rather than measured');
+    expect(note.toLowerCase()).not.toContain('exactly');
+    // And it earns its band: kLogSd 0.02 is not zero, so every row still carries one.
+    expect(host.querySelectorAll('[data-sens-band]').length).toBe(8);
+  });
+
   it('widens each row by the search interval and k spread combined in quadrature (A5, D3)', () => {
     const host = mount(); // countsCi90 [7800, 8700] and kLogSd 0.12 from the typed route
     const bands = host.querySelectorAll('[data-sens-band]');

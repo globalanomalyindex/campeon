@@ -1,7 +1,7 @@
 import type { Counts360, Dpi, GameId, Profile, Report, Result, TrialResult } from '../types';
 import { counts360 } from '../types';
 import { sensRatio } from '../convert/counts';
-import { tierTwoFrom, type KPin } from '../input/count-convention';
+import { tierTwoFrom, type KPin, type KSource } from '../input/count-convention';
 import { computeBreakdown, facetConcordance } from './breakdown';
 import { mulberry32 } from '../stats/rng';
 
@@ -48,12 +48,15 @@ export interface Prescription {
   /** C*, the located optimum in browser counts per 360, copied verbatim from the Report. */
   counts: Counts360;
   countsCi90: [Counts360, Counts360];
-  /** ONLY when k is pinned (lattice `scaled(k)` or a typed in-game sensitivity). Absent means
-   *  unpinned and tier two is withheld - never a table computed from a guessed k. Computed by
-   *  phase 3's tierTwoFrom, the single implementation of tier two (A4). */
+  /** ONLY when k is pinned (lattice `scaled(k)`, a typed in-game sensitivity, or a display at
+   *  devicePixelRatio exactly 1). Absent means unpinned and tier two is withheld - never a table
+   *  computed from a guessed k. Computed by phase 3's tierTwoFrom, the single implementation of
+   *  tier two (A4). */
   perGameSens?: Partial<Record<GameId, number>>;
-  /** Absent exactly when `perGameSens` is: an unpinned k costs the tier, never the answer. */
-  kSource?: 'lattice' | 'typed-sens';
+  /** Absent exactly when `perGameSens` is: an unpinned k costs the tier, never the answer. Which
+   *  route pinned it rides along because the routes are not interchangeable on screen: two measured
+   *  it and one deduced it, and the note the player reads has to say which. */
+  kSource?: KSource;
   /** The pinned convention itself: browser deltas per real mouse count. A DISCLOSURE, and never a
    *  divisor at render time. `hardwareCounts` below is C* / k with the division already done once
    *  in this module, and tier three renders that; re-deriving it at the screen would put the same
@@ -123,7 +126,7 @@ export function buildPrescription(
   let tierTwo:
     | {
         perGameSens: Partial<Record<GameId, number>>;
-        kSource: 'lattice' | 'typed-sens';
+        kSource: KSource;
         k: number;
         kLogSd: number;
         hardwareCounts: Counts360;

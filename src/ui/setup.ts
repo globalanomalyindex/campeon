@@ -15,6 +15,7 @@ import { GAME_YAW, yawFor } from '../convert/yaw-table';
 import { countsForSens } from '../convert/counts';
 import { boundsFromSeed } from './options/settings';
 import { pinConvention, type TypedSensRoute } from '../input/count-convention';
+import { watchDevicePixelRatio, type DprWatch } from '../input/dpr-watch';
 import type { Convention } from '../input/lattice';
 import { calibrateReducer, initialCalState, type CalState } from './calibrate-flow';
 import { createTurnView, type TurnView } from './calibrate/turn-view';
@@ -82,6 +83,20 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
   /** The measured spread behind a refusal, for the blocked screen to name: the turn's pass spread
    *  on 'spread', the card's pass spread on 'invalid', null when the reason carries no number. */
   let blockedSpread: number | null = null;
+  /**
+   * The display density behind the devicePixelRatio route, watched from the moment the turn view is
+   * mounted (the first moment a delta can arrive) to the moment k is pinned. Nothing else in this
+   * shell reads `window.devicePixelRatio`: `pinConvention` is pure and is handed a density that is
+   * vouched for, or null.
+   *
+   * It spans the WHOLE window rather than being sampled at the pin, because a density sampled after
+   * the fact says nothing about the stream that was captured before it. Started fresh on every
+   * mount of the turn view, so a redone turn is judged by its own capture and never by the density
+   * that held during the one it replaced.
+   */
+  let dprWatch: DprWatch | null = null;
+
+  function stopDprWatch(): void { dprWatch?.dispose(); dprWatch = null; }
 
   function dispatch(a: Parameters<typeof calibrateReducer>[1]): void {
     state = calibrateReducer(state, a);
@@ -125,7 +140,12 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     const typed: TypedSensRoute | null = offered
       ? { game: ctx.draft.currentGame, sens: ctx.draft.currentSens, arenaCounts: estimate.counts, anchorLogSd: estimate.logSd }
       : null;
-    ctx.draft.kPin = pinConvention(convention, typed);
+    // The density that held from the first delta of this turn to this line, or null if it moved or
+    // could not be vouched for. Read once, here, at the pin (count-convention.ts argues what a
+    // density of exactly 1 licenses and what it does not), then the watch is done.
+    const dpr = dprWatch?.stable() ?? null;
+    stopDprWatch();
+    ctx.draft.kPin = pinConvention(convention, typed, dpr);
     ctx.draft.profile = { ...ctx.draft.profile, speedAccuracy: 0.5 }; // balanced default; tune later on options
     ctx.draft.bounds = boundsFromSeed(estimate.counts);
     // The card reading, recorded rather than used: it seeds nothing and scales nothing, and the
@@ -164,7 +184,9 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     delete ctx.draft.convention;
     delete ctx.draft.dpi;
     sweptDpi = null;
-    ctx.draft.kPin = pinConvention(null, null);
+    stopDprWatch();
+    // No turn means no delta stream, so no density can license anything: null on all three routes.
+    ctx.draft.kPin = pinConvention(null, null, null);
     rememberPrefs(ctx);
     ctx.navigate('session');
     return true;
@@ -203,6 +225,9 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
     }
 
     if (state.step === 'turn') {
+      // Before the view, so no delta can arrive outside the watched window.
+      stopDprWatch();
+      dprWatch = watchDevicePixelRatio(window);
       view = createTurnView(host, {
         onTurn: (estimate, convention) => {
           pending = { estimate, convention };
@@ -349,7 +374,9 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
       // measurement state from an earlier run on this visit must not ride along either.
       delete ctx.draft.turn;
       delete ctx.draft.convention;
-      ctx.draft.kPin = pinConvention(null, null);
+      stopDprWatch();
+      // The remembered fast path runs no turn either: same three nulls, same honest refusal.
+      ctx.draft.kPin = pinConvention(null, null, null);
       ctx.navigate('session');
     });
     click('start-manual', () => dispatch({ type: 'start-manual' }));
@@ -442,6 +469,6 @@ export function setup(host: HTMLElement, ctx: AppContext, deps: SetupDeps = DEFA
 
   return {
     mount() { render(); },
-    unmount() { teardownView(); host.replaceChildren(); },
+    unmount() { teardownView(); stopDprWatch(); host.replaceChildren(); },
   };
 }

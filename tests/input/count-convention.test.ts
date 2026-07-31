@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { counts360, type Counts360 } from '../../src/types';
 import { countsForSens } from '../../src/convert/counts';
 import { GAME_YAW, yawFor } from '../../src/convert/yaw-table';
-import type { Convention } from '../../src/input/lattice';
+import { LATTICE_PURITY_MIN, SPACING_ONE_TOL, type Convention } from '../../src/input/lattice';
 import {
+  DPR_ONE_LOG_SD,
   kFromTypedSens,
   pinConvention,
   tierTwoFrom,
@@ -61,7 +62,7 @@ describe('pinConvention', () => {
     // The lattice says 2, the typed route says 1.5. The typed route wins: it is exact arithmetic on
     // a number the player read off their own game, while the lattice is an inference about how the
     // browser reports deltas. They disagreeing is a signal about the browser, not a tie to split.
-    const pin = pinConvention(scaledLattice, typed());
+    const pin = pinConvention(scaledLattice, typed(), null);
     expect(pin.pinned).toBe(true);
     if (pin.pinned) {
       expect(pin.k).toBeCloseTo(1.5, 10);
@@ -71,19 +72,19 @@ describe('pinConvention', () => {
   });
 
   it('inherits the anchor log sd on the typed route, because k inherits the reproduction error', () => {
-    const pin = pinConvention(null, typed({ anchorLogSd: 0.3 }));
+    const pin = pinConvention(null, typed({ anchorLogSd: 0.3 }), null);
     expect(pin).toMatchObject({ pinned: true, source: 'typed-sens', logSd: 0.3 });
   });
 
   it('falls back to the lattice when the typed number is unusable', () => {
-    const pin = pinConvention(scaledLattice, typed({ sens: 0 }));
+    const pin = pinConvention(scaledLattice, typed({ sens: 0 }), null);
     expect(pin).toEqual({ pinned: true, k: 2, source: 'lattice', logSd: 0 });
   });
 
   it('pins from an exactly pure lattice with no spread of its own', () => {
     // logSd 0 is not a fabricated interval HERE: purity exactly one says the spacing divides every
     // delta, and the spacing IS k, so there is no sampling step left to be uncertain about.
-    expect(pinConvention(scaledLattice, null)).toEqual({
+    expect(pinConvention(scaledLattice, null, null)).toEqual({
       pinned: true, k: 2, source: 'lattice', logSd: 0,
     });
   });
@@ -93,7 +94,7 @@ describe('pinConvention', () => {
     // phase unaccounted for, and a sub-harmonic or super-harmonic mis-pick is not impossible. A
     // zero-width claim there is uncertainty the evidence has not earned, so the shortfall below one
     // becomes k's log sd and tier two widens by it.
-    const pin = pinConvention({ state: 'scaled', k: 1.25, purity: 0.985 }, null);
+    const pin = pinConvention({ state: 'scaled', k: 1.25, purity: 0.985 }, null, null);
     expect(pin).toMatchObject({ pinned: true, k: 1.25, source: 'lattice' });
     if (pin.pinned) expect(pin.logSd).toBeCloseTo(0.015, 12);
   });
@@ -101,30 +102,119 @@ describe('pinConvention', () => {
   it('refuses the typed route when the anchor carries no honest spread', () => {
     // Pinning k off an anchor whose uncertainty is unknown would emit a per-game table with an
     // implied zero-width claim it has not earned. Refuse the route instead.
-    expect(pinConvention(null, typed({ anchorLogSd: NaN }))).toEqual({
+    expect(pinConvention(null, typed({ anchorLogSd: NaN }), null)).toEqual({
       pinned: false, reason: 'typed-sens-implausible',
     });
-    expect(pinConvention(null, typed({ anchorLogSd: -0.2 }))).toEqual({
+    expect(pinConvention(null, typed({ anchorLogSd: -0.2 }), null)).toEqual({
       pinned: false, reason: 'typed-sens-implausible',
     });
   });
 
   it('reports gate-closed when the estimator never ran and nothing was typed', () => {
-    expect(pinConvention(null, null)).toEqual({ pinned: false, reason: 'gate-closed' });
+    expect(pinConvention(null, null, null)).toEqual({ pinned: false, reason: 'gate-closed' });
   });
 
   it('reports lattice-indeterminate when the estimator ran and refused', () => {
-    expect(pinConvention(spacingOne, null)).toEqual({
+    expect(pinConvention(spacingOne, null, null)).toEqual({
       pinned: false, reason: 'lattice-indeterminate',
     });
-    expect(pinConvention({ state: 'indeterminate', reason: 'no-lattice', purity: 0.2 }, null)).toEqual({
+    expect(pinConvention({ state: 'indeterminate', reason: 'no-lattice', purity: 0.2 }, null, null)).toEqual({
       pinned: false, reason: 'lattice-indeterminate',
     });
   });
 
   it('reports typed-sens-implausible when the only offer was unusable', () => {
-    expect(pinConvention(spacingOne, typed({ sens: 0 }))).toEqual({
+    expect(pinConvention(spacingOne, typed({ sens: 0 }), null)).toEqual({
       pinned: false, reason: 'typed-sens-implausible',
+    });
+  });
+});
+
+// The third route: the deduction from a plain-density display. A unit lattice is what an honest
+// browser produces, so before this route existed the tool refused the typeable number exactly when
+// the browser was behaving correctly. The premise that closes the gap is stated at the pin: nothing
+// but display density can scale a delta, and devicePixelRatio reports display density.
+describe('pinConvention, the devicePixelRatio route', () => {
+  it('pins k at 1 on a unit lattice when the display density is exactly 1', () => {
+    // Not the lattice speaking: the lattice said `spacing-one`, which is a refusal. The pin is the
+    // deduction, and it is labelled as one so nothing downstream can present it as a measurement.
+    expect(pinConvention(spacingOne, null, 1)).toEqual({
+      pinned: true, k: 1, source: 'dpr-one', logSd: DPR_ONE_LOG_SD,
+    });
+  });
+
+  it('carries the spacing-one band as k spread rather than claiming a zero-width deduction', () => {
+    // The deduction fixes k's VALUE exactly, but the check that corroborates it classifies anything
+    // within SPACING_ONE_TOL of 1 as a unit lattice, so a scaling of up to two percent would be
+    // pinned as 1 and never seen. That band is the spread. It is also at least the purity shortfall
+    // the lattice route carries, since LATTICE_PURITY_MIN caps that shortfall at the same 0.02.
+    const pin = pinConvention(spacingOne, null, 1);
+    expect(pin.pinned && pin.logSd).toBe(SPACING_ONE_TOL);
+    expect(DPR_ONE_LOG_SD).toBeGreaterThan(0);
+    // Equal by construction, to float: the purity floor and the spacing band are both two percent,
+    // so this spread can never be narrower than the one the lattice route would have carried.
+    expect(DPR_ONE_LOG_SD).toBeCloseTo(1 - LATTICE_PURITY_MIN, 12);
+  });
+
+  it('refuses at every density other than exactly 1, with no rounding and no band', () => {
+    // At any other density the fractional factor has somewhere to come from, so the collapse the
+    // one-sided contract exists for is live again and the refusal stands. 1.25 and 1.5 are the
+    // cases a rounded or "close enough" comparison would wrongly pin, which is why they are here.
+    for (const dpr of [1.25, 1.5, 2, 3]) {
+      expect(pinConvention(spacingOne, null, dpr)).toEqual({
+        pinned: false, reason: 'lattice-indeterminate',
+      });
+    }
+    // Neighbours of 1 on both sides: the deduction is licensed by exactly 1 and by nothing near it.
+    for (const dpr of [0.999999, 1.000001, 1.02, 0.98]) {
+      expect(pinConvention(spacingOne, null, dpr).pinned).toBe(false);
+    }
+  });
+
+  it('refuses when the density could not be vouched for, and never invents one', () => {
+    // null is the shell saying "not read, or it moved during the capture". A density read after a
+    // stream was captured under a different one is the unit bug this route is built to avoid.
+    expect(pinConvention(spacingOne, null, null).pinned).toBe(false);
+    expect(pinConvention(spacingOne, null, NaN).pinned).toBe(false);
+  });
+
+  it('refuses at density 1 when the gate is closed, because acceleration is a different problem', () => {
+    // A null lattice means the estimator was never entitled to run: the stream is OS-adjusted, so
+    // an acceleration curve sits between the mouse and the deltas. The deduction says nothing about
+    // that, and a pin here would answer a question nobody asked with a number that is not k.
+    expect(pinConvention(null, null, 1)).toEqual({ pinned: false, reason: 'gate-closed' });
+  });
+
+  it('refuses at density 1 when the stream never corroborated a unit lattice', () => {
+    // The premise has to survive contact with the evidence. A stream the estimator could not fit,
+    // or never had enough of, is not a unit lattice, and deducing from a premise the data does not
+    // support is the shortcut this whole module exists to refuse.
+    for (const reason of ['no-lattice', 'too-few-samples'] as const) {
+      expect(pinConvention({ state: 'indeterminate', reason, purity: 0.4 }, null, 1)).toEqual({
+        pinned: false, reason: 'lattice-indeterminate',
+      });
+    }
+  });
+
+  it('never overturns a lattice that spoke: evidence outranks the premise', () => {
+    // A measured scaled(2) at density 1 contradicts the premise. The premise loses: it may license
+    // a pin where the estimator is silent and may not silence one that measured something.
+    expect(pinConvention(scaledLattice, null, 1)).toEqual({
+      pinned: true, k: 2, source: 'lattice', logSd: 0,
+    });
+  });
+
+  it('loses to the typed route, which measures the factor instead of assuming it away', () => {
+    const pin = pinConvention(spacingOne, typed(), 1);
+    expect(pin).toMatchObject({ pinned: true, source: 'typed-sens' });
+    if (pin.pinned) expect(pin.k).toBeCloseTo(1.5, 10);
+  });
+
+  it('still pins by deduction when a typed offer was unusable, exactly as the lattice route does', () => {
+    // An offer we could not use costs the offer, not the run: the measured or deduced route behind
+    // it is still there, and refusing both would withhold a tier over a mistyped number.
+    expect(pinConvention(spacingOne, typed({ sens: 0 }), 1)).toMatchObject({
+      pinned: true, k: 1, source: 'dpr-one',
     });
   });
 });

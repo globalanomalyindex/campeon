@@ -8,6 +8,7 @@ import { marksFromTrials } from './session-view';
 import {
   ciConcord, ratioFraming, CONFIRMED_MAX_ABS_LN, type Prescription, type RatioFraming,
 } from '../optimizer/result';
+import type { KSource } from '../input/count-convention';
 import { cm360From } from '../anchor/plausibility';
 
 const fmt = (v: number, digits = 1): string => (Number.isFinite(v) ? v.toFixed(digits) : '-');
@@ -29,7 +30,7 @@ const Z90 = 1.6448536269514722;
 // ── Tier-one copy. The tiers below the hero stay ordered by how much each claim assumes, but the
 // HERO leads with the strongest claim the player can act on without knowing anything in advance:
 // a per-game sensitivity to type whenever the count convention k is pinned (the one condition
-// under which an absolute number is honestly available; count-convention.ts owns the two routes),
+// under which an absolute number is honestly available; count-convention.ts owns the three routes),
 // the multiply factor when only the anchor was measured, and the located counts when neither was.
 // The factor is never weaker evidence for being demoted: it is a ratio of two counts in the same
 // units, the one claim that assumes nothing, and the copy that carries it says so wherever it
@@ -66,18 +67,22 @@ const sensRatioLine = (ratio: string, ciText: string): string =>
 const SENS_SWITCH_NOTE =
   'Playing a different game? Pick it under No. 2 and this number follows.';
 
-// ── Tier-two copy. The one assumption, named, in words a player can act on. Two routes pin k and
-// no third exists (the discrete DPI prior is the false-precision shortcut the spec bans). The
-// typed route may NOT claim an exact pin: it inherits the anchor's spread whole (kLogSd, A5), so
-// its note names the spread and the table carries it as a band.
-const K_NOTE: Record<'lattice' | 'typed-sens', string> = {
+// ── Tier-two copy. The one assumption, named, in words a player can act on. Three routes pin k and
+// no fourth exists (the discrete DPI prior is the false-precision shortcut the spec bans). Two of
+// them measure the factor and the third deduces it, and the notes below say which, because a
+// deduction and a measurement are not the same claim to make to someone about to type the number
+// into their game. The typed route may NOT claim an exact pin either: it inherits the anchor's
+// spread whole (kLogSd, A5), so its note names the spread and the table carries it as a band.
+const K_NOTE: Record<KSource, string> = {
   lattice:
     'One measured factor stands between my counts and your mouse. This session it showed up in the movement stream itself, so the table below is in your games’ own units.',
   'typed-sens':
     'One measured factor stands between my counts and your mouse. The in-game sensitivity you typed pinned it, to within the spread of the turn it was compared against, and each row below folds that spread into its 90% band.',
+  'dpr-one':
+    'One factor stands between my counts and your mouse, and on your display there is nothing for it to be: your screen runs at plain density, so the browser has no scale to apply, and the movement stream agreed by arriving on whole counts. That is reasoned rather than measured, so each row below carries a small band for the scale too slight for that reasoning to have caught.',
 };
 const TIER_TWO_WITHHELD =
-  'No per-game numbers this session. They need one measured factor, the scale between what your browser reports and what your mouse actually counts, and nothing this session pinned it down. Two routes pin it: a browser that hands me raw mouse input, where the factor shows up in the movement stream on its own, or your game and current in-game sensitivity named at setup.';
+  'No per-game numbers this session. They need one measured factor, the scale between what your browser reports and what your mouse actually counts, and nothing this session pinned it down. Three routes pin it: a browser that hands me raw mouse input, where the factor shows up in the movement stream on its own, a display at plain density, where there is no scale for the browser to apply, or your game and current in-game sensitivity named at setup.';
 const TIER_TWO_BOUNDED =
   'No per-game numbers for a bounded result. The number above is an edge of the window I searched, and converting an edge would hand you my search setting as if it were your best.';
 
