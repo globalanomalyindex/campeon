@@ -144,13 +144,15 @@
 }
 .cal-pace__fill {
   height: 100%; width: 100%;
-  /* scaleX from the left rather than an animated width: transform and opacity are the only
-     properties this system animates, and a width transition is a layout animation on every frame
-     of a 1000 Hz input stream. The fill moves on the shortest step of the ramp, long enough to
-     smooth the jitter and short enough that the meter still reads as the hand. */
+  /* scaleX from the left rather than an animated width: transform, opacity and filter are the only
+     properties this system animates, and a width transition is a layout animation on every frame of
+     a 1000 Hz input stream. The fill moves on the shortest step of the ramp, long enough to smooth
+     the jitter and short enough that the meter still reads as the hand. The pace/off-pace colour
+     switches with no transition of its own, on the same rule: it is a verdict on the current
+     stroke, and a verdict that fades in is a verdict arriving late. */
   transform: scaleX(0); transform-origin: left center;
   background: var(--color-warning);
-  transition: transform var(--dur-instant) linear, background-color var(--dur-fast) var(--ease-standard);
+  transition: transform var(--dur-instant) linear;
 }
 .cal-pace__fill[data-ok='true'] { background: var(--color-success); }
 .cal-pace__label { font: var(--type-body-sm); color: var(--text-muted); }
