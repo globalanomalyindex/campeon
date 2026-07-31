@@ -62,23 +62,43 @@ how trials were allocated.
 
 ## Still open
 
-### 1. The devicePixelRatio seam (highest priority)
+### 1. The count convention, mostly closed
 
-`flattenCoalesced` in `src/input/pointer-lock.ts` divides every pointer delta by
-`devicePixelRatio`, so the whole chain downstream runs in units of `counts / DPR`.
-`src/input/dpi-sweep.ts` then derives DPI from those same samples while its comment claims they
-are true counts, so it actually derives `trueDPI / DPR`.
+**The division is gone.** `flattenCoalesced` no longer divides by `devicePixelRatio`. That code
+carried a comment claiming the division reconciled Chrome reporting device pixels with Firefox
+reporting CSS pixels, and dividing two streams that differ by a factor by that same factor cannot
+reconcile them: it makes one correct and leaves the other wrong by exactly the factor. Pointer lock
+now exposes the raw stream untouched.
 
-The guided path is self-consistent: the measured DPI and the movement stream carry the same factor,
-it cancels, and every trial in a session shares it, so **the optimiser's ranking and the located
-optimum are unaffected**. The typed path is not self-consistent, and on a 2x display the arena
-delivers half the nominal sensitivity. The absolute number and the per-game table can therefore be
-scaled by DPR on a HiDPI display.
+What remains is one honest unknown, k, the factor between a browser delta and a real mouse count. It
+does not cancel and it lands on the number a player types into their game, so it is pinned by three
+routes and never guessed:
 
-It is not fixed because the two ways to resolve it disagree about which unit is canonical, and
-settling it needs a measurement rather than a code change: one mouse of known CPI, a 1x and a 2x
-display, and a record of what `movementX` sums to per browser. Guessing risks turning a scaling
-error into a wrong-direction one.
+1. **Typed game and sensitivity.** Exact: true counts per 360 is `360 / (yaw * sens)`, so comparing
+   against what the arena counted measures k directly.
+2. **The integer lattice.** A characteristic-function estimator over the raw deltas. One-sided by
+   construction: it can prove scaling happened and can never prove it did not, because a stream
+   scaled by a fraction and re-rounded reads as a spacing of 1 in 100 percent of runs and no
+   statistic on the stream separates that from a genuine 1.
+3. **A plain-density display.** At a `devicePixelRatio` of exactly 1 there is nothing to scale by, so
+   a corroborating spacing of 1 is a deduction rather than an inference.
+
+The third route needed real interrogation before it shipped, and it found a hole worth recording.
+Desktop Safari holds `devicePixelRatio` flat through page zoom, so a zoomed Safari page can report 1
+while scaling. That is closed by a gate already present rather than by luck: Safari ships no
+`onpointerrawupdate`, so raw mode is never granted there and the lattice never runs, which means the
+deduction is only ever evaluated where zoom does register in DPR. Scaling upstream of the browser, a
+driver multiplier or an injected mouse in a VM, is not k at all, because it applies equally to the
+game the number is typed into.
+
+The route carries a log sd of 0.02 rather than zero, because the check that corroborates it treats
+anything within 2 percent of 1 as a unit lattice, and that band is exactly the width a scaling could
+hide in.
+
+**Still genuinely open:** a stream that is scaled and re-rounded on a HiDPI display, where all three
+routes decline. The tool withholds the typeable number there and says why. Settling it still needs
+hardware: one mouse of known CPI, a 1x and a 2x display, and a record of what `movementX` sums to per
+browser.
 
 ### 2. Intervals that are still narrower than the evidence
 
