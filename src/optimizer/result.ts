@@ -1,4 +1,4 @@
-import type { Counts360, GameId, Profile, Report, Result, TrialResult } from '../types';
+import type { Counts360, Dpi, GameId, Profile, Report, Result, TrialResult } from '../types';
 import { counts360 } from '../types';
 import { sensRatio } from '../convert/counts';
 import { tierTwoFrom, type KPin } from '../input/count-convention';
@@ -185,6 +185,12 @@ export interface BuildResultOpts {
   /** Phase 3's pin, straight off the draft (SessionDraft.kPin). Absent or unpinned costs tier
    *  two, never tier one. */
   k?: KPin;
+  /** The card sweep's measured counts per inch, passed ONLY when the sweep ran in the same run
+   *  as the trials (the caller gates; session-view uses the draft's turn record as the marker).
+   *  A record stamped onto the Result verbatim, never a divisor here: counts per 360 stays the
+   *  only unit this module computes in, and the centimetre arithmetic lives at the screen with
+   *  the k-cancellation argument beside it (src/anchor/plausibility.ts). */
+  dpi?: Dpi;
 }
 
 /**
@@ -226,6 +232,10 @@ export function buildResult(
     // Bounds honesty: the clamped-vertex disclosure, copied verbatim. Absent for interior peaks and
     // for old reports; never inferred from the optimum happening to sit on an edge.
     ...(report.peakAtBound !== undefined ? { peakAtBound: report.peakAtBound } : {}),
+    // The same-run card reading, stamped so the Result and its centimetres survive a reload as a
+    // pair. Spread conditionally under exactOptionalPropertyTypes: absent means the sweep did not
+    // measure this run, and the screen keeps its counts-only tier three.
+    ...(opts.dpi !== undefined ? { dpi: opts.dpi } : {}),
     // A5: the per-facet peaks + concordance tier. Seeded on the trial count (a decoupled stream)
     // so this readout is deterministic and never perturbs the scored sequence.
     facetConcordance: facetConcordance(trials, mulberry32(0xface ^ trials.length)),

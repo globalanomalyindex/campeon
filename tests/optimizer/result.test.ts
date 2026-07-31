@@ -88,6 +88,19 @@ describe('buildResult', () => {
     expect(l.peakAtBound).toBe('low');
   });
 
+  it('stamps the same-run card reading verbatim, so a reloaded Result keeps its own pair', () => {
+    // The value is a record, never an input: nothing else on the Result may move when it rides.
+    const bare = buildResult(report, trials);
+    const r = buildResult(report, trials, { dpi: 1620 });
+    expect(r.dpi).toBe(1620);
+    expect(r.optimalCounts).toBe(bare.optimalCounts);
+    expect(r.breakdown).toEqual(bare.breakdown);
+  });
+
+  it('omits dpi when no reading is passed: absence means the sweep did not measure this run', () => {
+    expect('dpi' in buildResult(report, trials)).toBe(false);
+  });
+
   it('omits peakAtBound when the Report has none (old persisted results degrade gracefully)', () => {
     // Absence must mean "no clamp was recorded", never be inferred from the optimum sitting on
     // an edge: an old saved Result cannot have the flag fabricated for it in either direction.

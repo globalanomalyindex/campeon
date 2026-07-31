@@ -317,6 +317,15 @@ export function sessionView(host: HTMLElement, ctx: AppContext, deps: SessionVie
           // Phase 3's pin, straight off the draft. Absent or unpinned costs tier two and never the
           // factor, because the factor is a ratio of two counts in the same browser units.
           ...(ctx.draft.kPin !== undefined ? { k: ctx.draft.kPin } : {}),
+          // The card reading, but only when the guided path ran THIS run. The turn record is the
+          // marker: setup writes it exactly when the guided commit does and every other route
+          // clears it, so its presence proves the sweep and these trials shared one browser and
+          // one count convention k, which is what the payoff's centimetre division cancels
+          // (src/anchor/plausibility.ts). Without the gate, the saved-prefs fast path would ship
+          // another visit's reading under this run's counts, and the screen would print a
+          // confident length the pair never earned. Pinned in tests/ui/session-view.test.ts
+          // 'a fast-path draft (dpi without a turn) never stamps the reading'.
+          ...(ctx.draft.turn !== undefined && ctx.draft.dpi !== undefined ? { dpi: ctx.draft.dpi } : {}),
         });
         ctx.storage.saveSession({ id: sessionId, profile: ctx.draft.profile, trials: [...allTrials], status: 'complete', createdAt: now });
         ctx.storage.saveResult(sessionId, result);

@@ -623,6 +623,24 @@ describe('session-view: finalize reconciles the anchor and prescribes', () => {
     expect(ctx.lastResult!.result.optimalCounts).toBe(REPORT.optimalCounts);
   });
 
+  it('stamps the card reading onto the Result when the guided run measured it alongside the turn', async () => {
+    // Same-run pairing: the turn record proves the sweep and these trials shared one browser and
+    // one count convention, which is what the payoff's centimetre division cancels.
+    const ctx = await lockIn(
+      { report: REPORT, trials: TRIALS, reaches: [], leadInDiscarded: 0 },
+      (c2) => { c2.draft.turn = turnFromPasses([8900, 9050, 9000])!; },
+    );
+    expect(ctx.lastResult!.result.dpi).toBe(800);
+  });
+
+  it('a fast-path draft (dpi without a turn) never stamps the reading', async () => {
+    // fakeContext writes dpi: 800 and no turn, the exact shape the saved-prefs fast path leaves:
+    // a reading restored from another visit, riding a draft whose run measured nothing. Stamping
+    // it would print a length whose count conventions never shared a browser.
+    const ctx = await lockIn({ report: REPORT, trials: TRIALS, reaches: [], leadInDiscarded: 0 });
+    expect('dpi' in ctx.lastResult!.result).toBe(false);
+  });
+
   it('accumulates reaches across segments, because refining runs a second observer', async () => {
     // "Keep refining" calls runSession again, with its own ReachObserver, so its outcome carries
     // only the reaches of the trials it ran. Overwriting would hand the estimator a fraction of the

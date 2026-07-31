@@ -251,6 +251,16 @@ export interface Result {
    *  OLD saved Results (which lack it) render as before; absence carries no claim either way and the
    *  flag is never inferred from the optimum happening to sit on an edge. */
   peakAtBound?: 'low' | 'high';
+  /** The card sweep's measured counts per inch, stamped ONLY when the sweep and this Result's
+   *  counts came out of the same run (session-view gates on the draft's turn record, pinned in
+   *  tests/ui/session-view.test.ts). That pairing is what makes the payoff's centimetres sound:
+   *  both numbers carry the same count convention k, so k cancels in the division
+   *  (src/anchor/plausibility.ts holds the algebra). It rides the Result rather than being read
+   *  off the draft at render time because a Result rehydrated from localStorage keeps its own
+   *  run's reading, where the draft by then holds another visit's, which would cancel nothing.
+   *  Optional: an older Result, a typed-fallback run and a skipped or refused sweep all lack it,
+   *  and the screen then keeps its counts-only tier rather than guessing. */
+  dpi?: Dpi;
 }
 
 // ── persistence (state/) ───────────────────────────────────────────────

@@ -13,7 +13,12 @@ import type { Counts360, Result } from '../types';
  * value has carried a measured interval in every export this tool has ever written. The
  * prescription is the same defect one tier up: its ratio is measured against the optimum the search
  * found, so on a hand-picked value it would report a multiply factor for a number nothing measured.
- * Pure: returns a new object, never mutates the input.
+ *
+ * The card reading (`dpi`) rides through on purpose, like the breakdown: it characterizes the
+ * browser the run was counted in, and the hand-picked counts were counted in that same browser
+ * within the same run, so the count convention still cancels and the payoff's centimetres stay a
+ * true length of the pick (pinned in tests/ui/result.test.ts). Pure: returns a new object, never
+ * mutates the input.
  */
 export function adoptResult(measured: Result, adoptedCounts: Counts360): Result {
   const {
