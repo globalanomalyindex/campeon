@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  initialSweepMachine, sweepTap, MIN_PASS_COUNTS, SLOW_PASSES, type SweepMachine,
+  initialSweepMachine, sweepTap, LEAD_START, MIN_PASS_COUNTS, SLOW_PASSES, type SweepMachine,
 } from '../../src/ui/calibrate/sweep-view';
 import { CARD_WIDTH_CM, dpiFromSweep } from '../../src/input/dpi-sweep';
 import { accelVerdict } from '../../src/input/accel-check';
@@ -17,6 +17,16 @@ function runPasses(m: SweepMachine, passCounts: number[], mode: 'raw' | 'os-adju
   }
   return s;
 }
+
+describe('sweep view: the opening line', () => {
+  it('keeps the wallet sentence close to verbatim: any card, and they are all the same size', () => {
+    // The line that makes the instrument feel free, restored with the card. Pinned as a string
+    // (the DOM shell is runtime-verified), the same route setup.ts pins cardCheckHtml by.
+    expect(LEAD_START).toContain('any card from your wallet');
+    expect(LEAD_START).toContain('bank card, gym card, hotel key');
+    expect(LEAD_START).toContain('exactly the same size');
+  });
+});
 
 describe('sweep machine: the pass loop', () => {
   it('starts idle with no passes and no reading', () => {

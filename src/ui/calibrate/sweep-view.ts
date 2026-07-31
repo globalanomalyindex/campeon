@@ -120,7 +120,10 @@ export function sweepTap(
 
 export interface SweepView { dispose(): void; }
 
-const LEAD_START = 'Lay any bank or loyalty card flat on your desk, next to your mouse. Click the box to begin.';
+// The wallet line, back close to verbatim from the first card era: it is the sentence that makes
+// the instrument feel free, and it is true (ISO/IEC 7810 ID-1 covers all three). Exported so the
+// sentence can be pinned without a pointer lock (the same reason setup exports cardCheckHtml).
+export const LEAD_START = 'Grab any card from your wallet: bank card, gym card, hotel key. They are all exactly the same size. Lay it flat next to your mouse, then click the box to begin.';
 // Esc unlocks and drops the live pass, so the honest promise is "stop and start the pass over", not
 // "stop". Held in one place because it is re-set on every unlock, mid-pass ones included.
 const SUB_START = 'Locking the pointer hides the cursor so the raw motion can be read. Press Esc to stop, and the pass starts over when you click back in.';
