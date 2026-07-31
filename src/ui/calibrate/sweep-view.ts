@@ -121,6 +121,9 @@ export function sweepTap(
 export interface SweepView { dispose(): void; }
 
 const LEAD_START = 'Lay any bank or loyalty card flat on your desk, next to your mouse. Click the box to begin.';
+// Esc unlocks and drops the live pass, so the honest promise is "stop and start the pass over", not
+// "stop". Held in one place because it is re-set on every unlock, mid-pass ones included.
+const SUB_START = 'Locking the pointer hides the cursor so the raw motion can be read. Press Esc to stop, and the pass starts over when you click back in.';
 const PACE_SCALE = 6;   // counts per ms that fills the pace bar
 const SLOW_MAX = 2.2;   // counts per ms at or below = a good slow pace
 const FAST_MIN = 3.5;   // counts per ms at or above = a good quick pace
@@ -146,7 +149,7 @@ export function createSweepView(
         <span class="cal-step" data-sweep="pass">Slow pass 1</span>
         <h1 class="display">The card</h1>
         <p class="gate__lead" data-sweep="lead" aria-live="polite" aria-atomic="true">${LEAD_START}</p>
-        <p class="cal-sub" data-sweep="sub">Locking the pointer hides the cursor so the raw motion can be read. Press Esc to stop, and the pass starts over when you click back in.</p>
+        <p class="cal-sub" data-sweep="sub">${SUB_START}</p>
         <div class="calibrate__stage" data-surface="chamber">
           <canvas class="calibrate__trace" data-sweep="trace" hidden></canvas>
           <div class="cal-dir" data-sweep="dir">
@@ -190,6 +193,10 @@ export function createSweepView(
     traceRaf = null;
     if (!(pointer.isLocked() && recordingNow())) return;
     painter.paint(trace.geometry(performance.now(), traceMode));
+    // The pace meter rides the frame rather than the sample. Samples arrive at up to 1000 Hz and
+    // the meter is a thing the eye reads, so updating it per sample bought nothing and spent three
+    // DOM writes on every delta of a stream this instrument is trying to measure cleanly.
+    paintPace();
     traceRaf = requestAnimationFrame(traceFrame);
   }
 
@@ -211,7 +218,6 @@ export function createSweepView(
     if (lastT > 0) { const dt = s.t - lastT; if (dt > 0) pace = pace * 0.8 + (Math.abs(s.dx) / dt) * 0.2; }
     lastT = s.t;
     trace.add(s.t, Math.abs(s.dx));
-    updatePace();
   });
 
   function startPass(): void {
@@ -242,19 +248,24 @@ export function createSweepView(
     updateUi();
   });
 
-  function updatePace(): void {
+  // Held rather than looked up: these three are written on every animation frame of a live pass.
+  const paceWrap = $('pacewrap');
+  const paceFill = $('pace');
+  const paceLabel = $('pacelabel');
+
+  function paintPace(): void {
     const live = pointer.isLocked() && recordingNow();
-    ($('pacewrap') as HTMLElement).hidden = !live;
-    if (!live) { $('pacelabel').textContent = ''; return; }
-    const fill = $('pace');
+    paceWrap.hidden = !live;
+    if (!live) { paceLabel.textContent = ''; return; }
     // scaleX, never width: a width transition is a layout animation, and the system animates
     // transform, opacity and filter only.
-    fill.style.transform = `scaleX(${Math.min(1, pace / PACE_SCALE)})`;
+    paceFill.style.transform = `scaleX(${Math.min(1, pace / PACE_SCALE)})`;
     const ok = quickPass() ? pace >= FAST_MIN : pace <= SLOW_MAX;
-    fill.dataset['ok'] = ok ? 'true' : 'false';
-    $('pacelabel').textContent = quickPass()
+    paceFill.dataset['ok'] = ok ? 'true' : 'false';
+    const label = quickPass()
       ? (ok ? 'Good, nice and quick' : 'A little faster')
       : (ok ? 'Good, slow and steady' : 'Ease off, a little slower');
+    if (paceLabel.textContent !== label) paceLabel.textContent = label;
   }
 
   function updateUi(): void {
@@ -264,7 +275,14 @@ export function createSweepView(
     $('dir').style.display = 'flex';
     $('pass').textContent = quickPass() ? 'Quick pass' : `Slow pass ${Math.min(SLOW_PASSES, m.passes.length + 1)}`;
     syncTrace();
-    if (!locked) { $('lead').textContent = LEAD_START; return; }
+    if (!locked) {
+      // Includes the Esc mid-pass case, so the sub goes back to explaining the lock rather than
+      // leaving the abandoned pass's instruction under a lead that says to click the box.
+      $('lead').textContent = LEAD_START;
+      $('sub').textContent = SUB_START;
+      paintPace();
+      return;
+    }
     switch (m.phase) {
       case 'idle-slow':
         $('lead').textContent = m.passes.length === 0
@@ -290,7 +308,7 @@ export function createSweepView(
       case 'blocked':
         break; // terminal: the view is being torn down by the orchestrator
     }
-    updatePace();
+    paintPace();
   }
 
   // A denied lock says so in the live region and points at the typed route, rather than leaving the
